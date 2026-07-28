@@ -1,4 +1,4 @@
-# REDCELL 部署指南
+# Vero 部署指南
 
 **版本**: 1.0.0  
 **更新日期**: 2026-07-28
@@ -99,10 +99,10 @@ mkdir -p data wordlists audit
 ### 2. 启动服务
 
 ```bash
-# 启动所有服务 (REDCELL + Metasploit + PostgreSQL)
+# 启动所有服务 (Vero + Metasploit + PostgreSQL)
 docker-compose up -d
 
-# 只启动 REDCELL
+# 只启动 Vero
 docker-compose up -d redcell
 
 # 查看日志
@@ -115,7 +115,7 @@ docker-compose ps
 ### 3. 验证部署
 
 ```bash
-# 检查 REDCELL
+# 检查 Vero
 curl http://localhost:8000/
 
 # 检查 Metasploit RPC
@@ -221,7 +221,7 @@ spec:
 
 ### 6. 扩缩容
 
-⚠️ **注意**: REDCELL 使用 SQLite，不支持多实例。
+⚠️ **注意**: Vero 使用 SQLite，不支持多实例。
 
 ```bash
 # 查看当前副本数
@@ -260,8 +260,8 @@ kubectl rollout history deployment/redcell -n redcell
 
 ```bash
 # 推荐配置
-REDCELL_DB=/app/data/redcell.db
-REDCELL_PORT=8000
+Vero_DB=/app/data/redcell.db
+Vero_PORT=8000
 ANTHROPIC_API_KEY=sk-ant-...
 DEEPSEEK_API_KEY=sk-...
 
@@ -602,7 +602,7 @@ chown -R 1000:1000 ./data
 netstat -tulpn | grep 8000
 
 # 验证环境变量
-docker exec redcell env | grep REDCELL
+docker exec redcell env | grep Vero
 ```
 
 ### 2. 无法访问服务
@@ -739,4 +739,4 @@ your-registry.io/redcell:sha-abc123   # Git commit SHA
 ---
 
 **最后更新**: 2026-07-28  
-**维护者**: REDCELL Team
+**维护者**: Vero Team

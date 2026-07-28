@@ -1,4 +1,4 @@
-# REDCELL 红队渗透测试智能体 - 项目总结
+# Vero 红队渗透测试智能体 - 项目总结
 
 **项目状态**: ✅ **开发完成，生产就绪**  
 **完成日期**: 2026-07-28  
@@ -502,7 +502,7 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 
 ## 📝 项目签署
 
-**项目名称**: REDCELL 红队渗透测试智能体  
+**项目名称**: Vero 红队渗透测试智能体  
 **版本号**: v1.0.0  
 **开发者**: Claude (Opus 4.8)  
 **完成日期**: 2026-07-28  
