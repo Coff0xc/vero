@@ -52,7 +52,7 @@ func VerifyAll(reg *tools.Registry) []ToolStatus {
 // verifyTool —— 验证单个工具（使用安全参数）
 func verifyTool(tool *tools.Tool) tools.ToolResult {
 	// 根据工具名称使用安全的测试参数
-	args := getSafeTestArgs(tool.Name)
+	args := GetSafeTestArgs(tool.Name)
 
 	// 设置超时保护
 	done := make(chan tools.ToolResult, 1)
@@ -72,8 +72,8 @@ func verifyTool(tool *tools.Tool) tools.ToolResult {
 	}
 }
 
-// getSafeTestArgs —— 为每个工具提供安全的测试参数
-func getSafeTestArgs(toolName string) map[string]any {
+// getSafeTestArgs —— 为每个工具提供安全的测试参数（导出供 CLI 使用）
+func GetSafeTestArgs(toolName string) map[string]any {
 	switch {
 	case strings.Contains(toolName, "http") || strings.Contains(toolName, "web"):
 		return map[string]any{"target": "http://127.0.0.1:1"}
