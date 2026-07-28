@@ -63,6 +63,15 @@ func (s *Server) Router() http.Handler {
 	r.Get("/api/campaigns/{id}/report.md", s.handleReportMarkdown)
 	r.Get("/api/campaigns/{id}/report.html", s.handleReportHTML)
 
+	// 工具管理 API
+	r.Get("/api/tools", s.handleToolList)
+	r.Post("/api/tools/verify", s.handleToolVerify)
+
+	// 工作流模板 API
+	r.Get("/api/workflows", s.handleWorkflowList)
+	r.Get("/api/workflows/{id}", s.handleWorkflowGet)
+	r.Post("/api/workflows/{id}/execute", s.handleWorkflowExecute)
+
 	r.Handle("/*", s.handleStatic())
 	return r
 }

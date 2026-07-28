@@ -52,7 +52,15 @@ func main() {
 	containerEscape := flag.String("container-escape", "", "Docker 容器逃逸检测 (需在容器内运行), 例: -container-escape check")
 	k8sSA := flag.String("k8s-sa", "", "Kubernetes ServiceAccount 提取 (需在 pod 内运行), 例: -k8s-sa enum")
 
+	// 工具验证
+	toolTest := flag.Bool("tooltest", false, "验证所有工具集成状态")
+
 	flag.Parse()
+
+	if *toolTest {
+		runToolTest()
+		return
+	}
 
 	if *exploitT != "" {
 		runExploit(*exploitT)
