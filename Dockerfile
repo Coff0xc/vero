@@ -1,66 +1,78 @@
-# 多阶段构建 - 最小化镜像大小
 FROM golang:1.26-alpine AS builder
 
-# 安装构建依赖
-RUN apk add --no-cache git ca-certificates tzdata
+WORKDIR /app
 
-WORKDIR /build
+# Install build dependencies
+RUN apk add --no-cache git make nodejs npm
 
-# 复制依赖文件
+# Copy go module files
 COPY go.mod go.sum ./
 RUN go mod download
 
-# 复制源码
+# Copy source code
 COPY . .
 
-# 构建二进制
-RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build \
-    -ldflags="-w -s" \
-    -o vero \
-    ./cmd/vero
+# Build frontend
+WORKDIR /app/web
+RUN npm install && npm run build
 
-# 最终镜像 - 基于 Alpine
-FROM alpine:3.19
+# Build backend
+WORKDIR /app
+RUN go build -o vero ./cmd/vero
 
-# 安装运行时依赖
+# Final stage with security tools
+FROM alpine:latest
+
+# Install security tools and dependencies
 RUN apk add --no-cache \
-    ca-certificates \
     curl \
     nmap \
     nmap-scripts \
+    python3 \
+    py3-pip \
+    git \
+    bash \
+    ca-certificates \
+    wget \
+    unzip \
     && rm -rf /var/cache/apk/*
 
-# 创建非 root 用户
-RUN addgroup -g 1000 vero && \
-    adduser -D -u 1000 -G vero vero
+# Install nuclei
+RUN wget -qO nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.3.9/nuclei_3.3.9_linux_amd64.zip \
+    && unzip nuclei.zip \
+    && mv nuclei /usr/local/bin/ \
+    && rm nuclei.zip \
+    && nuclei -update-templates
 
-# 工作目录
-WORKDIR /app
+# Install ffuf
+RUN wget -qO ffuf.tar.gz https://github.com/ffuf/ffuf/releases/download/v2.1.0/ffuf_2.1.0_linux_amd64.tar.gz \
+    && tar xzf ffuf.tar.gz \
+    && mv ffuf /usr/local/bin/ \
+    && rm ffuf.tar.gz
 
-# 从构建阶段复制二进制
-COPY --from=builder /build/vero /usr/local/bin/vero
-COPY --from=builder /usr/share/zoneinfo /usr/share/zoneinfo
+# Install NetExec (nxc)
+RUN pip3 install --break-system-packages pipx \
+    && export PATH=$PATH:/root/.local/bin \
+    && pipx install git+https://github.com/Pennyw0rth/NetExec
 
-# 复制配置文件
-COPY --chown=vero:vero wordlists/ /app/wordlists/
+# Install impacket (for secretsdump, etc.)
+RUN pip3 install --break-system-packages impacket
 
-# 数据卷
-VOLUME ["/app/data"]
+# Install AWS CLI
+RUN pip3 install --break-system-packages awscli
 
-# 切换到非 root 用户
-USER vero
+# Install Azure CLI
+RUN pip3 install --break-system-packages azure-cli
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD curl -f http://localhost:8000/ || exit 1
+# Copy binary from builder
+COPY --from=builder /app/vero /usr/local/bin/vero
 
-# 默认端口
+# Create working directory
+WORKDIR /workspace
+
+# Expose port
 EXPOSE 8000
 
-# 环境变量
-ENV REDCELL_DB=/app/data/vero.db \
-    REDCELL_PORT=8000
-
-# 启动命令
+# Run
 ENTRYPOINT ["vero"]
-CMD ["-port", "8000", "-db", "/app/data/vero.db"]
+CMD []

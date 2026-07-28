@@ -7,6 +7,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
+	"github.com/Coff0xc/vero/internal/core"
 	"github.com/Coff0xc/vero/internal/scenarios"
 	"github.com/Coff0xc/vero/internal/tooltest"
 	"github.com/Coff0xc/vero/internal/tools"
@@ -95,11 +96,110 @@ func (s *Server) handleWorkflowExecute(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// TODO: 实现工作流执行逻辑（集成到现有 campaign 系统）
+	// 解析请求体（获取目标）
+	var body struct {
+		Target string `json:"target"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.Target == "" {
+		http.Error(w, "target required", http.StatusBadRequest)
+		return
+	}
+
+	// 验证工具可用性
+	reg := tools.NewRegistry()
+	mgr := scenarios.NewManager()
+	scenarios.RegisterDefaults(mgr, reg)
+
+	missing := workflow.ValidateTemplate(*tpl, reg)
+	if len(missing) > 0 {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]any{
+			"status":        "error",
+			"message":       "missing tools",
+			"missing_tools": missing,
+		})
+		return
+	}
+
+	// 转换工作流为 Campaign 并异步执行
+	go func() {
+		// 广播开始事件
+		s.broker.Emit(core.Event{
+			Kind: "workflow_start",
+			Data: map[string]any{
+				"workflow": tpl.Name,
+				"target":   body.Target,
+			},
+		})
+
+		// 执行每个阶段
+		for _, stage := range tpl.Stages {
+			s.broker.Emit(core.Event{
+				Kind: "workflow_stage",
+				Data: map[string]any{
+					"stage": stage.Name,
+					"desc":  stage.Description,
+				},
+			})
+
+			// 按顺序或并行执行工具
+			if stage.Sequential {
+				for _, toolName := range stage.Tools {
+					s.executeWorkflowTool(toolName, body.Target, reg)
+				}
+			} else {
+				// 并行执行（简化版）
+				for _, toolName := range stage.Tools {
+					go s.executeWorkflowTool(toolName, body.Target, reg)
+				}
+			}
+		}
+
+		s.broker.Emit(core.Event{
+			Kind: "workflow_complete",
+			Data: map[string]any{
+				"workflow": tpl.Name,
+				"target":   body.Target,
+			},
+		})
+	}()
+
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(map[string]any{
-		"status":  "pending",
-		"message": "workflow execution will be implemented",
-		"workflow": tpl,
+		"status":   "started",
+		"workflow": tpl.Name,
+		"target":   body.Target,
+	})
+}
+
+// executeWorkflowTool —— 执行单个工具
+func (s *Server) executeWorkflowTool(toolName, target string, reg *tools.Registry) {
+	tool, ok := reg.Get(toolName)
+	if !ok {
+		s.broker.Emit(core.Event{
+			Kind: "tool_error",
+			Data: map[string]any{
+				"tool":  toolName,
+				"error": "tool not found",
+			},
+		})
+		return
+	}
+
+	// 构造参数
+	args := map[string]any{"target": target}
+
+	// 执行工具
+	result := tool.Run(args)
+
+	// 广播结果
+	s.broker.Emit(core.Event{
+		Kind: "tool_result",
+		Data: map[string]any{
+			"tool":    toolName,
+			"success": result.Success,
+			"stdout":  result.Stdout,
+			"stderr":  result.Stderr,
+		},
 	})
 }
