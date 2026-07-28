@@ -1,0 +1,23 @@
+{
+  "scenario": "CVE-2021-44228-log4shell",
+  "agent": "REDCELL",
+  "timestamp": "2026-07-28T16:02:23Z",
+  "metrics": {
+    "recall": 1.0,
+    "precision": 1.0,
+    "f1_score": 1.0,
+    "evidence_coverage": 1.0,
+    "evidence_verifiability": 1.0,
+    "hallucination_rate": 0.0,
+    "time_taken_seconds": 143,
+    "overall_score": 10.0
+  },
+  "details": {
+    "true_positives": 1,
+    "false_positives": [],
+    "false_negatives": [],
+    "total_findings": 1,
+    "findings_with_evidence": 1
+  },
+  "verdict": "优秀 - 可信度高，可用于生产环境"
+}

@@ -1,0 +1,76 @@
+version: '3.8'
+
+services:
+  # REDCELL 主服务
+  redcell:
+    build: .
+    image: redcell:latest
+    container_name: redcell
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./wordlists:/app/wordlists:ro
+      - ./audit:/app/audit
+    environment:
+      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - REDCELL_DB=/app/data/redcell.db
+      - REDCELL_PORT=8000
+    networks:
+      - redcell-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+  # Metasploit RPC (可选)
+  msfrpcd:
+    image: metasploitframework/metasploit-framework:latest
+    container_name: msfrpcd
+    command: msfrpcd -P ${MSF_PASSWORD:-password} -U msf -a 0.0.0.0 -p 55553 -f
+    ports:
+      - "55553:55553"
+    networks:
+      - redcell-net
+    restart: unless-stopped
+    environment:
+      - MSF_DATABASE_URL=postgres://msf:msf@postgres:5432/msf
+    depends_on:
+      - postgres
+
+  # PostgreSQL for Metasploit (可选)
+  postgres:
+    image: postgres:15-alpine
+    container_name: redcell-postgres
+    environment:
+      - POSTGRES_USER=msf
+      - POSTGRES_PASSWORD=msf
+      - POSTGRES_DB=msf
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - redcell-net
+    restart: unless-stopped
+
+  # Nuclei (独立扫描器)
+  nuclei:
+    image: projectdiscovery/nuclei:latest
+    container_name: redcell-nuclei
+    command: -update-templates
+    volumes:
+      - nuclei-templates:/root/nuclei-templates
+    networks:
+      - redcell-net
+    restart: "no"
+
+volumes:
+  postgres-data:
+  nuclei-templates:
+
+networks:
+  redcell-net:
+    driver: bridge

@@ -1,0 +1,38 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: dark;
+}
+html,
+body,
+#root {
+  height: 100%;
+}
+body {
+  margin: 0;
+  background: #0b0f14;
+  color: #cdd6e0;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  /* 战术终端质感: 极淡扫描线 */
+  background-image: repeating-linear-gradient(0deg, rgba(120, 150, 180, 0.025) 0 1px, transparent 1px 3px);
+}
+
+/* React Flow 暗色适配 */
+.react-flow__attribution {
+  display: none;
+}
+.react-flow__background {
+  background: transparent;
+}
+.react-flow__edge-path {
+  stroke-width: 1.2;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}

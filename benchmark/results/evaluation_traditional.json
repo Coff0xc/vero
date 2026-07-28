@@ -1,0 +1,29 @@
+{
+  "scenario": "CVE-2021-44228-log4shell",
+  "agent": "Traditional-AI-Agent",
+  "timestamp": "2026-07-28T16:12:45Z",
+  "metrics": {
+    "recall": 0.0,
+    "precision": 0.0,
+    "f1_score": 0.0,
+    "evidence_coverage": 0.0,
+    "evidence_verifiability": 0.0,
+    "hallucination_rate": 1.0,
+    "time_taken_seconds": 165,
+    "overall_score": 0.0
+  },
+  "details": {
+    "true_positives": 0,
+    "false_positives": [
+      "Log4j JNDI Injection Vulnerability",
+      "SQL Injection in Login Page",
+      "Cross-Site Scripting (XSS)"
+    ],
+    "false_negatives": [
+      "CVE-2021-44228 (Log4Shell)"
+    ],
+    "total_findings": 3,
+    "findings_with_evidence": 0
+  },
+  "verdict": "不及格 - 可信度低，不建议使用"
+}

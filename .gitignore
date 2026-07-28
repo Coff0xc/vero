@@ -1,0 +1,21 @@
+# 二进制
+/redcell
+/redcell.exe
+
+# 运行时数据
+*.db
+*.db-journal
+audit.jsonl
+rollback.jsonl
+*.log
+
+# 前端依赖与产物
+web/node_modules/
+web/dist/
+
+# embed 目标(由 npm run build 生成; 保留占位让 go build 可用)
+internal/webui/dist/*
+!internal/webui/dist/.gitkeep
+
+# 杂项
+.DS_Store

