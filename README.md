@@ -1,4 +1,4 @@
-# REDCELL
+# Vero
 
 > **Evidence-Driven Autonomous Red Team Agent**  
 > The first AI penetration testing tool you can actually trust.
@@ -9,7 +9,7 @@
 
 ---
 
-## 🎯 Why REDCELL?
+## 🎯 Why Vero?
 
 **Every AI red team tool has the same problem: you can't trust the results.**
 
@@ -18,7 +18,7 @@
 - False positives everywhere
 - Can't verify what actually happened
 
-**REDCELL solves this with Evidence-Driven Architecture.**
+**Vero solves this with Evidence-Driven Architecture.**
 
 ---
 
@@ -28,15 +28,15 @@ We built the first benchmark to measure AI agent **trustworthiness**, not just c
 
 **Results on CVE-2021-44228 (Log4Shell):**
 
-| Metric | REDCELL | Traditional AI Agent |
-|--------|---------|---------------------|
+| Metric | Vero | Traditional AI Agent |
+|--------|------|---------------------|
 | Recall | **100%** | 0% |
 | Precision | **100%** | 0% |
 | Evidence Coverage | **100%** | 0% |
 | Hallucination Rate | **0%** | 100% |
 | Overall Score | **10.0/10** | 0.0/10 |
 
-**Verdict**: REDCELL is production-ready. Traditional methods are not.
+**Verdict**: Vero is production-ready. Traditional methods are not.
 
 📊 [Full Benchmark Report →](benchmark/BENCHMARK_REPORT.md)
 
@@ -123,7 +123,7 @@ go build -o redcell ./cmd/redcell
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
-export REDCELL_MODEL=claude-opus-4-8
+export VERO_MODEL=claude-opus-4-8
 ./redcell
 ```
 
@@ -178,7 +178,7 @@ We created the **first trustworthiness benchmark** for AI red team agents.
 
 ## 🛡️ Security & Ethics
 
-**REDCELL is for authorized penetration testing only.**
+**Vero is for authorized penetration testing only.**
 
 - ⚠️ Requires authorization before use
 - ✅ HITL gates prevent accidental damage
@@ -232,7 +232,7 @@ MIT License - see [LICENSE](LICENSE)
 
 **AI in security is here, but trust is missing.**
 
-REDCELL proves that:
+Vero proves that:
 - ✅ AI agents CAN be trusted (with right architecture)
 - ✅ Evidence-driven design works (100% vs 0%)
 - ✅ Type systems can constrain LLM hallucinations
