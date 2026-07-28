@@ -52,7 +52,7 @@ func Generate(target string, g *core.AttackGraph, campaignID string, duration in
 		Meta: ReportMeta{
 			Target:      target,
 			GeneratedAt: time.Now(),
-			Engine:      "REDCELL v1.0",
+			Engine:      "Vero v1.0",
 			CampaignID:  campaignID,
 			Duration:    duration,
 		},
@@ -70,6 +70,8 @@ func Generate(target string, g *core.AttackGraph, campaignID string, duration in
 		Findings:      buildFindings(findings),
 		AttackGraph:   g,
 		Remediation:   buildRecommendations(findings),
+		Timeline:      GenerateTimeline(g),
+		AttackPath:    GenerateAttackPath(g),
 	}
 
 	return rep

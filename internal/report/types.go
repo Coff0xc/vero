@@ -9,12 +9,14 @@ import (
 
 // Report —— 完整渗透测试报告（可序列化为 JSON/PDF/HTML）。
 type Report struct {
-	Meta          ReportMeta       `json:"meta"`
-	Executive     ExecutiveSummary `json:"executive"`
-	AttackSurface []Service        `json:"attack_surface"`
-	Findings      []Finding        `json:"findings"`
-	AttackGraph   *core.AttackGraph `json:"attack_graph,omitempty"`
-	Remediation   []Recommendation `json:"remediation"`
+	Meta          ReportMeta          `json:"meta"`
+	Executive     ExecutiveSummary    `json:"executive"`
+	AttackSurface []Service           `json:"attack_surface"`
+	Findings      []Finding           `json:"findings"`
+	AttackGraph   *core.AttackGraph   `json:"attack_graph,omitempty"`
+	Remediation   []Recommendation    `json:"remediation"`
+	Timeline      *Timeline           `json:"timeline"`       // 攻击时间线
+	AttackPath    *AttackPath         `json:"attack_path"`    // 攻击路径图
 }
 
 // ReportMeta —— 报告元数据。
