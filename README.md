@@ -1,102 +1,74 @@
 # Vero
 
-> **Evidence-Driven Autonomous Red Team Agent**  
-> The first AI penetration testing tool you can actually trust.
+**Evidence-Driven Autonomous Red Team Agent**
+
+An AI-powered penetration testing agent that requires proof for every finding.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Go Version](https://img.shields.io/badge/Go-1.26+-00ADD8?logo=go)](https://golang.org)
-[![Benchmark](https://img.shields.io/badge/Benchmark-100%25%20vs%200%25-success)](benchmark/)
 
 ---
 
-## 🎯 Why Vero?
+## Features
 
-**Every AI red team tool has the same problem: you can't trust the results.**
+### Evidence-Driven Architecture
 
-- LLM hallucinates vulnerabilities that don't exist
-- No evidence to back up findings
-- False positives everywhere
-- Can't verify what actually happened
-
-**Vero solves this with Evidence-Driven Architecture.**
-
----
-
-## 🔬 The Proof
-
-We built the first benchmark to measure AI agent **trustworthiness**, not just capability.
-
-**Results on CVE-2021-44228 (Log4Shell):**
-
-| Metric | Vero | Traditional AI Agent |
-|--------|------|---------------------|
-| Recall | **100%** | 0% |
-| Precision | **100%** | 0% |
-| Evidence Coverage | **100%** | 0% |
-| Hallucination Rate | **0%** | 100% |
-| Overall Score | **10.0/10** | 0.0/10 |
-
-**Verdict**: Vero is production-ready. Traditional methods are not.
-
-📊 [Full Benchmark Report →](benchmark/BENCHMARK_REPORT.md)
-
----
-
-## ✨ Core Features
-
-### 1. Evidence-Driven Architecture
-
-**Every finding must have proof.**
+Every finding must have tool output as evidence. The type system enforces this constraint:
 
 ```go
-// Type system enforces evidence
+type Finding struct {
+    Title    string
+    Severity string
+    Evidence Evidence  // Required, not optional
+}
+
 func (g *AttackGraph) Confirm(id string, ev Evidence) error {
-    if ev.Excerpt == "" {
-        return errors.New("no evidence, rejected")
+    if ev == (Evidence{}) {
+        return fmt.Errorf("evidence required")
     }
-    // Only confirmed with tool output evidence
+    // ...
 }
 ```
 
-- ✅ No evidence = stays as hypothesis
-- ✅ Evidence verified character-by-character
-- ✅ 0% hallucination rate
+No evidence = no confirmation.
 
-### 2. Human-in-the-Loop Safety Gates
+### Human-in-the-Loop Safety
 
-**Dangerous actions require approval.**
+Actions are classified by danger level (L0-L4). High-risk operations require approval:
 
-```
-L0 Reconnaissance → Auto-run
-L1 Active Scan   → Auto-run + log
-L2 Credentials   → Audit
-L3 Exploitation  → HITL required ⚠️
-L4 Destructive   → HITL + rollback
-```
+- **L0-L2**: Auto-execute (scans, enumeration)
+- **L3-L4**: Require approval (exploitation, lateral movement)
 
-### 3. Attack Graph with Proof
+### Attack Graph
 
-**Visual attack chain with evidence links.**
+Discoveries are stored as nodes with evidence chains. You can trace how each finding was discovered.
 
-```
-host:target.com → service:http:443 → vuln:CVE-2021-44228
-                       ↓
-            Evidence: [nuclei output]
-                    [curl response]
-```
+### 32 Built-in Tools
 
-### 4. Professional Reports
+- **Network**: nmap, masscan, rustscan
+- **Web**: nuclei, ffuf, sqlmap, nikto
+- **Exploit**: metasploit, searchsploit
+- **Cloud**: aws-cli, az-cli, gcloud
+- **Container**: docker, kubectl, trivy
+- **AD**: bloodhound, crackmapexec, mimikatz
 
-- **Markdown**: For documentation
-- **HTML**: Beautiful visual reports
-- **JSON**: API integration
-- **CVSS v3.1 scoring**: Automatic risk calculation
+### 7 Scenario Packs
+
+Pre-configured tool combinations for common engagements:
+
+- Web Application Testing
+- Active Directory
+- Cloud (AWS/Azure/GCP)
+- Container/Kubernetes
+- Post-Exploitation
+- External Reconnaissance
+- Internal Network
 
 ---
 
-## 🚀 Quick Start
+## Quick Start
 
-### Prerequisites
+### Requirements
 
 - Go 1.26+
 - (Optional) Real tools: nmap, nuclei, curl
@@ -104,41 +76,32 @@ host:target.com → service:http:443 → vuln:CVE-2021-44228
 ### Build
 
 ```bash
-go build -o redcell ./cmd/redcell
+go build -o vero ./cmd/vero
 ```
 
 ### Run
 
 ```bash
 # Start web UI
-./redcell
+./vero
 # Open http://localhost:8000
 
 # CLI mode
-./redcell -selfcheck  # Offline test (no API key needed)
-./redcell -nmap target.com  # Real scan
+./vero -selfcheck  # Offline test (no API key needed)
+./vero -nmap target.com  # Real scan
 ```
 
-### With Claude
+### With Claude API
 
 ```bash
 export ANTHROPIC_API_KEY=sk-ant-...
 export VERO_MODEL=claude-opus-4-8
-./redcell
+./vero
 ```
 
 ---
 
-## 📚 Documentation
-
-- **[User Manual](USER_MANUAL.md)** - Complete guide (60 pages)
-- **[Deployment Guide](DEPLOYMENT.md)** - Docker/K8s setup (50 pages)
-- **[Benchmark](benchmark/)** - Scientific evaluation
-- **[Project Summary](PROJECT_SUMMARY.md)** - Technical details
-
----
-
-## 🧪 Architecture
+## Architecture
 
 ```
 Tools (32 built-in)
@@ -147,36 +110,44 @@ Core (Evidence Graph + Verify + HITL)
   ↓
 Scenarios (7 packs: Web/AD/Cloud/Container)
   ↓
-Planner (BFS + Dynamic Replanning)
-  ↓
-Server (Web UI + SSE + SQLite)
+Reports (Markdown/HTML/JSON)
 ```
 
-**Key Innovation**: Evidence constraint at data structure layer, not prompt layer.
+**Core Loop**:
+1. LLM proposes action
+2. System checks danger level
+3. Tool executes (if approved)
+4. Evidence captured
+5. Graph updated
+6. Repeat
 
 ---
 
-## 🎓 Benchmark
+## Documentation
 
-We created the **first trustworthiness benchmark** for AI red team agents.
-
-**Test Scenarios**:
-- ✅ CVE-2021-44228 (Log4Shell)
-- 🔜 CVE-2017-5638 (Struts2)
-- 🔜 CVE-2014-0160 (Heartbleed)
-- 🔜 17 more coming...
-
-**Evaluation Metrics**:
-- Traditional: Recall, Precision
-- **New**: Evidence Coverage, Hallucination Rate, Verifiability
-
-**Goal**: Prove AI agents can be trusted in security domain.
-
-📊 [Run the benchmark →](benchmark/README.md)
+- **[User Manual](USER_MANUAL.md)** - Complete guide (60 pages)
+- **[Deployment Guide](DEPLOYMENT.md)** - Docker/K8s setup (50 pages)
+- **[Project Summary](PROJECT_SUMMARY.md)** - Technical details
 
 ---
 
-## 🛡️ Security & Ethics
+## Development
+
+```bash
+# Run tests
+make test
+
+# Development mode (hot reload)
+make dev-server  # Backend on :8000
+make dev-web     # Frontend on :5173
+
+# Build production binary
+make build
+```
+
+---
+
+## Security & Ethics
 
 **Vero is for authorized penetration testing only.**
 
@@ -189,57 +160,16 @@ We created the **first trustworthiness benchmark** for AI red team agents.
 
 ---
 
-## 🤝 Contributing
+## License
 
-We welcome contributions!
-
-**Areas we need help**:
-- More benchmark scenarios
-- Tool integrations
-- Bug reports
-- Documentation
-
-See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+MIT License - See [LICENSE](LICENSE)
 
 ---
 
-## 📄 License
+## Contributing
 
-MIT License - see [LICENSE](LICENSE)
+Contributions welcome. Open an issue or PR.
 
 ---
-
-## 🙏 Credits
 
 **Author**: coff0xc
-
-**Built with**:
-- Go + React + SQLite
-- Claude Opus for research
-- Standing on shoulders of giants: nmap, nuclei, Metasploit
-
----
-
-## 📞 Contact
-
-- **GitHub Issues**: Bug reports and feature requests
-- **Discussions**: Questions and ideas
-- **Email**: [redacted for privacy]
-
----
-
-## 🌟 Why This Matters
-
-**AI in security is here, but trust is missing.**
-
-Vero proves that:
-- ✅ AI agents CAN be trusted (with right architecture)
-- ✅ Evidence-driven design works (100% vs 0%)
-- ✅ Type systems can constrain LLM hallucinations
-
-**This is not "another red team tool."**  
-**This is scientific proof that trustworthy AI agents are possible.**
-
----
-
-**⭐ Star this repo if you believe AI security tools should be trustworthy!**
