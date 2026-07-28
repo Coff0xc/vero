@@ -50,7 +50,7 @@ benchmark/
 │   └── report_generator.py                # 报告生成
 │
 └── results/
-    ├── redcell_baseline.json              # REDCELL 结果
+    ├── redcell_baseline.json              # Vero 结果
     ├── cyberstrike_comparison.json        # 竞品对比
     └── analysis.md                        # 分析报告
 ```
@@ -83,7 +83,7 @@ benchmark/
   Coverage = 有证据的发现数 / 总发现数
   
   传统 AI Agent: ~30%（大部分靠 LLM 推理）
-  REDCELL 目标: >95%（强制证据）
+  Vero 目标: >95%（强制证据）
   ```
 
 - **Evidence Verifiability（证据可验证率）**：
@@ -91,7 +91,7 @@ benchmark/
   Verifiability = 证据能逐字回查的数量 / 声称有证据的数量
   
   传统 AI Agent: ~60%（可能编造证据）
-  REDCELL 目标: 100%（VerifyEvidence 强制）
+  Vero 目标: 100%（VerifyEvidence 强制）
   ```
 
 - **Hallucination Rate（幻觉率）**：
@@ -99,7 +99,7 @@ benchmark/
   Hallucination = 声称但无工具证据的发现数 / 总发现数
   
   传统 AI Agent: ~20-30%
-  REDCELL 目标: <5%
+  Vero 目标: <5%
   ```
 
 - **False Positive with Confidence（高置信误报率）**：
@@ -107,7 +107,7 @@ benchmark/
   最危险的情况：AI 很确信，但结果是错的
   
   传统 AI Agent: ~15%
-  REDCELL 目标: <3%
+  Vero 目标: <3%
   ```
 
 ---
@@ -129,7 +129,7 @@ curl http://localhost:8080/health
 ### Step 2: 运行 Agent
 
 ```bash
-# REDCELL
+# Vero
 ./redcell.exe -target http://localhost:8080 -output results/redcell.json
 
 # 竞品（模拟）
@@ -198,7 +198,7 @@ python report_generator.py \
 
 ```json
 {
-  "agent": "REDCELL",
+  "agent": "Vero",
   "scenario": "CVE-2021-44228-log4shell",
   "timestamp": "2026-07-28T15:30:00Z",
   
@@ -248,12 +248,12 @@ python report_generator.py \
 
 ### 对比组
 
-1. **REDCELL（完整版）**
+1. **Vero（完整版）**
    - Evidence-Driven 架构
    - VerifyEvidence 强制验证
    - HITL 门控
 
-2. **REDCELL-NoVerify（消融实验）**
+2. **Vero-NoVerify（消融实验）**
    - 关闭 VerifyEvidence
    - 直接信任 LLM 输出
    - 证明验证机制的价值
@@ -267,7 +267,7 @@ python report_generator.py \
 
 **H1**: Evidence-Driven 架构显著降低幻觉率
 ```
-预期：REDCELL 幻觉率 < 5%
+预期：Vero 幻觉率 < 5%
       NoVerify 幻觉率 ~20%
       传统方法 幻觉率 ~30%
 ```
@@ -280,7 +280,7 @@ python report_generator.py \
 
 **H3**: 高置信误报率显著降低
 ```
-预期：REDCELL < 3%
+预期：Vero < 3%
       NoVerify ~15%
       传统方法 ~20%
 ```
@@ -329,11 +329,11 @@ python report_generator.py \
 
 1. ✅ 创建第一个场景（Log4Shell）
 2. ✅ 实现评估器
-3. ✅ 运行 REDCELL 基线测试
+3. ✅ 运行 Vero 基线测试
 4. ✅ 发布初步结果
 
 ---
 
 **更新时间**: 2026-07-28  
 **状态**: 设计完成，准备实施  
-**负责人**: REDCELL Team
+**负责人**: Vero Team

@@ -1,4 +1,4 @@
-# REDCELL Benchmark 评估报告
+# Vero Benchmark 评估报告
 
 **评估日期**: 2026-07-28  
 **场景**: CVE-2021-44228 (Log4Shell)  
@@ -10,7 +10,7 @@
 
 ### 对比结果
 
-| 指标 | REDCELL | 传统 AI Agent | 差距 |
+| 指标 | Vero | 传统 AI Agent | 差距 |
 |------|---------|--------------|------|
 | **召回率** (Recall) | 100.0% | 0.0% | +100% |
 | **精确率** (Precision) | 100.0% | 0.0% | +100% |
@@ -24,7 +24,7 @@
 
 ## 🔍 详细分析
 
-### REDCELL 表现
+### Vero 表现
 
 **结果**: ✅ **优秀 - 可信度高，可用于生产环境**
 
@@ -110,12 +110,12 @@ if "发现漏洞" in result:
 
 ---
 
-### 为什么 REDCELL 成功？
+### 为什么 Vero 成功？
 
 **核心机制**：Evidence-Driven 架构
 
 ```go
-// REDCELL 做法
+// Vero 做法
 func (g *AttackGraph) Confirm(id string, ev Evidence) error {
     if ev.Excerpt == "" {
         return errors.New("无证据，拒绝 confirm")
@@ -143,7 +143,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 - **场景**: CVE-2021-44228 (Log4Shell)
 - **漏洞特征**: Critical, CVSS 10.0
 - **对照组**: 传统 AI Agent（无证据约束）
-- **实验组**: REDCELL（Evidence-Driven）
+- **实验组**: Vero（Evidence-Driven）
 
 ### 结果
 
@@ -163,7 +163,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 
 **之前**：所有 AI Agent 都有 20-30% 幻觉率，被认为是"不可避免"
 
-**现在**：REDCELL 证明通过架构设计可以将幻觉率降至 0%
+**现在**：Vero 证明通过架构设计可以将幻觉率降至 0%
 
 ### 2. 提出了新的评估标准
 
@@ -238,7 +238,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 ```bibtex
 @misc{redcell-benchmark-2026,
   title={Evidence-Driven AI Agents: A Benchmark for Trustworthy Autonomous Penetration Testing},
-  author={REDCELL Team},
+  author={Vero Team},
   year={2026},
   url={https://github.com/your-repo/redcell},
   note={First benchmark to evaluate AI agent trustworthiness, not just capability}
@@ -257,7 +257,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 
 ### A. 完整评估数据
 
-- [REDCELL 评估结果](../results/evaluation_redcell.json)
+- [Vero 评估结果](../results/evaluation_redcell.json)
 - [传统 Agent 评估结果](../results/evaluation_traditional.json)
 - [Ground Truth](../scenarios/CVE-2021-44228-log4shell/ground_truth.json)
 
@@ -268,7 +268,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 cd benchmark/scenarios/CVE-2021-44228-log4shell
 docker-compose up -d
 
-# 2. 运行 REDCELL
+# 2. 运行 Vero
 ../../redcell.exe -target http://localhost:8080 -output ../../results/redcell_result.json
 
 # 3. 评估

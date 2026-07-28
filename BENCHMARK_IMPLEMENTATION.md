@@ -21,7 +21,7 @@
 - ✅ 自动化评估流程
 
 ### 4. 对比实验（完整）
-- ✅ REDCELL 基线结果
+- ✅ Vero 基线结果
 - ✅ 传统 Agent 对比结果
 - ✅ 评估报告生成
 - ✅ 统计分析
@@ -32,7 +32,7 @@
 
 ### 实验结果
 
-| 指标 | REDCELL | 传统 AI Agent | 提升 |
+| 指标 | Vero | 传统 AI Agent | 提升 |
 |------|---------|--------------|------|
 | 召回率 | 100% | 0% | +100% |
 | 精确率 | 100% | 0% | +100% |
@@ -43,11 +43,11 @@
 ### 关键发现
 
 1. **Evidence-Driven 架构完全消除了幻觉**
-   - REDCELL: 0% 幻觉率
+   - Vero: 0% 幻觉率
    - 传统方法: 100% 幻觉率（所有发现都无证据）
 
 2. **证据约束不影响能力**
-   - REDCELL 召回率 100%（正确发现 Log4Shell）
+   - Vero 召回率 100%（正确发现 Log4Shell）
    - 同时保持 0 误报
 
 3. **传统方法即使"提到正确答案"也不可信**
@@ -57,16 +57,16 @@
 
 ---
 
-## 💡 对 REDCELL 项目的意义
+## 💡 对 Vero 项目的意义
 
 ### 不是"功能增强"，是"范式验证"
 
 这个 Benchmark 证明了：
 
-1. **REDCELL 的核心价值不是"工具多"**
+1. **Vero 的核心价值不是"工具多"**
    - 竞品有 150-200 工具
-   - REDCELL 只有 32 工具
-   - 但 REDCELL 的结果**可信**
+   - Vero 只有 32 工具
+   - 但 Vero 的结果**可信**
 
 2. **Evidence-Driven 是根本性创新**
    - 不是锦上添花的功能
@@ -97,7 +97,7 @@
    - 发布：Medium, Dev.to, Hacker News
 
 3. **制作 Demo 视频**
-   - 5 分钟展示：REDCELL 发现 Log4Shell，证据充分
+   - 5 分钟展示：Vero 发现 Log4Shell，证据充分
    - 对比：传统方法虽然"提到"但无法验证
    - 发布：YouTube, Twitter
 
@@ -121,7 +121,7 @@
    - 投稿：USENIX Security 2027
 
 2. **BlackHat/DEFCON 投稿**
-   - Arsenal: 展示 REDCELL + Benchmark
+   - Arsenal: 展示 Vero + Benchmark
    - Demo Labs: 现场演示
 
 ---
@@ -146,9 +146,9 @@ benchmark/
 │   └── mock_results.py                    # Mock 数据生成
 │
 └── results/                               # 评估结果
-    ├── redcell_log4shell_baseline.json    # REDCELL 结果
+    ├── redcell_log4shell_baseline.json    # Vero 结果
     ├── traditional_log4shell_comparison.json  # 传统方法结果
-    ├── evaluation_redcell.json            # REDCELL 评估报告
+    ├── evaluation_redcell.json            # Vero 评估报告
     └── evaluation_traditional.json        # 传统方法评估报告
 ```
 
@@ -160,7 +160,7 @@ benchmark/
 
 1. **首个可信度 Benchmark**
    - 现有 Benchmark（SWE-bench, HumanEval）只评估能力
-   - REDCELL Benchmark 评估可信度
+   - Vero Benchmark 评估可信度
 
 2. **Evidence-Driven 架构验证**
    - 理论上：类型系统可以约束 LLM
@@ -192,7 +192,7 @@ benchmark/
 
 **我的答案是**：
 
-> **REDCELL Benchmark 不是"测试工具的工具"，而是"证明 AI 可以在安全领域被信任的第一个科学实验"。**
+> **Vero Benchmark 不是"测试工具的工具"，而是"证明 AI 可以在安全领域被信任的第一个科学实验"。**
 
 **这个实验的结果**：
 - ✅ 100% vs 0% 的对比（极具说服力）
@@ -206,7 +206,7 @@ benchmark/
 
 ---
 
-**这才是 REDCELL 真正的价值。** 🚀
+**这才是 Vero 真正的价值。** 🚀
 
 **不是"又一个红队工具"，而是"证明可信 AI Agent 可行性的科学实验"。**
 
