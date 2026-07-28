@@ -9,8 +9,8 @@ import (
 
 	"github.com/anthropics/anthropic-sdk-go"
 
-	"redcell/internal/core"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // DefaultModel —— 攻击性任务默认用 opus: sonnet 有 cyber 安全拦截会整轮失败(已验证)。

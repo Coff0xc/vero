@@ -4,8 +4,8 @@ import (
 	"strings"
 	"testing"
 
-	"redcell/internal/core"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ReAct 的核心是"喂给模型的上下文": 完整轨迹 + 每步真实观察 + 成败标记。

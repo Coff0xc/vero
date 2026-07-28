@@ -7,7 +7,7 @@ import (
 	"testing"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // TestConcurrentToolExecution —— 并发工具执行测试。

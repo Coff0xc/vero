@@ -8,7 +8,7 @@ import (
 
 	"github.com/go-chi/chi/v5"
 
-	"redcell/internal/report"
+	"github.com/Coff0xc/vero/internal/report"
 )
 
 // handleReportJSON —— 导出 JSON 格式报告。

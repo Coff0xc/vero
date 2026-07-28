@@ -4,7 +4,7 @@ package report
 import (
 	"time"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 // Report —— 完整渗透测试报告（可序列化为 JSON/PDF/HTML）。

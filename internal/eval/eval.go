@@ -5,9 +5,9 @@ package eval
 import (
 	"math"
 
-	"redcell/internal/core"
-	"redcell/internal/llm"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/llm"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // KPI —— 一次战役的评测结果。

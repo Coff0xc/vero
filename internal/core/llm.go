@@ -1,6 +1,6 @@
 package core
 
-import "redcell/internal/tools"
+import "github.com/Coff0xc/vero/internal/tools"
 
 // LLM —— 决策接口: 看目标 + 攻击图, 提议下一步 Action(返回 nil 表示结束)。
 // MockLLM / ClaudeLLM / PlannerLLM 都实现它 —— 内核不关心决策来自真实模型还是确定性规划器。

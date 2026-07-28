@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 func TestMarkdownSortsAndCitesEvidence(t *testing.T) {

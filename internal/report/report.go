@@ -7,7 +7,7 @@ import (
 	"sort"
 	"strings"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 var sevRank = map[string]int{"critical": 0, "high": 1, "medium": 2, "low": 3, "info": 4}

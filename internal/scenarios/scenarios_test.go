@@ -3,7 +3,7 @@ package scenarios
 import (
 	"testing"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 func TestPackRegisterAndRoute(t *testing.T) {

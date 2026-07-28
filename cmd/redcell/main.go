@@ -20,21 +20,21 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/audit"
-	"redcell/internal/core"
-	"redcell/internal/llm"
-	"redcell/internal/planner"
-	"redcell/internal/report"
-	"redcell/internal/scenarios"
-	"redcell/internal/server"
-	"redcell/internal/store"
-	"redcell/internal/tools"
-	"redcell/internal/webui"
+	"github.com/Coff0xc/vero/internal/audit"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/llm"
+	"github.com/Coff0xc/vero/internal/planner"
+	"github.com/Coff0xc/vero/internal/report"
+	"github.com/Coff0xc/vero/internal/scenarios"
+	"github.com/Coff0xc/vero/internal/server"
+	"github.com/Coff0xc/vero/internal/store"
+	"github.com/Coff0xc/vero/internal/tools"
+	"github.com/Coff0xc/vero/internal/webui"
 )
 
 func main() {
 	port := flag.Int("port", 8000, "监听端口")
-	dbPath := flag.String("db", "redcell.db", "SQLite 数据库路径")
+	dbPath := flag.String("db", "vero.db", "SQLite 数据库路径")
 	selfcheck := flag.Bool("selfcheck", false, "离线自检后退出")
 	probe := flag.String("probe", "", "真实 HTTP 指纹侦察目标(curl -sI), 侦察后退出")
 	scan := flag.String("scan", "", "真实 TCP 端口扫描目标(Go 原生, 无 nmap 依赖), 扫描后退出")
@@ -410,9 +410,9 @@ func runRealAgent(target string) {
 func writeReport(target string, g *core.AttackGraph, violations int) {
 	ts := time.Now().Format("2006-01-02 15:04:05")
 	md := report.Markdown(target, g, violations, ts)
-	if err := os.WriteFile("redcell-report.md", []byte(md), 0o644); err != nil {
+	if err := os.WriteFile("vero-report.md", []byte(md), 0o644); err != nil {
 		fmt.Printf("报告写入失败: %v\n", err)
 		return
 	}
-	fmt.Printf("\n📄 渗透报告已生成: redcell-report.md (%d 字节)\n", len(md))
+	fmt.Printf("\n📄 渗透报告已生成: vero-report.md (%d 字节)\n", len(md))
 }

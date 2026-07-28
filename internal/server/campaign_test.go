@@ -11,8 +11,8 @@ import (
 	"testing/fstest"
 	"time"
 
-	"redcell/internal/audit"
-	"redcell/internal/store"
+	"github.com/Coff0xc/vero/internal/audit"
+	"github.com/Coff0xc/vero/internal/store"
 )
 
 // 端到端集成: 对一个可控假靶启动真实战役, 自动批准 HITL, 验证编排跑到 done 并落库。

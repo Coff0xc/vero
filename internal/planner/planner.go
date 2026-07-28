@@ -11,7 +11,7 @@ import (
 	"sort"
 	"strings"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 // Rule —— 一条攻击规则: 前提(needs 类型的 confirmed 节点存在) -> 产出(produces 类型)。

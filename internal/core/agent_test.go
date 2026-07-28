@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // scriptLLM —— 测试内的确定性决策器(不引 llm 包, 避免 core<->llm 测试期循环依赖)。

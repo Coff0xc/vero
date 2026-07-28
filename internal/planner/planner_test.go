@@ -3,8 +3,8 @@ package planner
 import (
 	"testing"
 
-	"redcell/internal/core"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 func seed(g *core.AttackGraph, id, typ, label string) {

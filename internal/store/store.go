@@ -12,7 +12,7 @@ import (
 
 	_ "modernc.org/sqlite"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 const schema = `

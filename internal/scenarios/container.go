@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ---------- 容器逃逸场景包 (Container Escape) ----------

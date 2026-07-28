@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 // HITLTimeout —— 操作员超时未裁决则默认拒绝(对应 Python 300s 超时)。

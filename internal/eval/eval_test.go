@@ -3,8 +3,8 @@ package eval
 import (
 	"testing"
 
-	"redcell/internal/core"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 func evalReg() *tools.Registry {

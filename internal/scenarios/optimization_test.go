@@ -5,7 +5,7 @@ import (
 	"strings"
 	"testing"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // BenchmarkParseFFUFOptimized —— 优化后的 ParseFFUF 性能对比。

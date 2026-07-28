@@ -3,7 +3,7 @@ package server
 import (
 	"sync"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 // Broker —— SSE 广播中枢: 每个连接一个 channel, Emit 广播给所有订阅者。

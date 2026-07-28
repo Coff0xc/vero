@@ -14,10 +14,10 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 
-	"redcell/internal/audit"
-	"redcell/internal/scenarios"
-	"redcell/internal/store"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/audit"
+	"github.com/Coff0xc/vero/internal/scenarios"
+	"github.com/Coff0xc/vero/internal/store"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // Server —— 作战室后端: SSE 推送 + Web HITL + 战役编排 + 持久化。

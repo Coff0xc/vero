@@ -6,7 +6,7 @@ import (
 	"os"
 	"strings"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // HITLThreshold —— >= L3(利用/提权)的动作必须人工批准。

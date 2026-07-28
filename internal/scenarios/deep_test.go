@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // TestCloudToolsDeepDive —— P2 云工具深度测试。

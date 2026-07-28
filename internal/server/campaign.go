@@ -7,11 +7,11 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/core"
-	"redcell/internal/llm"
-	"redcell/internal/report"
-	"redcell/internal/scenarios"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/llm"
+	"github.com/Coff0xc/vero/internal/report"
+	"github.com/Coff0xc/vero/internal/scenarios"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // buildLiveRegistry —— 真实工具集: Go 原生端口扫描 + web/AD 场景包(curl/nuclei/exploit)。

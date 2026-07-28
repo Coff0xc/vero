@@ -7,7 +7,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 // Generate —— 从攻击图生成完整报告（新版）。

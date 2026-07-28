@@ -1,4 +1,4 @@
-module redcell
+module github.com/Coff0xc/vero
 
 go 1.26
 

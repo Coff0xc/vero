@@ -1,6 +1,6 @@
 package llm
 
-import "redcell/internal/core"
+import "github.com/Coff0xc/vero/internal/core"
 
 // targetInjector —— 包装任意决策器: LLM 未在 args 填 target(或填空)时, 自动注入战役目标。
 // 让 LLM 专注"选哪个工具/为什么", 目标主机由编排层保证 —— 减少 LLM 出错面。

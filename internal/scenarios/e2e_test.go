@@ -3,7 +3,7 @@ package scenarios
 import (
 	"testing"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // TestE2EWithP123Tools —— 端到端测试: 验证 P1/P2/P3 工具在攻击链中的集成。

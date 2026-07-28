@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // Pack —— 场景包: 一组工具 + 指纹函数(已发现 service 集合 -> 是否激活)。

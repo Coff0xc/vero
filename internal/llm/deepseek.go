@@ -8,8 +8,8 @@ import (
 	"os"
 	"time"
 
-	"redcell/internal/core"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/core"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 const deepSeekURL = "https://api.deepseek.com/chat/completions"

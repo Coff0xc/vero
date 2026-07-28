@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ---------- 云环境侦察包 (Cloud) ----------

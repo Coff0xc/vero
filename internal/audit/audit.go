@@ -14,7 +14,7 @@ import (
 	"sync"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // Auditor —— append-only 审计器(文件路径可配, 并发安全)。

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ---------- ffuf 目录爆破集成 ----------

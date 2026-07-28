@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"redcell/internal/core"
+	"github.com/Coff0xc/vero/internal/core"
 )
 
 func TestStoreRoundtrip(t *testing.T) {

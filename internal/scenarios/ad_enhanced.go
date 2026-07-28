@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ---------- NetExec (nxc) 完整集成 ----------

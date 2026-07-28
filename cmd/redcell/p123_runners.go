@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 
-	"redcell/internal/scenarios"
-	"redcell/internal/tools"
+	"github.com/Coff0xc/vero/internal/scenarios"
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // ---------- P1: Metasploit RPC 命令行入口 ----------
