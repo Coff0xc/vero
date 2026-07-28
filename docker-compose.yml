@@ -2,10 +2,10 @@ version: '3.8'
 
 services:
   # REDCELL 主服务
-  redcell:
+  vero:
     build: .
-    image: redcell:latest
-    container_name: redcell
+    image: vero:latest
+    container_name: vero
     ports:
       - "8000:8000"
     volumes:
@@ -15,10 +15,10 @@ services:
     environment:
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY:-}
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
-      - REDCELL_DB=/app/data/redcell.db
+      - REDCELL_DB=/app/data/vero.db
       - REDCELL_PORT=8000
     networks:
-      - redcell-net
+      - vero-net
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/"]
@@ -35,7 +35,7 @@ services:
     ports:
       - "55553:55553"
     networks:
-      - redcell-net
+      - vero-net
     restart: unless-stopped
     environment:
       - MSF_DATABASE_URL=postgres://msf:msf@postgres:5432/msf
@@ -45,7 +45,7 @@ services:
   # PostgreSQL for Metasploit (可选)
   postgres:
     image: postgres:15-alpine
-    container_name: redcell-postgres
+    container_name: vero-postgres
     environment:
       - POSTGRES_USER=msf
       - POSTGRES_PASSWORD=msf
@@ -53,18 +53,18 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
     networks:
-      - redcell-net
+      - vero-net
     restart: unless-stopped
 
   # Nuclei (独立扫描器)
   nuclei:
     image: projectdiscovery/nuclei:latest
-    container_name: redcell-nuclei
+    container_name: vero-nuclei
     command: -update-templates
     volumes:
       - nuclei-templates:/root/nuclei-templates
     networks:
-      - redcell-net
+      - vero-net
     restart: "no"
 
 volumes:
@@ -72,5 +72,5 @@ volumes:
   nuclei-templates:
 
 networks:
-  redcell-net:
+  vero-net:
     driver: bridge

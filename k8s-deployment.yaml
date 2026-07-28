@@ -3,28 +3,28 @@
 apiVersion: v1
 kind: Namespace
 metadata:
-  name: redcell
+  name: vero
   labels:
-    name: redcell
+    name: vero
 
 ---
 # ConfigMap
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: redcell-config
-  namespace: redcell
+  name: vero-config
+  namespace: vero
 data:
   REDCELL_PORT: "8000"
-  REDCELL_DB: "/app/data/redcell.db"
+  REDCELL_DB: "/app/data/vero.db"
 
 ---
 # Secret (需要手动创建 API keys)
 apiVersion: v1
 kind: Secret
 metadata:
-  name: redcell-secrets
-  namespace: redcell
+  name: vero-secrets
+  namespace: vero
 type: Opaque
 stringData:
   ANTHROPIC_API_KEY: ""  # 填入实际 key
@@ -36,8 +36,8 @@ stringData:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: redcell-data
-  namespace: redcell
+  name: vero-data
+  namespace: vero
 spec:
   accessModes:
     - ReadWriteOnce
@@ -51,29 +51,29 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: redcell
-  namespace: redcell
+  name: vero
+  namespace: vero
   labels:
-    app: redcell
+    app: vero
 spec:
   replicas: 1  # 单实例 (SQLite 限制)
   selector:
     matchLabels:
-      app: redcell
+      app: vero
   strategy:
     type: Recreate  # 避免多实例同时访问 SQLite
   template:
     metadata:
       labels:
-        app: redcell
+        app: vero
     spec:
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
         fsGroup: 1000
       containers:
-      - name: redcell
-        image: redcell:latest
+      - name: vero
+        image: vero:latest
         imagePullPolicy: IfNotPresent
         ports:
         - containerPort: 8000
@@ -83,23 +83,23 @@ spec:
         - name: REDCELL_PORT
           valueFrom:
             configMapKeyRef:
-              name: redcell-config
+              name: vero-config
               key: REDCELL_PORT
         - name: REDCELL_DB
           valueFrom:
             configMapKeyRef:
-              name: redcell-config
+              name: vero-config
               key: REDCELL_DB
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
-              name: redcell-secrets
+              name: vero-secrets
               key: ANTHROPIC_API_KEY
               optional: true
         - name: DEEPSEEK_API_KEY
           valueFrom:
             secretKeyRef:
-              name: redcell-secrets
+              name: vero-secrets
               key: DEEPSEEK_API_KEY
               optional: true
         volumeMounts:
@@ -134,10 +134,10 @@ spec:
       volumes:
       - name: data
         persistentVolumeClaim:
-          claimName: redcell-data
+          claimName: vero-data
       - name: wordlists
         configMap:
-          name: redcell-wordlists
+          name: vero-wordlists
           optional: true
 
 ---
@@ -145,10 +145,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: redcell
-  namespace: redcell
+  name: vero
+  namespace: vero
   labels:
-    app: redcell
+    app: vero
 spec:
   type: ClusterIP
   ports:
@@ -157,15 +157,15 @@ spec:
     protocol: TCP
     name: http
   selector:
-    app: redcell
+    app: vero
 
 ---
 # Ingress (可选 - 需要 Ingress Controller)
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: redcell
-  namespace: redcell
+  name: vero
+  namespace: vero
   annotations:
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
@@ -174,17 +174,17 @@ spec:
   ingressClassName: nginx
   tls:
   - hosts:
-    - redcell.example.com
-    secretName: redcell-tls
+    - vero.example.com
+    secretName: vero-tls
   rules:
-  - host: redcell.example.com
+  - host: vero.example.com
     http:
       paths:
       - path: /
         pathType: Prefix
         backend:
           service:
-            name: redcell
+            name: vero
             port:
               number: 8000
 
@@ -193,12 +193,12 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: redcell-netpol
-  namespace: redcell
+  name: vero-netpol
+  namespace: vero
 spec:
   podSelector:
     matchLabels:
-      app: redcell
+      app: vero
   policyTypes:
   - Ingress
   - Egress
@@ -230,16 +230,16 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: redcell
-  namespace: redcell
+  name: vero
+  namespace: vero
 
 ---
 # Role (如果需要访问 K8s API)
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: redcell-role
-  namespace: redcell
+  name: vero-role
+  namespace: vero
 rules:
 - apiGroups: [""]
   resources: ["pods", "pods/log"]
@@ -250,13 +250,13 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: redcell-rolebinding
-  namespace: redcell
+  name: vero-rolebinding
+  namespace: vero
 subjects:
 - kind: ServiceAccount
-  name: redcell
-  namespace: redcell
+  name: vero
+  namespace: vero
 roleRef:
   kind: Role
-  name: redcell-role
+  name: vero-role
   apiGroup: rbac.authorization.k8s.io
