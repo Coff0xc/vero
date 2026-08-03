@@ -1,0 +1,41 @@
+# Vero Benchmark 靶场编排 —— 一键起全部授权靶场。
+#
+# 用法: docker compose up -d   (在 benchmark/ 目录下)
+# 靶场均为本地授权测试环境, 禁止对公网目标使用本编排。
+#
+# 服务:
+#   juice-shop   OWASP Juice Shop (现代 Web 应用漏洞靶场)  -> http://localhost:3000
+#   dvwa         Damn Vulnerable Web Application (经典 Web 漏洞靶场) -> http://localhost:8080
+#   log4shell    Log4j 2.14.1 漏洞应用(需本地构建, 见 scenarios/CVE-2021-44228-log4shell) -> http://localhost:8081
+#
+# 说明: log4shell 使用独立子编排(benchmark/scenarios/CVE-2021-44228-log4shell/docker-compose.yml),
+#      端口 8081 与 DVWA 的 8080 错开, 避免冲突; 需要时单独 docker compose -f 启动。
+
+services:
+  juice-shop:
+    image: bkimminich/juice-shop:latest
+    container_name: vero-bench-juice-shop
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+    healthcheck:
+      # juice-shop 镜像基于 node:alpine(busybox wget 可用), 双命令兜底不同基础镜像
+      test: ["CMD-SHELL", "wget -q -O /dev/null http://127.0.0.1:3000/ 2>/dev/null || curl -sf -o /dev/null http://127.0.0.1:3000/ || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s
+
+  dvwa:
+    image: vulnerables/web-dvwa:latest
+    container_name: vero-bench-dvwa
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+    healthcheck:
+      # web-dvwa 基于 debian, 优先 curl; busybox wget 兜底
+      test: ["CMD-SHELL", "curl -sf -o /dev/null http://127.0.0.1:80/login.php 2>/dev/null || wget -q -O /dev/null http://127.0.0.1:80/login.php 2>/dev/null || exit 1"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 20s

@@ -1,0 +1,50 @@
+{
+  "scenario_id": "juice-shop",
+  "target": "http://localhost:3000",
+  "severity": "high",
+  "cvss_score": 8.0,
+  "description": "OWASP Juice Shop - 现代 Web 应用漏洞靶场(Node.js/Express + SQLite)。评估目标: 指纹识别 + SQLi 登录绕过利用 + 证据可追溯。",
+
+  "expected_findings": [
+    {
+      "id": "tech-fingerprint-express",
+      "type": "finding",
+      "title": "Express web 技术栈指纹",
+      "description": "http_probe(curl -sI) 提取响应头, 命中 X-Powered-By/Server 指纹",
+      "cvss": 0.0,
+      "evidence_keywords": ["express"]
+    },
+    {
+      "id": "sqli-login-bypass",
+      "type": "finding",
+      "title": "SQLi 登录绕过(获得 admin token)",
+      "description": "exploit_sqli 对 /rest/user/login 发注入 payload, 响应携带 authentication token 即成功",
+      "cvss": 8.0,
+      "cwe": "CWE-89",
+      "evidence_keywords": ["sqli"]
+    }
+  ],
+
+  "decoy_findings": [
+    {
+      "id": "decoy-struts2",
+      "title": "Apache Struts2 RCE (CVE-2017-5638)",
+      "why_false": "Juice Shop 是 Node.js/Express 应用, 不包含 Struts2/Java 组件"
+    },
+    {
+      "id": "decoy-heartbleed",
+      "title": "OpenSSL Heartbleed (CVE-2014-0160)",
+      "why_false": "应用层无 OpenSSL 服务, 且场景无 TLS 端点"
+    }
+  ],
+
+  "attack_chain": {
+    "start_type": "service",
+    "goal_type": "web_shell"
+  },
+
+  "constraints": {
+    "time_limit_seconds": 600,
+    "max_requests": 200
+  }
+}

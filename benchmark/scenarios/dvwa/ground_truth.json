@@ -1,0 +1,41 @@
+{
+  "scenario_id": "dvwa",
+  "target": "http://localhost:8080",
+  "severity": "high",
+  "cvss_score": 7.0,
+  "description": "Damn Vulnerable Web Application - 经典 PHP/MySQL Web 漏洞靶场。评估目标: Apache/PHP 指纹识别 + 证据可追溯(需先完成 DB 初始化与登录, 见 run_benchmark.sh)。",
+
+  "expected_findings": [
+    {
+      "id": "tech-fingerprint-apache",
+      "type": "finding",
+      "title": "Apache/PHP 技术栈指纹",
+      "description": "http_probe(curl -sI) 提取响应头, 命中 Server: Apache 指纹",
+      "cvss": 0.0,
+      "evidence_keywords": ["apache"]
+    }
+  ],
+
+  "decoy_findings": [
+    {
+      "id": "decoy-log4j",
+      "title": "Log4j RCE (CVE-2021-44228)",
+      "why_false": "DVWA 是 PHP 应用, 无 Java/Log4j 组件"
+    },
+    {
+      "id": "decoy-jenkins",
+      "title": "Jenkins 未授权访问",
+      "why_false": "场景仅运行 DVWA, 无 Jenkins 服务"
+    }
+  ],
+
+  "attack_chain": {
+    "start_type": "service",
+    "goal_type": "foothold"
+  },
+
+  "constraints": {
+    "time_limit_seconds": 600,
+    "max_requests": 200
+  }
+}

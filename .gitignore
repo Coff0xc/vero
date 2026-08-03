@@ -40,6 +40,15 @@ audit/
 # 杂项
 .DS_Store
 
+# 子代理运行产物(pi-subagents 本地工件, 不经 git 分发)
+.pi-subagents/
+
+# benchmark 运行产物
+benchmark/.dvwa-cookies.txt
+benchmark/results/
+benchmark/**/snapshot.json
+benchmark/evaluator/evaluator.exe
+
 # 运行时产物 —— 进程 PID / 本地配置(可能含密钥, 绝不上库)
 run-pid.txt
 vero.config.json
