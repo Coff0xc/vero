@@ -1,5 +1,18 @@
 import { useStore } from '../store'
+import { NODE_STATE_LABELS } from '../lib/i18n'
 
+// 节点 type → 中文(仅展示层, type 标识本身保持英文)。
+const NODE_TYPE_LABELS: Record<string, string> = {
+  host: '主机',
+  service: '服务',
+  finding: '发现',
+  web_shell: 'Web 后门',
+  cred: '凭证',
+  claim: '声明',
+  foothold: '据点',
+}
+
+// 证据抽屉: 作为右栏的兄弟列展开(flex 布局让位), 不再绝对定位盖住攻击图。
 export function EvidenceDrawer() {
   const selected = useStore((s) => s.selected)
   const nodes = useStore((s) => s.nodes)
@@ -9,30 +22,31 @@ export function EvidenceDrawer() {
 
   return (
     <aside
-      className={`absolute top-0 right-0 bottom-0 w-[min(380px,82%)] bg-gradient-to-b from-panel to-panel2 border-l border-line shadow-2xl transition-transform duration-200 z-20 flex flex-col p-4 ${
-        open ? 'translate-x-0' : 'translate-x-[103%]'
+      className={`shrink-0 border-l border-line bg-gradient-to-b from-panel to-panel2 flex flex-col overflow-hidden transition-[width] duration-200 ${
+        open ? 'w-[min(360px,80vw)]' : 'w-0 border-l-0'
       }`}
+      aria-hidden={!open}
     >
-      <div className="flex items-center justify-between">
-        <span className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">证据检视 · Evidence Chain</span>
+      <div className="flex items-center justify-between p-4 pb-0 whitespace-nowrap">
+        <span className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">证据检视</span>
         <button onClick={() => select(null)} className="text-muted hover:text-alert text-base" aria-label="关闭">
           ✕
         </button>
       </div>
-      <div className="text-sm text-signal my-2.5 break-all">{selected ?? '—'}</div>
+      <div className="text-sm text-signal my-2.5 px-4 break-all">{selected ?? '—'}</div>
       {node && (
-        <div className="text-[11px] text-muted mb-3.5">
-          {node.type} ·{' '}
+        <div className="text-[11px] text-muted mb-3.5 px-4">
+          {NODE_TYPE_LABELS[node.type] ?? node.type} ·{' '}
           <b
             className={`font-disp tracking-wider px-2 py-0.5 rounded-sm uppercase text-[10px] border ${
               node.state === 'confirmed' ? 'text-live border-live' : 'text-ghost border-ghost'
             }`}
           >
-            {node.state}
+            {NODE_STATE_LABELS[node.state] ?? node.state}
           </b>
         </div>
       )}
-      <div className="overflow-auto flex-1">
+      <div className="overflow-auto flex-1 px-4 pb-4">
         {node && node.evidence.length > 0 ? (
           node.evidence.map((ev, i) => (
             <div key={i} className="my-2 border-l-2 border-l-live bg-live/5 rounded-r-sm">
@@ -44,11 +58,11 @@ export function EvidenceDrawer() {
           ))
         ) : node ? (
           <div className="border-l-2 border-l-ghost bg-ghost/5 pl-2.5 text-muted text-xs py-3.5 leading-relaxed">
-            尚未坐实 — 该节点是 hypothesis，还没有可回查的证据。需要一次独立验证动作才能升为 confirmed。
+            尚未坐实 — 该节点是假设, 还没有可回查的证据。需要一次独立验证动作才能升为已证实。
           </div>
         ) : (
           <div className="text-muted text-xs py-3.5 leading-relaxed">
-            点击攻击图里的任一节点，查看它如何被证实——逐字证据来自哪次工具输出。
+            点击攻击图里的任一节点, 查看它如何被证实 — 逐字证据来自哪次工具输出。
           </div>
         )}
       </div>

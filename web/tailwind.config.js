@@ -16,8 +16,8 @@ export default {
         muted: '#728496',
       },
       fontFamily: {
-        disp: ['"Chakra Petch"', 'system-ui', 'sans-serif'],
-        mono: ['"IBM Plex Mono"', 'ui-monospace', 'monospace'],
+        disp: ['"Segoe UI"', '"Microsoft YaHei"', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', '"Cascadia Mono"', 'Consolas', '"Courier New"', 'monospace'],
       },
     },
   },

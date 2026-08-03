@@ -55,6 +55,7 @@ export function AttackGraph() {
   const nodes = useStore((s) => s.nodes)
   const edges = useStore((s) => s.edges)
   const select = useStore((s) => s.select)
+  const selected = useStore((s) => s.selected)
 
   const { rfNodes, rfEdges } = useMemo(() => {
     const byStage: Record<number, string[]> = {}
@@ -66,21 +67,30 @@ export function AttackGraph() {
       const st = STAGE[n.type] ?? 1
       const idx = byStage[st].indexOf(n.id)
       const confirmed = n.state === 'confirmed'
+      const isSel = n.id === selected
       return {
         id: n.id,
         position: { x: st * 210 + 40, y: idx * 92 + 48 },
         data: { label: shortId(n.id) },
         connectable: false,
+        // 选中态: 亮边框 + 光晕(修原版点击无任何视觉反馈, 不知道选中了啥)
         style: {
           background: confirmed ? '#0e2b27' : '#18222e',
-          border: `${confirmed ? 2 : 1}px solid ${confirmed ? '#4ec9b0' : '#5b6b7a'}`,
+          border: `${isSel ? 2.5 : confirmed ? 2 : 1}px solid ${
+            isSel ? '#e8b23a' : confirmed ? '#4ec9b0' : '#5b6b7a'
+          }`,
           borderRadius: 6,
           color: '#cdd6e0',
           fontSize: 11,
-          fontFamily: 'IBM Plex Mono, monospace',
+          fontFamily: 'ui-monospace, Consolas, monospace',
           width: 168,
           padding: 8,
-          boxShadow: confirmed ? '0 0 14px rgba(78,201,176,.35)' : 'none',
+          boxShadow: isSel
+            ? '0 0 16px rgba(232,178,58,.5)'
+            : confirmed
+              ? '0 0 14px rgba(78,201,176,.35)'
+              : 'none',
+          transition: 'box-shadow .15s, border-color .15s',
         },
       }
     })
@@ -92,12 +102,12 @@ export function AttackGraph() {
     }))
     addKillChainEdges(nodes, rfEdges)
     return { rfNodes, rfEdges }
-  }, [nodes, edges])
+  }, [nodes, edges, selected])
 
   return (
     <div className="absolute inset-0">
       <div className="absolute left-4 top-3 z-10 font-disp text-[10px] tracking-[2.5px] uppercase text-muted pointer-events-none">
-        攻击图 · Attack Graph
+        攻击图
         <span className="block text-ghost lowercase tracking-normal mt-1 font-mono">点击节点 → 查看证据链</span>
       </div>
       <ReactFlow
@@ -123,15 +133,19 @@ function Legend() {
     <div className="absolute right-3.5 bottom-3 text-[10px] text-muted font-disp tracking-wider bg-ink/70 px-2.5 py-2 border border-line rounded-sm leading-loose">
       <div>
         <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-ghost" />
-        hypothesis 未坐实
+        假设, 未坐实
       </div>
       <div>
         <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-live" style={{ boxShadow: '0 0 6px #4ec9b0' }} />
-        confirmed 已证实
+        已证实
       </div>
       <div>
         <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-signal" />
         杀伤链推进
+      </div>
+      <div>
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ border: '2px solid #e8b23a' }} />
+        当前选中
       </div>
     </div>
   )

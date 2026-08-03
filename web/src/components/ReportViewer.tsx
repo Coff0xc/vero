@@ -1,250 +1,103 @@
-// Web 端报告增强组件：时间线和攻击路径
+// 报告浏览器: 独立 tab, 自行拉取 /api/reports 列表(不再依赖 campaign 状态)。
+// 字段对齐后端 server/reports.go 的 ListReports 响应结构。
 import { useState, useEffect } from 'react'
 
-interface TimelineEvent {
-  timestamp: string
-  phase: string
-  action: string
-  description: string
-  critical: boolean
+interface Report {
+  campaign_id: string
+  target: string
+  started_at: string
+  duration_sec: number
+  finding_count: number
+  risk_score: number
 }
 
-interface PathNode {
-  id: string
-  type: string
-  label: string
-  critical: boolean
-}
-
-interface PathEdge {
-  from: string
-  to: string
-  label: string
-  method: string
-}
-
-interface ReportData {
-  meta: {
-    target: string
-    generated_at: string
-    duration_sec: number
-  }
-  executive: {
-    total_findings: number
-    critical_count: number
-    high_count: number
-    medium_count: number
-    low_count: number
-    risk_score: number
-  }
-  timeline?: {
-    events: TimelineEvent[]
-  }
-  attack_path?: {
-    nodes: PathNode[]
-    edges: PathEdge[]
+const fmtTime = (s: string) => {
+  try {
+    return new Date(s).toLocaleString('zh-CN', { hour12: false })
+  } catch {
+    return s
   }
 }
 
-export function ReportViewer({ campaignId }: { campaignId: string }) {
-  const [report, setReport] = useState<ReportData | null>(null)
-  const [activeView, setActiveView] = useState<'summary' | 'timeline' | 'graph'>('summary')
+export function ReportViewer() {
+  const [reports, setReports] = useState<Report[]>([])
+  const [error, setError] = useState('')
+  const [busy, setBusy] = useState(false)
 
-  useEffect(() => {
-    fetch(`/api/campaigns/${campaignId}/report.json`)
-      .then(r => r.json())
-      .then(data => setReport(data))
-  }, [campaignId])
-
-  if (!report) return <div className="p-6">加载中...</div>
-
-  const phaseColors: Record<string, string> = {
-    reconnaissance: 'bg-blue-500',
-    exploitation: 'bg-orange-500',
-    'post-exploitation': 'bg-red-500',
+  const load = () => {
+    setBusy(true)
+    setError('')
+    fetch('/api/reports')
+      .then(async (r) => {
+        const body = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(body.error ?? `HTTP ${r.status}`)
+        setReports(body.reports ?? [])
+      })
+      .catch((e) => setError(String(e)))
+      .finally(() => setBusy(false))
   }
 
-  const severityColors: Record<string, string> = {
-    critical: 'bg-red-600',
-    high: 'bg-orange-500',
-    medium: 'bg-yellow-500',
-    low: 'bg-blue-500',
-  }
+  useEffect(load, [])
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-bold">渗透测试报告</h2>
-          <p className="text-gray-600">目标: {report.meta.target}</p>
-        </div>
-        <div className="flex gap-2">
-          <button
-            onClick={() => setActiveView('summary')}
-            className={`px-4 py-2 rounded ${activeView === 'summary' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            摘要
-          </button>
-          <button
-            onClick={() => setActiveView('timeline')}
-            className={`px-4 py-2 rounded ${activeView === 'timeline' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            时间线
-          </button>
-          <button
-            onClick={() => setActiveView('graph')}
-            className={`px-4 py-2 rounded ${activeView === 'graph' ? 'bg-blue-600 text-white' : 'bg-gray-200'}`}
-          >
-            攻击路径
-          </button>
-        </div>
+    <div className="p-6 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="text-lg font-disp font-semibold tracking-wider text-ink2 uppercase">报告</h2>
+        <button
+          onClick={load}
+          disabled={busy}
+          className="px-3 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-live text-live hover:bg-live hover:text-ink transition disabled:opacity-50"
+        >
+          {busy ? '刷新中…' : '刷新'}
+        </button>
       </div>
 
-      {/* Summary View */}
-      {activeView === 'summary' && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">风险评分</h3>
-            <div className="flex items-center justify-center">
-              <div className="relative w-32 h-32">
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <span className="text-4xl font-bold">{report.executive.risk_score.toFixed(1)}</span>
-                </div>
-                <svg className="w-32 h-32 transform -rotate-90">
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
-                    stroke="#e5e7eb"
-                    strokeWidth="8"
-                    fill="none"
-                  />
-                  <circle
-                    cx="64"
-                    cy="64"
-                    r="56"
-                    stroke={report.executive.risk_score > 7 ? '#dc2626' : report.executive.risk_score > 4 ? '#f59e0b' : '#10b981'}
-                    strokeWidth="8"
-                    fill="none"
-                    strokeDasharray={`${(report.executive.risk_score / 10) * 351.86} 351.86`}
-                  />
-                </svg>
-              </div>
-            </div>
-          </div>
+      {error && <div className="text-xs text-alert">加载失败: {error}</div>}
 
-          <div className="bg-white rounded-lg shadow p-6">
-            <h3 className="text-lg font-semibold mb-4">发现统计</h3>
-            <div className="space-y-3">
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-red-600"></span>
-                  Critical
-                </span>
-                <span className="font-semibold">{report.executive.critical_count}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-orange-500"></span>
-                  High
-                </span>
-                <span className="font-semibold">{report.executive.high_count}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-yellow-500"></span>
-                  Medium
-                </span>
-                <span className="font-semibold">{report.executive.medium_count}</span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full bg-blue-500"></span>
-                  Low
-                </span>
-                <span className="font-semibold">{report.executive.low_count}</span>
-              </div>
-            </div>
-          </div>
+      {reports.length === 0 && !error && (
+        <div className="border border-dashed border-line rounded-sm p-8 text-center text-muted text-xs">
+          暂无报告 — 完成一次战役后, JSON / Markdown / HTML 报告会出现在这里
         </div>
       )}
 
-      {/* Timeline View */}
-      {activeView === 'timeline' && report.timeline && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">攻击时间线</h3>
-          <div className="space-y-4">
-            {report.timeline.events.map((event, idx) => (
-              <div key={idx} className="flex gap-4">
-                <div className="flex flex-col items-center">
-                  <div className={`w-4 h-4 rounded-full ${phaseColors[event.phase] || 'bg-gray-400'}`}></div>
-                  {idx < report.timeline!.events.length - 1 && (
-                    <div className="w-0.5 h-full bg-gray-300 mt-2"></div>
-                  )}
-                </div>
-                <div className="flex-1 pb-4">
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold">{event.action}</span>
-                    {event.critical && (
-                      <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">
-                        关键
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-600">{event.description}</p>
-                  <span className="text-xs text-gray-400">{event.phase}</span>
-                </div>
+      <ul className="space-y-2">
+        {reports.map((r) => (
+          <li key={r.campaign_id} className="border border-line rounded-sm bg-panel px-4 py-3 flex items-center justify-between gap-4">
+            <div className="min-w-0">
+              <div className="font-mono text-xs text-ink2 truncate" title={r.campaign_id}>
+                战役 #{r.campaign_id}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Attack Graph View */}
-      {activeView === 'graph' && report.attack_path && (
-        <div className="bg-white rounded-lg shadow p-6">
-          <h3 className="text-lg font-semibold mb-4">攻击路径图</h3>
-          <div className="space-y-4">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {report.attack_path.nodes.map(node => (
-                <div
-                  key={node.id}
-                  className={`border rounded-lg p-4 ${node.critical ? 'border-red-500 bg-red-50' : 'border-gray-300'}`}
+              <div className="font-mono text-[11px] text-muted mt-0.5 truncate" title={r.target}>{r.target}</div>
+              <div className="text-[11px] text-ghost mt-0.5">
+                {r.finding_count} 项发现 · 风险 {r.risk_score} · 耗时 {r.duration_sec}s
+              </div>
+            </div>
+            <div className="flex items-center gap-3 shrink-0">
+              <span className="text-[11px] text-ghost">{fmtTime(r.started_at)}</span>
+              <div className="flex gap-2.5 whitespace-nowrap">
+                <a
+                  href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.json`}
+                  className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
                 >
-                  <div className="flex items-center gap-2 mb-2">
-                    <span className="text-sm font-semibold">{node.type}</span>
-                    {node.critical && (
-                      <span className="px-2 py-0.5 text-xs bg-red-600 text-white rounded">
-                        CRITICAL
-                      </span>
-                    )}
-                  </div>
-                  <p className="text-sm">{node.label}</p>
-                </div>
-              ))}
+                  JSON
+                </a>
+                <a
+                  href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.md`}
+                  className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
+                >
+                  Markdown
+                </a>
+                <a
+                  href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.html`}
+                  className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
+                >
+                  HTML
+                </a>
+              </div>
             </div>
-
-            <div className="mt-6">
-              <h4 className="font-semibold mb-2">攻击链</h4>
-              {report.attack_path.edges.map((edge, idx) => (
-                <div key={idx} className="flex items-center gap-2 text-sm py-1">
-                  <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                    {edge.from.split(':').pop()}
-                  </span>
-                  <span className="text-gray-400">→</span>
-                  <span className="text-xs text-gray-600">{edge.label}</span>
-                  <span className="text-gray-400">→</span>
-                  <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
-                    {edge.to.split(':').pop()}
-                  </span>
-                  <span className="text-xs text-gray-500">via {edge.method}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
+          </li>
+        ))}
+      </ul>
     </div>
   )
 }

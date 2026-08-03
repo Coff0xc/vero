@@ -1,140 +1,129 @@
-// Web 端工作流管理组件
-import { useState, useEffect } from 'react'
+// Web 端工作流管理组件 —— 提供 target 输入(后端要求 target body 必填,
+// 原版不发 body 导致执行必 400) + 暗色主题 + 执行错误提示。
+import { useState, useEffect, type FormEvent } from 'react'
 
 interface Stage {
   name: string
-  description: string
   tools: string[]
-  sequential: boolean
-  critical: boolean
+  parallel: boolean
 }
 
 interface Workflow {
-  id: string
-  name: string
-  description: string
-  category: string
-  stages: Stage[]
-  tags: string[]
+  Name: string
+  Desc: string
+  Stages: Stage[]
+}
+
+interface WFResult {
+  summary: string
+  duration: string
+  error?: string
 }
 
 export function WorkflowManager() {
   const [workflows, setWorkflows] = useState<Workflow[]>([])
-  const [selectedWorkflow, setSelectedWorkflow] = useState<Workflow | null>(null)
-  const [executing, setExecuting] = useState(false)
+  const [error, setError] = useState('')
+  const [running, setRunning] = useState<string | null>(null)
+  const [result, setResult] = useState<WFResult | null>(null)
+  const [target, setTarget] = useState('http://localhost:3000')
 
   useEffect(() => {
     fetch('/api/workflows')
-      .then(r => r.json())
-      .then(data => setWorkflows(data.workflows || []))
+      .then((r) => r.json())
+      .then((data) => setWorkflows(data.workflows || []))
+      .catch((e) => setError(String(e)))
   }, [])
 
-  const selectWorkflow = (id: string) => {
-    fetch(`/api/workflows/${id}`)
-      .then(r => r.json())
-      .then(data => setSelectedWorkflow(data.workflow))
-  }
-
-  const executeWorkflow = (id: string) => {
-    setExecuting(true)
-    fetch(`/api/workflows/${id}/execute`, { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        alert(`工作流执行状态: ${data.status}`)
-        setExecuting(false)
+  const execute = async (e: FormEvent, name: string) => {
+    e.preventDefault()
+    if (!target.trim()) {
+      setResult({ summary: '需要目标地址', duration: '', error: 'target 不能为空' })
+      return
+    }
+    setRunning(name)
+    setResult(null)
+    try {
+      // 修正: 后端只注册 POST /api/workflows/{id}/execute, 原 /api/workflows/execute 必 405。
+      const r = await fetch(`/api/workflows/${encodeURIComponent(name)}/execute`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ target: target.trim() }),
       })
-  }
-
-  const categoryColors: Record<string, string> = {
-    web: 'bg-blue-500',
-    ad: 'bg-purple-500',
-    cloud: 'bg-cyan-500',
-    container: 'bg-green-500',
+      const body = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        setResult({ summary: `执行失败 (HTTP ${r.status})`, duration: '', error: body.error ?? body.message ?? '未知错误' })
+      } else {
+        setResult({
+          summary: `战役“${name}”已开始, 进度与审批请求请查看战役控制台`,
+          duration: '',
+          error: body.error,
+        })
+      }
+    } catch (err) {
+      setResult({ summary: '请求失败', duration: '', error: String(err) })
+    } finally {
+      setRunning(null)
+    }
   }
 
   return (
     <div className="p-6 space-y-6">
-      <h2 className="text-2xl font-bold">工作流模板</h2>
+      <h2 className="text-lg font-disp font-semibold tracking-wider text-ink2 uppercase">工作流模板</h2>
+      {error && <div className="text-xs text-alert">加载失败: {error}</div>}
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* 工作流列表 */}
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold">预定义模板</h3>
-          {workflows.map(wf => (
-            <div
-              key={wf.id}
-              className="border rounded-lg p-4 cursor-pointer hover:bg-gray-50"
-              onClick={() => selectWorkflow(wf.id)}
-            >
-              <div className="flex items-center justify-between mb-2">
-                <h4 className="font-semibold">{wf.name}</h4>
-                <span className={`px-2 py-1 text-xs rounded text-white ${categoryColors[wf.category]}`}>
-                  {wf.category}
-                </span>
-              </div>
-              <p className="text-sm text-gray-600 mb-2">{wf.description}</p>
-              <div className="flex gap-2">
-                {wf.tags.map(tag => (
-                  <span key={tag} className="px-2 py-1 text-xs bg-gray-200 rounded">
-                    {tag}
-                  </span>
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
+      <div className="max-w-md">
+        <label className="block font-disp text-[10px] tracking-[2px] uppercase text-muted mb-1.5">目标地址 *</label>
+        <input
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          placeholder="http://host:port"
+          spellCheck={false}
+          className="w-full bg-panel2 border border-line text-ink2 text-xs px-3 py-2 rounded-sm font-mono outline-none focus:border-signal"
+        />
+      </div>
 
-        {/* 工作流详情 */}
-        {selectedWorkflow && (
-          <div className="border rounded-lg p-6 space-y-4">
-            <div className="flex justify-between items-center">
-              <h3 className="text-xl font-bold">{selectedWorkflow.name}</h3>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {workflows.map((wf) => (
+          <form key={wf.Name} onSubmit={(e) => execute(e, wf.Name)} className="border border-line rounded-sm bg-panel p-4 space-y-3">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-mono text-sm text-ink2 break-all">{wf.Name}</h3>
+                <p className="text-xs text-muted mt-1 leading-relaxed">{wf.Desc}</p>
+              </div>
               <button
-                onClick={() => executeWorkflow(selectedWorkflow.id)}
-                disabled={executing}
-                className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:opacity-50"
+                type="submit"
+                disabled={running !== null}
+                className="px-3 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-signal text-signal hover:bg-signal hover:text-ink transition disabled:opacity-50 whitespace-nowrap"
               >
-                {executing ? '执行中...' : '执行工作流'}
+                {running === wf.Name ? '执行中…' : '执行'}
               </button>
             </div>
-
-            <p className="text-gray-600">{selectedWorkflow.description}</p>
-
-            <div className="space-y-4">
-              <h4 className="font-semibold">执行阶段</h4>
-              {selectedWorkflow.stages.map((stage, idx) => (
-                <div key={idx} className="border-l-4 border-blue-500 pl-4 py-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className="font-semibold">{idx + 1}. {stage.name}</span>
-                    {stage.critical && (
-                      <span className="px-2 py-0.5 text-xs bg-red-100 text-red-700 rounded">
-                        关键
-                      </span>
-                    )}
-                    {stage.sequential ? (
-                      <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded">
-                        顺序
-                      </span>
-                    ) : (
-                      <span className="px-2 py-0.5 text-xs bg-green-100 text-green-700 rounded">
-                        并行
-                      </span>
-                    )}
+            <div className="space-y-1.5">
+              {wf.Stages.map((st, i) => (
+                <div key={i} className="border-l-2 border-l-ghost pl-2.5">
+                  <div className="text-[11px] text-ghost font-disp tracking-wider uppercase">
+                    {i + 1}. {st.name}
+                    {st.parallel ? <span className="ml-1.5 text-signal">∥ 并行</span> : null}
                   </div>
-                  <p className="text-sm text-gray-600 mb-2">{stage.description}</p>
-                  <div className="flex flex-wrap gap-2">
-                    {stage.tools.map(tool => (
-                      <span key={tool} className="px-2 py-1 text-xs bg-gray-100 rounded font-mono">
-                        {tool}
-                      </span>
-                    ))}
+                  <div className="font-mono text-[11px] text-muted truncate" title={st.tools.join(' · ')}>
+                    {st.tools.join(' · ')}
                   </div>
                 </div>
               ))}
             </div>
-          </div>
-        )}
+          </form>
+        ))}
       </div>
+
+      {result && (
+        <div className={`border rounded-sm p-4 text-xs leading-relaxed ${result.error ? 'border-alert text-alert' : 'border-line text-live'}`}>
+          <div className="font-disp tracking-wider uppercase text-[10px] mb-1">
+            {result.error ? '执行失败' : '已受理'}
+          </div>
+          {result.error ?? result.summary}
+          {result.duration && <span className="text-muted block mt-1">耗时 {result.duration}</span>}
+        </div>
+      )}
     </div>
   )
 }

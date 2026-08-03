@@ -14,9 +14,56 @@ body {
   margin: 0;
   background: #0b0f14;
   color: #cdd6e0;
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
   /* 战术终端质感: 极淡扫描线 */
   background-image: repeating-linear-gradient(0deg, rgba(120, 150, 180, 0.025) 0 1px, transparent 1px 3px);
+}
+
+/* 等宽字体: 全系统栈, 内网/离线环境不依赖 Google Fonts */
+.font-mono {
+  font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, 'Courier New', monospace;
+}
+.font-disp {
+  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+  letter-spacing: 0.05em;
+}
+
+/* 暗色滚动条(修默认白色刺眼) */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: #2a3a4a #0e141c;
+}
+*::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+*::-webkit-scrollbar-track {
+  background: #0e141c;
+}
+*::-webkit-scrollbar-thumb {
+  background: #2a3a4a;
+  border-radius: 4px;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3a4c60;
+}
+
+/* KPI 数字变化的动画提示 */
+@keyframes kpi-flash {
+  0% {
+    background-color: rgba(78, 201, 176, 0.35);
+    transform: scale(1.12);
+  }
+  100% {
+    background-color: transparent;
+    transform: scale(1);
+  }
+}
+.kpi-flash {
+  display: inline-block;
+  padding: 0 6px;
+  border-radius: 4px;
+  animation: kpi-flash 0.7s ease-out;
 }
 
 /* React Flow 暗色适配 */
@@ -28,6 +75,9 @@ body {
 }
 .react-flow__edge-path {
   stroke-width: 1.2;
+}
+.react-flow__node.selected {
+  z-index: 10;
 }
 
 @media (prefers-reduced-motion: reduce) {
