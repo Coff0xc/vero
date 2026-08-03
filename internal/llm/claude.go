@@ -34,6 +34,8 @@ type ClaudeLLM struct {
 	reg     *tools.Registry
 	lastErr string   // 最近一次决策失败原因, 供内核暴露给前端
 	lessons []lesson // 结构化反思教训(Reflector.OnFailure 收集, 注入后续决策 prompt)
+
+	lastReflection string // BattleReflector: 战役级战略反思(每 N 步), 下轮注入 prompt
 }
 
 // NewClaude —— 需要 ANTHROPIC_API_KEY(SDK 默认从环境读)。reg 提供 allowlist。
@@ -116,6 +118,11 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 	defer cancel()
 
+	// 战役级反思注入: 有则追加在 ReAct 轨迹之后, 让下轮决策基于证伪收敛。
+	user := buildReActPromptWithLessons(goal, g, history, c.reg.Specs(), c.lessons)
+	if c.lastReflection != "" {
+		user += "\n\n战役反思(上一轮总结, 参考其方向):\n" + c.lastReflection
+	}
 	msg, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
 		Model:       anthropic.Model(c.model),
 		MaxTokens:   2048,
@@ -126,7 +133,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 			OfTool: &anthropic.ToolChoiceToolParam{Name: "act"},
 		},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(buildReActPromptWithLessons(goal, g, history, c.reg.Specs(), c.lessons))),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(user)),
 		},
 	})
 	if err != nil {
@@ -287,4 +294,49 @@ func oneline(s string, max int) string {
 		return string(r[:max]) + "…"
 	}
 	return s
+}
+
+// chatText —— 无工具纯文本对话(Observe/Reflect 用): 简单消息调用, 90s 超时。
+func (c *ClaudeLLM) chatText(system, user string) (string, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
+	defer cancel()
+	msg, err := c.client.Messages.New(ctx, anthropic.MessageNewParams{
+		Model:     anthropic.Model(c.model),
+		MaxTokens: 1024,
+		System:    []anthropic.TextBlockParam{{Text: system}},
+		Messages: []anthropic.MessageParam{
+			anthropic.NewUserMessage(anthropic.NewTextBlock(user)),
+		},
+	})
+	if err != nil {
+		return "", err
+	}
+	var b strings.Builder
+	for _, block := range msg.Content {
+		if v, ok := block.AsAny().(anthropic.TextBlock); ok {
+			b.WriteString(v.Text)
+		}
+	}
+	return b.String(), nil
+}
+
+// Observe —— 实现 core.Observer(LLM-as-parser): 从工具原始输出提取结构化观察。
+// 证据约束: parseObserveResponse 强制 excerpt 逐字存在于 stdout, 模型编造即丢弃。
+func (c *ClaudeLLM) Observe(tool string, args map[string]any, stdout string) []tools.Observation {
+	raw, err := c.chatText(observeSystem, observePrompt(tool, args, stdout))
+	if err != nil {
+		return nil // 静默降级: 观察失败不阻断战役
+	}
+	return parseObserveResponse(raw, stdout)
+}
+
+// Reflect —— 实现 core.BattleReflector(战役级反思): 战略总结缓存到 lastReflection,
+// 下轮 proposePlan 注入 prompt; 返回文本供内核广播 reflect 事件。
+func (c *ClaudeLLM) Reflect(goal string, g *core.AttackGraph, history []core.HistoryItem) string {
+	txt, err := c.chatText(reflectSystem, reflectPrompt(goal, g, history))
+	if err != nil || strings.TrimSpace(txt) == "" {
+		return ""
+	}
+	c.lastReflection = tools.Clip(strings.TrimSpace(txt), 600)
+	return c.lastReflection
 }

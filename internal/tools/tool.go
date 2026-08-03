@@ -45,12 +45,15 @@ type RunFunc func(args map[string]any) ToolResult
 type ParseFunc func(stdout string, args map[string]any) []Observation
 
 // Tool —— 一个可执行工具(对应 Python Tool)。Parse 可为 nil(无结构化产出)。
+// Produces —— 工具成功后的默认攻击链产出类型(service/web_shell/cred/foothold/shell):
+// 内核在动作未显式标注 produces 时用它建节点+边, 使攻击链不依赖 LLM 自觉填字段。
 type Tool struct {
-	Name  string
-	Level int
-	Desc  string // 给 LLM 的能力描述(能做什么/边界), 让 LLM 不再盲选工具名
-	Run   RunFunc
-	Parse ParseFunc
+	Name     string
+	Level    int
+	Desc     string // 给 LLM 的能力描述(能做什么/边界), 让 LLM 不再盲选工具名
+	Run      RunFunc
+	Parse    ParseFunc
+	Produces string // 可选: 成功即推进的攻击链产出类型
 }
 
 // Registry —— 工具注册表(显式实例, 取代 Python 的全局 REGISTRY dict)。

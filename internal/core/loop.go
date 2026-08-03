@@ -13,6 +13,9 @@ import (
 // HITLThreshold —— >= L3(利用/提权)的动作必须人工批准。
 const HITLThreshold = tools.LevelExploit
 
+// reflectEvery —— 战役级反思间隔(BattleReflector): 每 N 步让决策器总结证伪/策略。
+const reflectEvery = 4
+
 // Approve —— HITL 审批回调: 返回是否放行(CLI 与 Web 各有实现)。
 type Approve func(a Action, level int) bool
 
@@ -64,6 +67,15 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 		if ctx.Err() != nil { // 取消: 立即停, 保留已确认证据
 			emit(Event{Kind: "done", Data: map[string]any{"reason": "战役已被操作员取消"}})
 			break
+		}
+		// 战役级反思: 每 reflectEvery 步一次(有实质动作后), 决策器总结证伪/策略,
+		// 自行缓存并注入下轮 prompt —— 把探索式搜索从“盲目试”变为“基于证伪收敛”。
+		if step > 0 && step%reflectEvery == 0 {
+			if br, ok := llm.(BattleReflector); ok {
+				if txt := br.Reflect(goal, g, history); txt != "" {
+					emit(Event{Kind: "reflect", Data: map[string]any{"text": txt}})
+				}
+			}
 		}
 		// 决策: 支持多步规划的 LLM 一次给一段计划(链式推理);
 		// 老式 LLM 仍按单步 Propose。两者都返回 nil = 决策器认为该结束了。
@@ -164,7 +176,20 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	}
 	// 成功 -> 按工具杀伤级推进阶段状态机(init→recon→scan→exploit)。
 	advancePhase(emit, phase, level)
-	applyObservations(g, tool, action, res, emit)
+	// 固定 parser 结构化; 返回产出条数, 供 LLM-as-observer 兜底判断。
+	n := applyObservations(g, tool, action, res, emit)
+	// LLM-as-observer(黑盒智能渗透核心): 固定 parser 无产出时, 让决策器用语言理解力
+	// 从原始 stdout 提取观察 —— 证据约束不变(Excerpt 逐字回查, 防 LLM 编造)。
+	if n == 0 {
+		if ob, ok := llm.(Observer); ok {
+			for _, o := range ob.Observe(action.Tool, action.Args, res.Stdout) {
+				nid := o.Kind + ":" + o.Key
+				g.UpsertNode(&Node{ID: nid, Type: o.Kind, Label: o.Label, Severity: o.Severity, Technique: o.Technique, Tactic: o.Tactic})
+				_, _ = g.Confirm(nid, Evidence{Tool: action.Tool, Excerpt: o.Excerpt})
+				emitGraph(emit, g, nid, "confirm")
+			}
+		}
+	}
 
 	// claim: 声称默认 hypothesis(不可信), 独立验证才 confirm
 	if action.Claim != "" {
@@ -190,12 +215,18 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	}
 	// 规划产出: 规划步成功 -> 建 produces 类型节点(confirmed, 证据=工具输出)
 	// 并补 rel="produces" 的 confirmed 边(上一阶段节点 -> 产物), 给 FindPath 提供真实攻击链边。
-	if action.Produces != "" {
+	// 动作未显式标注 produces 时, 用工具级默认产出(Tool.Produces)兜底 ——
+	// 攻击链不依赖 LLM 自觉填字段(黑盒自主模式鲁棒性)。
+	pType := action.Produces
+	if pType == "" {
+		pType = tool.Produces
+	}
+	if pType != "" {
 		pt := tools.ArgStr(action.Args, "target", "?")
-		pid := action.Produces + ":" + pt
-		g.UpsertNode(&Node{ID: pid, Type: action.Produces, Label: pt})
+		pid := pType + ":" + pt
+		g.UpsertNode(&Node{ID: pid, Type: pType, Label: pt})
 		_, _ = g.Confirm(pid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
-		if prev := prevStageNode(g, action.Produces); prev != "" && !g.HasEdge(prev, "produces", pid) {
+		if prev := prevStageNode(g, pType, pt); prev != "" && !g.HasEdge(prev, "produces", pid) {
 			g.Edges = append(g.Edges, &Edge{
 				Src: prev, Rel: "produces", Dst: pid, State: StateConfirmed,
 				Evidence: []Evidence{{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)}},
@@ -221,11 +252,13 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 }
 
 // applyObservations —— parser 驱动图: 结构化 observation -> 节点/边 + 证据绑定。
-func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res tools.ToolResult, emit EmitFunc) {
+// 返回产出条数(供 LLM-as-observer 兜底判断: 0 条时交决策器深度理解)。
+func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res tools.ToolResult, emit EmitFunc) int {
 	if tool.Parse == nil {
-		return
+		return 0
 	}
-	for _, o := range tool.Parse(res.Stdout, action.Args) {
+	parsed := tool.Parse(res.Stdout, action.Args)
+	for _, o := range parsed {
 		nid := o.Kind + ":" + o.Key
 		// TTP/severity 走结构化字段(parser 填的), 不从 label 解析; 报告直接读 Node.Severity。
 		g.UpsertNode(&Node{ID: nid, Type: o.Kind, Label: o.Label, Severity: o.Severity, Technique: o.Technique, Tactic: o.Tactic})
@@ -244,6 +277,7 @@ func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res too
 		}
 		emitGraph(emit, g, nid, "confirm")
 	}
+	return len(parsed)
 }
 
 // emitGraph —— graph 事件携带节点 type + 最近证据(供前端点节点检视证据链)。
@@ -294,9 +328,11 @@ func firstLine(s string) string {
 // 与前端 CHAIN 对齐; 真实规划链(planner/LLM produces)都走这条链。
 var attackChainStages = []string{"service", "web_shell", "cred", "foothold", "shell"}
 
-// prevStageNode —— produces 产物类型 stageType 的上一阶段已 confirmed 节点(按插入序取首个)。
+// prevStageNode —— produces 产物类型 stageType 的上一阶段已 confirmed 节点。
+// 优先选 label 含 target 的节点(如产物 web_shell:http://host:3000 应挂在 service:host:3000 上,
+// 而非先扫到的 445), 回退按插入序取首个。
 // 用于把 produces 节点连成攻击链边(如 service -produces-> web_shell -produces-> cred -produces-> foothold)。
-func prevStageNode(g *AttackGraph, stageType string) string {
+func prevStageNode(g *AttackGraph, stageType, target string) string {
 	prev := ""
 	for i, t := range attackChainStages {
 		if t == stageType {
@@ -309,6 +345,20 @@ func prevStageNode(g *AttackGraph, stageType string) string {
 	if prev == "" {
 		return ""
 	}
+	// 第一轮: 前置阶段中 host:port 与产物 target 一致的(如产物 web_shell:http://host:3000
+	// 挂在 service:localhost:3000 上, 而非先扫到的 445)。host:port 规范化后比较。
+	if target != "" {
+		hp := hostPortOf(target)
+		if hp != "" {
+			for _, id := range g.Order {
+				n := g.Nodes[id]
+				if n.Type == prev && n.State == StateConfirmed && strings.Contains(n.Label, hp) {
+					return id
+				}
+			}
+		}
+	}
+	// 回退: 任意前置阶段 confirmed 节点(插入序首个)。
 	for _, id := range g.Order {
 		n := g.Nodes[id]
 		if n.Type == prev && n.State == StateConfirmed {
@@ -316,6 +366,18 @@ func prevStageNode(g *AttackGraph, stageType string) string {
 		}
 	}
 	return ""
+}
+
+// hostPortOf —— 从 URL/主机串里提取 host:port(去 scheme/路径; 无端口保留 host)。
+func hostPortOf(s string) string {
+	hp := s
+	if i := strings.Index(hp, "://"); i >= 0 {
+		hp = hp[i+3:]
+	}
+	if j := strings.IndexAny(hp, "/?"); j >= 0 {
+		hp = hp[:j]
+	}
+	return hp
 }
 
 // advancePhase —— 显式阶段状态机: 按成功工具杀伤级推进 init→recon→scan→exploit。

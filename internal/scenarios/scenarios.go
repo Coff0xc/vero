@@ -232,7 +232,7 @@ func WebPack() Pack {
 			{Name: "web_vuln_scan", Level: tools.LevelScan, Desc: "nuclei 漏洞扫描, 发现 web 暴露面/技术栈/配置缺陷/敏感端点", Run: webVuln, Parse: ParseNuclei},
 			{Name: "ffuf_dir_brute", Level: tools.LevelScan, Desc: "ffuf 目录爆破, 发现隐藏路径/后台/备份文件, 需 wordlist 参数(可选)", Run: ffufDirBrute, Parse: ParseFFUF},
 			{Name: "ffuf_vhost_enum", Level: tools.LevelScan, Desc: "ffuf 虚拟主机枚举, 通过 Host 头爆破子域名, 需 domain 参数", Run: ffufVhostEnum, Parse: ParseFFUFVhost},
-			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 对 /rest/user/login 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi},
+			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 对 /rest/user/login 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi, Produces: "web_shell"},
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			return s["http"] || s["https"] || s["ssl/http"] || s["http-proxy"]
@@ -293,4 +293,5 @@ func RegisterDefaults(m *Manager, reg *tools.Registry) {
 	m.Register(reg, ExploitPack())         // P1: Metasploit RPC
 	m.Register(reg, CloudPack())           // P2: 云环境侦察
 	m.Register(reg, ContainerPack())       // P3: 容器逃逸
+	m.Register(reg, ReconPack())           // 智能渗透: 交互式侦察感知层
 }

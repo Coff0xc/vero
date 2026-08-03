@@ -28,6 +28,24 @@ type Reflector interface {
 	OnFailure(action Action, reason string)
 }
 
+// Observer —— 可选能力(LLM-as-parser, 黑盒智能渗透的核心): 工具执行成功后,
+// 若该工具没有固定 parser(Parse==nil)或固定 parser 产出 0 条观察, 内核把原始 stdout
+// 交给决策器, 让它用语言理解力提取结构化 observation。
+// 证据约束不变: 每条 observation 的 Excerpt 必须逐字存在于 stdout(内核回查),
+// 防 LLM 凭空编造 —— 这是"LLM 理解"与"防幻觉底线"的接缝。
+type Observer interface {
+	Observe(tool string, args map[string]any, stdout string) []tools.Observation
+}
+
+// BattleReflector —— 可选能力(战役级反思): 主循环每 reflectEvery 步调用一次,
+// 决策器总结"哪些假设被证伪/什么模式有效/下一步换什么方向", 返回反思文本
+// (决策器自行缓存并注入下轮 prompt; 返回空串表示无输出)。
+// 与 Reflector(单动作失败教训)互补: 这是粗粒度战略反思, 把探索式搜索从"盲目试"
+// 变为"基于证伪逐步收敛"。
+type BattleReflector interface {
+	Reflect(goal string, g *AttackGraph, history []HistoryItem) string
+}
+
 // Plan —— 一次提议产出的多步计划: 按序执行, 某步失败/被拒即中断后续步。
 // 红队攻击链是依赖推进的(侦察→打点→凭证→横向), 一次给出整段计划让模型做全局推理,
 // 而非每轮只挤下一步 —— 这是对"单步决策"架构缺陷(#44)的核心增强。

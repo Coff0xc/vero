@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/Coff0xc/vero/internal/core"
@@ -28,6 +29,8 @@ type DeepSeekLLM struct {
 	client  *http.Client
 	lastErr string   // 最近一次决策失败原因(API 错误/无效模型等), 供内核暴露给前端
 	lessons []lesson // 结构化反思教训(Reflector.OnFailure 收集, 注入后续决策 prompt)
+
+	lastReflection string // BattleReflector: 战役级战略反思(每 N 步), 下轮注入 prompt
 }
 
 // NewDeepSeek —— apiKey 为空则从 DEEPSEEK_API_KEY 环境变量读。temp 为思考强度(0~1)。
@@ -72,11 +75,16 @@ func (d *DeepSeekLLM) ProposePlan(goal string, g *core.AttackGraph, history []co
 
 func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Plan {
 	props, required := actSchema(d.reg.Names())
+	// 战役级反思注入: 有则追加在 ReAct 轨迹之后, 让下轮决策基于证伪收敛。
+	user := buildReActPromptWithLessons(goal, g, history, d.reg.Specs(), d.lessons)
+	if d.lastReflection != "" {
+		user += "\n\n战役反思(上一轮总结, 参考其方向):\n" + d.lastReflection
+	}
 	body := map[string]any{
 		"model": d.model,
 		"messages": []map[string]any{
 			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": buildReActPromptWithLessons(goal, g, history, d.reg.Specs(), d.lessons)},
+			{"role": "user", "content": user},
 		},
 		"tools": []map[string]any{{
 			"type": "function",
@@ -173,4 +181,88 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces})
 	}
 	return p
+}
+
+// chatText —— 无工具纯文本对话(Observe/Reflect 用): 复用 proposePlan 的
+// 重试/错误处理模式; 返回 choices[0].message.content。
+func (d *DeepSeekLLM) chatText(system, user string) (string, error) {
+	if d.apiKey == "" {
+		return "", fmt.Errorf("deepseek: 未配置 API key")
+	}
+	body := map[string]any{
+		"model": d.model,
+		"messages": []map[string]any{
+			{"role": "system", "content": system},
+			{"role": "user", "content": user},
+		},
+		"max_tokens":  1024,
+		"temperature": d.temp,
+	}
+	raw, _ := json.Marshal(body)
+	var out struct {
+		Choices []struct {
+			Message struct {
+				Content string `json:"content"`
+			} `json:"message"`
+		} `json:"choices"`
+	}
+	var lastErr error
+	for attempt := 0; attempt < 2; attempt++ {
+		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, deepSeekURL, bytes.NewReader(raw))
+		if err != nil {
+			return "", err
+		}
+		req.Header.Set("Authorization", "Bearer "+d.apiKey)
+		req.Header.Set("Content-Type", "application/json")
+		resp, err := d.client.Do(req)
+		if err != nil {
+			lastErr = err
+			time.Sleep(time.Second)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			_ = resp.Body.Close()
+			lastErr = fmt.Errorf("deepseek: HTTP %d", resp.StatusCode)
+			time.Sleep(time.Second)
+			continue
+		}
+		derr := json.NewDecoder(resp.Body).Decode(&out)
+		_ = resp.Body.Close()
+		if derr != nil {
+			lastErr = derr
+			continue
+		}
+		if len(out.Choices) > 0 {
+			return out.Choices[0].Message.Content, nil
+		}
+		lastErr = fmt.Errorf("deepseek: 空响应")
+	}
+	return "", lastErr
+}
+
+// Observe —— 实现 core.Observer(LLM-as-parser): 从工具原始输出提取结构化观察。
+// 证据约束: parseObserveResponse 强制 excerpt 逐字存在于 stdout, 模型编造即丢弃。
+func (d *DeepSeekLLM) Observe(tool string, args map[string]any, stdout string) []tools.Observation {
+	if d.apiKey == "" {
+		return nil
+	}
+	raw, err := d.chatText(observeSystem, observePrompt(tool, args, stdout))
+	if err != nil {
+		return nil // 静默降级: 观察失败不阻断战役
+	}
+	return parseObserveResponse(raw, stdout)
+}
+
+// Reflect —— 实现 core.BattleReflector(战役级反思): 战略总结缓存到 lastReflection,
+// 下轮 proposePlan 注入 prompt; 返回文本供内核广播 reflect 事件。
+func (d *DeepSeekLLM) Reflect(goal string, g *core.AttackGraph, history []core.HistoryItem) string {
+	if d.apiKey == "" {
+		return ""
+	}
+	txt, err := d.chatText(reflectSystem, reflectPrompt(goal, g, history))
+	if err != nil || strings.TrimSpace(txt) == "" {
+		return ""
+	}
+	d.lastReflection = tools.Clip(strings.TrimSpace(txt), 600)
+	return d.lastReflection
 }
