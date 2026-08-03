@@ -9,7 +9,7 @@ export type EventKind =
   | 'workflow_start' | 'workflow_stage' | 'workflow_complete' | 'workflow_cancelled'
   | 'tool_result' | 'tool_error'
   | 'path' | 'phase'
-  | 'error'
+  | 'error' | 'reflect'
 
 export interface EngineData { engine: string; target: string }
 export interface StepData { step: number; tool: string; args: Record<string, unknown>; level: number; why?: string }
@@ -41,6 +41,17 @@ export interface ToolErrorData { tool: string; error: string }
 export interface PathData { nodes: string[] } // 主路径: 连通节点 id 序列
 export interface PhaseData { phase: string } // init/recon/scan/exploit/done
 export interface ErrorData { msg: string }
+export interface ReflectData { text: string }
+
+// ChatMessage —— 对话消息(对话式 UI 的消息流): 用户输入 + 事件渲染成的助手消息。
+export interface ChatMessage {
+  id: number
+  role: 'user' | 'assistant'
+  kind: EventKind | 'user'
+  text: string
+  meta?: LogLine['meta']
+  ts: number
+}
 
 // SSEEvent —— 判别联合: kind 决定 data 的确切形状。
 export type SSEEvent =
@@ -63,6 +74,7 @@ export type SSEEvent =
   | { kind: 'path'; data: PathData }
   | { kind: 'phase'; data: PhaseData }
   | { kind: 'error'; data: ErrorData }
+  | { kind: 'reflect'; data: ReflectData }
 
 export const EVENT_KINDS: readonly EventKind[] = [
   'engine', 'step', 'tool', 'graph', 'edge', 'hitl_request',
@@ -71,6 +83,7 @@ export const EVENT_KINDS: readonly EventKind[] = [
   'tool_result', 'tool_error',
   'path', 'phase',
   'error',
+  'reflect',
 ]
 
 export interface Evidence {
