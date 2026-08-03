@@ -4,14 +4,19 @@ import { useState, useEffect, type FormEvent } from 'react'
 
 interface Stage {
   name: string
+  description?: string
   tools: string[]
-  parallel: boolean
+  sequential: boolean
+  critical?: boolean
 }
 
 interface Workflow {
-  Name: string
-  Desc: string
-  Stages: Stage[]
+  id: string
+  name: string
+  description: string
+  category?: string
+  stages: Stage[]
+  tags?: string[]
 }
 
 interface WFResult {
@@ -43,7 +48,6 @@ export function WorkflowManager() {
     setRunning(name)
     setResult(null)
     try {
-      // 修正: 后端只注册 POST /api/workflows/{id}/execute, 原 /api/workflows/execute 必 405。
       const r = await fetch(`/api/workflows/${encodeURIComponent(name)}/execute`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -84,29 +88,29 @@ export function WorkflowManager() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {workflows.map((wf) => (
-          <form key={wf.Name} onSubmit={(e) => execute(e, wf.Name)} className="border border-line rounded-sm bg-panel p-4 space-y-3">
+          <form key={wf.id} onSubmit={(e) => execute(e, wf.name)} className="border border-line rounded-sm bg-panel p-4 space-y-3">
             <div className="flex items-start justify-between gap-3">
               <div>
-                <h3 className="font-mono text-sm text-ink2 break-all">{wf.Name}</h3>
-                <p className="text-xs text-muted mt-1 leading-relaxed">{wf.Desc}</p>
+                <h3 className="font-mono text-sm text-ink2 break-all">{wf.name}</h3>
+                <p className="text-xs text-muted mt-1 leading-relaxed">{wf.description}</p>
               </div>
               <button
                 type="submit"
                 disabled={running !== null}
                 className="px-3 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-signal text-signal hover:bg-signal hover:text-ink transition disabled:opacity-50 whitespace-nowrap"
               >
-                {running === wf.Name ? '执行中…' : '执行'}
+                {running === wf.name ? '执行中…' : '执行'}
               </button>
             </div>
             <div className="space-y-1.5">
-              {wf.Stages.map((st, i) => (
+              {(wf.stages ?? []).map((st, i) => (
                 <div key={i} className="border-l-2 border-l-ghost pl-2.5">
                   <div className="text-[11px] text-ghost font-disp tracking-wider uppercase">
                     {i + 1}. {st.name}
-                    {st.parallel ? <span className="ml-1.5 text-signal">∥ 并行</span> : null}
+                    {!st.sequential ? <span className="ml-1.5 text-signal">∥ 并行</span> : null}
                   </div>
-                  <div className="font-mono text-[11px] text-muted truncate" title={st.tools.join(' · ')}>
-                    {st.tools.join(' · ')}
+                  <div className="font-mono text-[11px] text-muted truncate" title={(st.tools ?? []).join(' · ')}>
+                    {(st.tools ?? []).join(' · ')}
                   </div>
                 </div>
               ))}

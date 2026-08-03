@@ -23,6 +23,8 @@ export const EVENT_LABELS: Record<string, string> = {
   path: '路径',
   phase: '阶段',
   error: '错误',
+  reflect: '反思',
+  thinking: '思考',
 }
 
 // 工具级别 → 短标签(ToolManager 等复用)。

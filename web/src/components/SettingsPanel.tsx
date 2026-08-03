@@ -5,6 +5,7 @@ import { useEffect, useState, type FormEvent } from 'react'
 import { useStore } from '../store'
 import type { ConfigPublic } from '../types'
 import { ENGINE_ZH, ENGINE_DESC } from '../lib/i18n'
+import { ProviderSection } from './ProviderSection'
 
 interface KeyState {
   value: string // 新输入的 key(空 = 未改)
@@ -61,6 +62,10 @@ export function SettingsPanel() {
           max_budget: body.max_budget ?? 10,
           has_anthropic: !!body.has_anthropic,
           has_deepseek: !!body.has_deepseek,
+          yolo: !!body.yolo,
+          deep_thinking: !!body.deep_thinking,
+          providers: body.providers ?? [],
+          active_provider: body.active_provider ?? '',
         })
       })
       .catch((e) => setNotice({ ok: false, msg: `读取配置失败: ${String(e)}` }))
@@ -322,6 +327,8 @@ export function SettingsPanel() {
           <span className="text-[11px] text-muted">单次战役的决策迭代次数上限</span>
         </div>
       </section>
+
+      <ProviderSection />
     </form>
   )
 }

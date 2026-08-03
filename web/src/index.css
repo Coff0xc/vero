@@ -12,11 +12,16 @@ body,
 }
 body {
   margin: 0;
-  background: #0b0f14;
+  background: #0a0d12;
   color: #cdd6e0;
   font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
-  /* 战术终端质感: 极淡扫描线 */
-  background-image: repeating-linear-gradient(0deg, rgba(120, 150, 180, 0.025) 0 1px, transparent 1px 3px);
+  /* 作战室氛围: 顶部琥珀微光 + 左下青色微光 + 极淡扫描线 */
+  background-image:
+    radial-gradient(1200px 480px at 72% -12%, rgba(232, 178, 58, 0.045), transparent 62%),
+    radial-gradient(900px 420px at 8% 112%, rgba(78, 201, 176, 0.035), transparent 60%),
+    repeating-linear-gradient(0deg, rgba(120, 150, 180, 0.02) 0 1px, transparent 1px 3px);
+  background-attachment: fixed;
+  -webkit-font-smoothing: antialiased;
 }
 
 /* 等宽字体: 全系统栈, 内网/离线环境不依赖 Google Fonts */
@@ -28,24 +33,40 @@ body {
   letter-spacing: 0.05em;
 }
 
-/* 暗色滚动条(修默认白色刺眼) */
+/* 选中文本: 琥珀色呼应主强调色 */
+::selection {
+  background: rgba(232, 178, 58, 0.28);
+  color: #f2f6fa;
+}
+
+/* 暗色滚动条: 细、透明轨道、hover 亮起 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #2a3a4a #0e141c;
+  scrollbar-color: #24313f transparent;
 }
 *::-webkit-scrollbar {
-  width: 9px;
-  height: 9px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-track {
-  background: #0e141c;
+  background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #2a3a4a;
-  border-radius: 4px;
+  background: #24313f;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
   background: #3a4c60;
+  background-clip: content-box;
+}
+
+/* 键盘聚焦可见性(可访问性): 琥珀细环 */
+:focus-visible {
+  outline: 1.5px solid rgba(232, 178, 58, 0.55);
+  outline-offset: 2px;
+  border-radius: 4px;
 }
 
 /* KPI 数字变化的动画提示 */
@@ -111,22 +132,7 @@ body {
   animation: card-pop 0.22s ease-out;
 }
 
-/* 攻击图节点出现: 淡入 + 缩放 */
-@keyframes node-pop {
-  from {
-    opacity: 0;
-    transform: scale(0.75);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-.rf-node-pop {
-  animation: node-pop 0.35s ease-out;
-}
-
-/* 已证实节点呼吸发光 */
+/* 已证实节点呼吸发光(仅 box-shadow, 不动 transform —— ReactFlow 节点定位依赖 transform) */
 @keyframes node-glow {
   0%,
   100% {
@@ -138,6 +144,162 @@ body {
 }
 .rf-node-glow {
   animation: node-glow 2.4s ease-in-out infinite;
+}
+
+/* ---- 精致化工具类 ---- */
+
+/* 玻璃面板: 半透明 + 背景模糊, 用于浮层/输入区 */
+.glass {
+  background: rgba(14, 20, 28, 0.78);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+/* 卡片悬浮: hover 微浮起 + 边框亮起(配合 transition) */
+.card-lift {
+  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+}
+.card-lift:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.35);
+}
+
+/* 主行动按钮: 青绿渐变 + 深色文字 + hover 发光 */
+.btn-accent {
+  background: linear-gradient(135deg, #4ec9b0 0%, #37a790 100%);
+  color: #07211b;
+  font-weight: 600;
+  transition: box-shadow 0.18s ease, filter 0.18s ease, transform 0.12s ease;
+}
+.btn-accent:hover:not(:disabled) {
+  box-shadow: 0 0 16px rgba(78, 201, 176, 0.4);
+  filter: brightness(1.06);
+}
+.btn-accent:active:not(:disabled) {
+  transform: scale(0.97);
+}
+.btn-accent:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* 危险行动按钮: 红调描边 + hover 填充微光 */
+.btn-danger {
+  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+}
+.btn-danger:hover:not(:disabled) {
+  box-shadow: 0 0 14px rgba(255, 92, 77, 0.3);
+}
+.btn-danger:active:not(:disabled) {
+  transform: scale(0.97);
+}
+
+/* 打字光标(对话等待/流式输出) */
+@keyframes caret-blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+.caret-blink {
+  animation: caret-blink 1s step-end infinite;
+}
+
+/* 加载三点(思考中) */
+@keyframes dot-pulse {
+  0%,
+  80%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  40% {
+    opacity: 1;
+    transform: translateY(-2px);
+  }
+}
+.dot-pulse {
+  display: inline-block;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+}
+.dot-pulse:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.dot-pulse:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+/* 状态点光环(运行中) */
+@keyframes ring-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(232, 178, 58, 0.45);
+  }
+  70% {
+    box-shadow: 0 0 0 6px rgba(232, 178, 58, 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(232, 178, 58, 0);
+  }
+}
+.ring-pulse {
+  animation: ring-pulse 1.6s ease-out infinite;
+}
+
+/* Hero 徽标漂浮 + 光晕呼吸 */
+@keyframes hero-float {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+@keyframes hero-halo {
+  0%,
+  100% {
+    box-shadow: 0 0 18px rgba(78, 201, 176, 0.18), 0 0 42px rgba(78, 201, 176, 0.06);
+  }
+  50% {
+    box-shadow: 0 0 26px rgba(78, 201, 176, 0.32), 0 0 60px rgba(78, 201, 176, 0.1);
+  }
+}
+.hero-badge {
+  animation: hero-float 3.2s ease-in-out infinite, hero-halo 3.2s ease-in-out infinite;
+}
+
+/* 骨架微光(通用 loading) */
+@keyframes shimmer {
+  0% {
+    background-position: -200px 0;
+  }
+  100% {
+    background-position: 200px 0;
+  }
+}
+.shimmer {
+  background: linear-gradient(90deg, rgba(120, 150, 180, 0.06) 25%, rgba(120, 150, 180, 0.14) 50%, rgba(120, 150, 180, 0.06) 75%);
+  background-size: 400px 100%;
+  animation: shimmer 1.4s linear infinite;
+}
+
+/* 分区标题: 字母拉开 + 左侧琥珀刻度 */
+.section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  letter-spacing: 2.5px;
+}
+.section-title::before {
+  content: '';
+  display: inline-block;
+  width: 3px;
+  height: 10px;
+  border-radius: 2px;
+  background: linear-gradient(180deg, #e8b23a, rgba(232, 178, 58, 0.25));
 }
 
 @media (prefers-reduced-motion: reduce) {

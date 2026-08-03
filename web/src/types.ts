@@ -9,7 +9,7 @@ export type EventKind =
   | 'workflow_start' | 'workflow_stage' | 'workflow_complete' | 'workflow_cancelled'
   | 'tool_result' | 'tool_error'
   | 'path' | 'phase'
-  | 'error' | 'reflect'
+  | 'error' | 'reflect' | 'thinking'
 
 export interface EngineData { engine: string; target: string }
 export interface StepData { step: number; tool: string; args: Record<string, unknown>; level: number; why?: string }
@@ -42,12 +42,13 @@ export interface PathData { nodes: string[] } // 主路径: 连通节点 id 序�
 export interface PhaseData { phase: string } // init/recon/scan/exploit/done
 export interface ErrorData { msg: string }
 export interface ReflectData { text: string }
+export interface ThinkingData { text: string } // 深度思考: 决策器思维链(reasoning_content)
 
-// ChatMessage —— 对话消息(对话式 UI 的消息流): 用户输入 + 事件渲染成的助手消息。
+// ChatMessage —— 对话消息(对话式 UI 的消息流): 用户输入 + 事件渲染成的助手消息 + 问答回复。
 export interface ChatMessage {
   id: number
   role: 'user' | 'assistant'
-  kind: EventKind | 'user'
+  kind: EventKind | 'user' | 'chat'
   text: string
   meta?: LogLine['meta']
   ts: number
@@ -75,6 +76,7 @@ export type SSEEvent =
   | { kind: 'phase'; data: PhaseData }
   | { kind: 'error'; data: ErrorData }
   | { kind: 'reflect'; data: ReflectData }
+  | { kind: 'thinking'; data: ThinkingData }
 
 export const EVENT_KINDS: readonly EventKind[] = [
   'engine', 'step', 'tool', 'graph', 'edge', 'hitl_request',
@@ -84,6 +86,7 @@ export const EVENT_KINDS: readonly EventKind[] = [
   'path', 'phase',
   'error',
   'reflect',
+  'thinking',
 ]
 
 export interface Evidence {
@@ -161,6 +164,39 @@ export interface ConfigPublic {
   max_budget: number
   has_anthropic: boolean
   has_deepseek: boolean
+  yolo: boolean // YOLO 模式: 跳过 HITL 审批
+  deep_thinking: boolean // 深度思考模式
+  providers: ProviderPublic[] // 多提供商(OpenAI 兼容)
+  active_provider: string
+  presets?: ProviderPreset[]
+}
+
+// ProviderPublic —— 提供商视图(密钥只回显是否已配置)。
+export interface ProviderPublic {
+  id: string
+  name: string
+  base_url: string
+  model: string
+  has_key: boolean
+  supports_reasoning: boolean
+  web_search: boolean
+}
+
+export interface ProviderPreset {
+  id: string
+  name: string
+  base_url: string
+}
+
+// ProviderPatch —— 设置面板提交的提供商(空 api_key = 保留原值)。
+export interface ProviderPatch {
+  id: string
+  name: string
+  base_url: string
+  api_key?: string
+  model?: string
+  supports_reasoning?: boolean
+  web_search?: boolean
 }
 
 // POST /api/config 请求体 —— 仅提交变更字段; 空 key 字段 = 不改, 清空显式用 clear_*:true。

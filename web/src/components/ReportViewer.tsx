@@ -23,6 +23,25 @@ export function ReportViewer() {
   const [reports, setReports] = useState<Report[]>([])
   const [error, setError] = useState('')
   const [busy, setBusy] = useState(false)
+  const [notice, setNotice] = useState('')
+
+  const [genBusy, setGenBusy] = useState<string | null>(null)
+
+  // 点击生成报告(不再随战役自动生成)。
+  const genReport = async (id: string) => {
+    setGenBusy(id)
+    try {
+      const r = await fetch(`/api/campaigns/${encodeURIComponent(id)}/report`, { method: 'POST' })
+      const body = (await r.json().catch(() => ({}))) as { ok?: boolean; file?: string; error?: string }
+      if (!r.ok || !body.ok) throw new Error(body.error ?? `HTTP ${r.status}`)
+      setError('')
+      setGenBusy(null)
+      setNotice(`报告已生成: ${body.file} (Markdown/HTML/JSON 可在线查看)`)
+    } catch (err) {
+      setGenBusy(null)
+      setNotice(`生成失败: ${String(err)}`)
+    }
+  }
 
   const load = () => {
     setBusy(true)
@@ -53,6 +72,7 @@ export function ReportViewer() {
       </div>
 
       {error && <div className="text-xs text-alert">加载失败: {error}</div>}
+      {notice && <div className="text-xs text-live">{notice}</div>}
 
       {reports.length === 0 && !error && (
         <div className="border border-dashed border-line rounded-sm p-8 text-center text-muted text-xs">
@@ -74,9 +94,25 @@ export function ReportViewer() {
             </div>
             <div className="flex items-center gap-3 shrink-0">
               <span className="text-[11px] text-ghost">{fmtTime(r.started_at)}</span>
-              <div className="flex gap-2.5 whitespace-nowrap">
+              <div className="flex gap-2.5 whitespace-nowrap items-center">
+                <button
+                  onClick={() => void genReport(r.campaign_id)}
+                  className="text-[11px] px-2 py-0.5 rounded border border-signal text-signal hover:bg-signal/10 transition-colors"
+                >
+                  {genBusy === r.campaign_id ? '生成中…' : '生成报告'}
+                </button>
+                <a
+                  href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.html`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-[11px] text-signal hover:text-ink2 underline underline-offset-2"
+                >
+                  在线查看
+                </a>
                 <a
                   href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.json`}
+                  target="_blank"
+                  rel="noreferrer"
                   className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
                 >
                   JSON
@@ -86,12 +122,6 @@ export function ReportViewer() {
                   className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
                 >
                   Markdown
-                </a>
-                <a
-                  href={`/api/campaigns/${encodeURIComponent(r.campaign_id)}/report.html`}
-                  className="text-[11px] text-live hover:text-ink2 underline underline-offset-2"
-                >
-                  HTML
                 </a>
               </div>
             </div>
