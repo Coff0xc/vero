@@ -101,6 +101,25 @@ func (s *Store) EndCampaign(campaignID int64, confirmed, hypothesis, violations 
 	return err
 }
 
+// DeleteCampaign —— 删除战役及其关联事件/快照(对话式 UI 的“删除历史会话”)。
+func (s *Store) DeleteCampaign(id int64) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for _, q := range []string{
+		"DELETE FROM graph_snapshots WHERE campaign_id = ?",
+		"DELETE FROM events WHERE campaign_id = ?",
+		"DELETE FROM campaigns WHERE id = ?",
+	} {
+		if _, err := tx.Exec(q, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
 // Campaign —— 一行战役记录。
 type Campaign struct {
 	ID                 int64             `json:"id"`
@@ -196,4 +215,24 @@ func (s *Store) GetCampaign(id string) (*Campaign, error) {
 	// 如果没有快照，Graph 保持 nil
 
 	return &c, nil
+}
+
+// ListEvents —— 某战役的事件流(历史会话回放)。
+func (s *Store) ListEvents(campaignID int64) ([]map[string]any, error) {
+	rows, err := s.db.Query("SELECT kind, data FROM events WHERE campaign_id = ? ORDER BY id ASC", campaignID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []map[string]any{} // 空切片而非 nil(前端 JSON 消费友好, 修 null.map 崩溃)
+	for rows.Next() {
+		var kind, data string
+		if err := rows.Scan(&kind, &data); err != nil {
+			return nil, err
+		}
+		var d map[string]any
+		_ = json.Unmarshal([]byte(data), &d)
+		out = append(out, map[string]any{"kind": kind, "data": d})
+	}
+	return out, rows.Err()
 }

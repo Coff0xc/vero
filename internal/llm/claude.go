@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/anthropics/anthropic-sdk-go"
+	"github.com/anthropics/anthropic-sdk-go/option"
 	"github.com/anthropics/anthropic-sdk-go/packages/param"
 
 	"github.com/Coff0xc/vero/internal/core"
@@ -38,14 +39,19 @@ type ClaudeLLM struct {
 	lastReflection string // BattleReflector: 战役级战略反思(每 N 步), 下轮注入 prompt
 }
 
-// NewClaude —— 需要 ANTHROPIC_API_KEY(SDK 默认从环境读)。reg 提供 allowlist。
-// temp 为思考强度(0~1, 低=稳健; 0 表示用模型默认)。
-func NewClaude(reg *tools.Registry, temp float64) *ClaudeLLM {
+// NewClaude —— reg 提供 allowlist; apiKey 非空时显式注入(修: 原实现不接 key,
+// UI 配的 Claude key 进不了 SDK —— 只从 env 读, 文件 key 链路断裂导致 401)。
+// apiKey 为空则回退 SDK 默认(ANTHROPIC_API_KEY 环境变量)。temp 为思考强度(0~1)。
+func NewClaude(reg *tools.Registry, apiKey string, temp float64) *ClaudeLLM {
 	model := modelFromEnv()
 	if model == "" {
 		model = DefaultModel
 	}
-	return &ClaudeLLM{client: anthropic.NewClient(), model: model, temp: temp, reg: reg}
+	var opts []option.RequestOption
+	if apiKey != "" {
+		opts = append(opts, option.WithAPIKey(apiKey))
+	}
+	return &ClaudeLLM{client: anthropic.NewClient(opts...), model: model, temp: temp, reg: reg}
 }
 
 // modelFromEnv —— 统一读 VERO_MODEL(兼容旧 REDCELL_MODEL)。
@@ -339,4 +345,9 @@ func (c *ClaudeLLM) Reflect(goal string, g *core.AttackGraph, history []core.His
 	}
 	c.lastReflection = tools.Clip(strings.TrimSpace(txt), 600)
 	return c.lastReflection
+}
+
+// Chat —— 对话式问答(对话智能): 基于战役上下文 + 多轮历史回答用户问题。
+func (c *ClaudeLLM) Chat(context, question string, history [][2]string) (string, error) {
+	return c.chatText(chatSystem, ChatPrompt(context, question, history))
 }

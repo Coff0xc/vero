@@ -2,6 +2,8 @@ package server
 
 import (
 	"context"
+	"encoding/json"
+	"net/http"
 	"fmt"
 	"os"
 	"sort"
@@ -47,7 +49,10 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 
 	reg, sm := buildLiveRegistry()
 
-	cid, _ := s.store.StartCampaign("侦察 " + target)
+	cid, err0 := s.store.StartCampaign("侦察 " + target)
+	if err0 != nil {
+		s.broker.Emit(core.Event{Kind: "error", Data: map[string]any{"msg": "战役持久化失败: " + err0.Error()}})
+	}
 
 	// emit —— 事件广播闭包: 审计 + 落库 + SSE。必须在决策引擎选择前定义(引擎选择也会广播事件)。
 	emit := func(e core.Event) {
@@ -62,55 +67,46 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 		s.broker.Emit(e)
 	}
 
-	// 决策引擎: 工作台配置决定(引擎/key/思考强度/预算), 不再只看环境变量。
+	// 决策引擎: 多提供商(OpenAI 兼容)优先, 兼容旧 claude/deepseek 配置; 无 key 回退脚本。
 	var chosen core.LLM
 	engine := "脚本(无 key)"
+	s.cfgMu.Lock()
 	cfg := s.cfg
-	switch cfg.Engine {
-	case config.EngineScript:
+	s.cfgMu.Unlock()
+	// YOLO 模式: 跳过全部 HITL 审批(授权靶场/自动化)。
+	approve := func(a core.Action, lvl int) bool { return s.gate.ApproveCtx(ctx, a, lvl) }
+	if cfg.YOLO {
+		approve = core.AutoApprove
+	}
+	prov := cfg.Active()
+	useProvider := prov != nil && prov.Model != "" && (prov.APIKey != "" || prov.ID == "ollama")
+	switch {
+	case cfg.Engine == config.EngineScript:
 		chosen = scriptLLM(reg, target)
 		engine = "脚本(固定)"
-	case config.EngineClaude:
-		if cfg.AnthropicKey == "" {
-			emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置 ANTHROPIC_API_KEY, 回退脚本模式"}})
-			chosen = scriptLLM(reg, target)
-			engine = "脚本(key 缺失回退)"
-		} else {
-			chosen = llm.WithTarget(llm.NewClaude(reg, cfg.Temperature), target)
-			engine = "Claude 自主"
+	case useProvider:
+		chosen = llm.WithTarget(llm.NewOpenAI(prov, reg, cfg.Temperature), target)
+		engine = prov.Name + " 自主"
+		if cfg.DeepThinking {
+			engine += "·深度思考"
 		}
-	case config.EngineDeepSeek:
-		if cfg.DeepSeekKey == "" {
-			emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置 DEEPSEEK_API_KEY, 回退脚本模式"}})
-			chosen = scriptLLM(reg, target)
-			engine = "脚本(key 缺失回退)"
-		} else {
-			chosen = llm.WithTarget(llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature), target)
-			engine = "DeepSeek 自主"
-		}
-	default: // auto: 有 key 用真实模型, 否则脚本
-		switch {
-		case cfg.DeepSeekKey != "":
-			chosen = llm.WithTarget(llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature), target)
-			engine = "DeepSeek 自主"
-		case cfg.AnthropicKey != "":
-			chosen = llm.WithTarget(llm.NewClaude(reg, cfg.Temperature), target)
-			engine = "Claude 自主"
-		default:
-			chosen = scriptLLM(reg, target)
-		}
+	case cfg.AnthropicKey != "":
+		chosen = llm.WithTarget(llm.NewClaude(reg, cfg.AnthropicKey, cfg.Temperature), target)
+		engine = "Claude 自主"
+	default:
+		emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置可用模型(提供商 key/模型), 回退脚本模式"}})
+		chosen = scriptLLM(reg, target)
+		engine = "脚本(key 缺失回退)"
 	}
 
-	s.broker.Emit(core.Event{Kind: "engine", Data: map[string]any{"engine": engine, "target": target}})
+	s.broker.Emit(core.Event{Kind: "engine", Data: map[string]any{"engine": engine, "target": target, "yolo": cfg.YOLO}})
 
 	goal := "对目标 " + target + " 做红队侦察与漏洞验证: 端口扫描→HTTP指纹→漏扫→发现可利用点尝试利用(如 SQLi)。用真实证据坐实; 充分则停止。"
 	budget := cfg.MaxBudget
 	if budget < 1 {
 		budget = 10
 	}
-	g, trace := core.RunAgentCtx(ctx, goal, chosen, reg, func(a core.Action, lvl int) bool {
-		return s.gate.ApproveCtx(ctx, a, lvl) // 取消时 HITL 等待立即解除
-	}, emit, budget)
+	g, trace := core.RunAgentCtx(ctx, goal, chosen, reg, approve, emit, budget)
 
 	services := map[string]bool{}
 	for _, n := range g.Nodes {
@@ -143,6 +139,9 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 	reportFile := fmt.Sprintf("vero-report-%d.md", cid)
 	md := report.Markdown(target, g, viol, time.Now().Format("2006-01-02 15:04:05"))
 	_ = os.WriteFile(reportFile, []byte(md), 0o644)
+
+	// 捕获战役上下文(对话式问答感知: /api/chat 基于它回答)。
+	s.captureCtx(target, engine, g)
 
 	emit(core.Event{Kind: "summary", Data: map[string]any{
 		"confirmed": conf, "hypothesis": hypo, "evidence_violations": viol, "report": reportFile}})
@@ -180,4 +179,107 @@ func mainPath(g *core.AttackGraph) []string {
 		}
 	}
 	return nil
+}
+
+// campaignCtx —— 最近一次战役的对话感知上下文。
+type campaignCtx struct {
+	Target string
+	Engine string
+	Graph  *core.AttackGraph
+}
+
+// captureCtx —— 战役结束(或取消)时捕获上下文, 供 /api/chat 感知。
+func (s *Server) captureCtx(target, engine string, g *core.AttackGraph) {
+	s.ctxMu.Lock()
+	s.lastCtx = &campaignCtx{Target: target, Engine: engine, Graph: g}
+	s.ctxMu.Unlock()
+}
+
+// campaignContext —— 把最近战役渲染成问答上下文(confirmed 发现 + severity + 证据 excerpt)。
+func (s *Server) campaignContext() string {
+	s.ctxMu.Lock()
+	lc := s.lastCtx
+	s.ctxMu.Unlock()
+	if lc == nil || lc.Graph == nil {
+		return "(当前无战役数据 — 先发起一次渗透, 或询问通用安全知识)"
+	}
+	var b strings.Builder
+	fmt.Fprintf(&b, "目标: %s\n引擎: %s\n", lc.Target, lc.Engine)
+	b.WriteString("\n已确认发现(confirmed, 证据逐字可查):\n")
+	n := 0
+	for _, id := range lc.Graph.Order {
+		node := lc.Graph.Nodes[id]
+		if node.State != core.StateConfirmed {
+			continue
+		}
+		n++
+		fmt.Fprintf(&b, "- %s (%s)", id, node.Type)
+		if node.Severity != "" {
+			fmt.Fprintf(&b, " severity=%s", node.Severity)
+		}
+		if node.Technique != "" {
+			fmt.Fprintf(&b, " ATT&CK=%s", node.Technique)
+		}
+		if len(node.Evidence) > 0 {
+			fmt.Fprintf(&b, " 证据[%s]: %s", node.Evidence[0].Tool, tools.Clip(node.Evidence[0].Excerpt, 90))
+		}
+		b.WriteString("\n")
+		if n >= 25 {
+			b.WriteString("...\n")
+			break
+		}
+	}
+	if n == 0 {
+		b.WriteString("(无 — 战役可能未发现漏洞或已失败)\n")
+	}
+	// 待验证假设(供回答时区分)。
+	hypo := 0
+	for _, id := range lc.Graph.Order {
+		if lc.Graph.Nodes[id].State == core.StateHypothesis {
+			hypo++
+		}
+	}
+	fmt.Fprintf(&b, "\n待验证假设: %d 条\n", hypo)
+	return b.String()
+}
+
+// handleChat —— 对话式问答: 感知当前战役上下文, 用配置的 LLM 回答用户问题。
+// 请求: {question, history?[[role,content]...]}; 响应: {answer}。
+func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
+	var body struct {
+		Question string     `json:"question"`
+		History  [][2]string `json:"history"`
+	}
+	_ = json.NewDecoder(r.Body).Decode(&body)
+	if strings.TrimSpace(body.Question) == "" {
+		http.Error(w, "question required", http.StatusBadRequest)
+		return
+	}
+	ctx := s.campaignContext()
+	reg := tools.NewRegistry()
+	s.cfgMu.Lock()
+	cfg := s.cfg
+	s.cfgMu.Unlock()
+	var chat llm.Chatter
+	var thinking string
+	var oai *llm.OpenAILLM
+	if prov := cfg.Active(); prov != nil && prov.Model != "" && (prov.APIKey != "" || prov.ID == "ollama") {
+		oai = llm.NewOpenAI(prov, reg, cfg.Temperature)
+		chat = oai
+	} else if cfg.AnthropicKey != "" {
+		chat = llm.NewClaude(reg, cfg.AnthropicKey, cfg.Temperature)
+	} else {
+		http.Error(w, "未配置可用模型(请先在设置中填入提供商 key 与模型)", http.StatusBadGateway)
+		return
+	}
+	answer, err := chat.Chat(ctx, body.Question, body.History)
+	if err != nil {
+		http.Error(w, "对话服务不可用: "+err.Error(), http.StatusBadGateway)
+		return
+	}
+	// 深度思考: 同步取思维链(修 defer 时序 —— 原实现 defer 在 writeJSON 后才执行, thinking 恒空)。
+	if cfg.DeepThinking && oai != nil {
+		thinking = oai.LastThinking()
+	}
+	writeJSON(w, map[string]any{"answer": answer, "thinking": thinking})
 }

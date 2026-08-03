@@ -7,6 +7,7 @@ package server
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"net"
 	"net/http"
@@ -40,6 +41,11 @@ type Server struct {
 
 	installMu sync.Mutex // 工具自动安装防并发
 	cfg       *config.Config
+
+	ctxMu   sync.Mutex
+	lastCtx *campaignCtx // 最近一次战役的上下文(对话式问答感知用)
+
+	cfgMu sync.Mutex // 配置并发保护(handleConfigSet 与战役/chat 并发读, 修 data race)
 }
 
 // New —— 组装 server。webFS 为前端静态资源(embed 或 os.DirFS), 其根含 index.html。
@@ -71,14 +77,19 @@ func (s *Server) Router() http.Handler {
 	r.Get("/events", s.handleEvents)
 	r.Post("/start", s.handleStart)
 	r.Post("/approve", s.handleApprove)
+	r.Get("/api/approvals/pending", s.handleApprovalsPending)
 	r.Post("/cancel", s.handleCancel)
+	r.Post("/chat", s.handleChat) // 对话式问答(感知当前战役上下文)
 	r.Get("/healthz", s.handleHealth)
 	r.Get("/api/campaigns", s.handleCampaigns)
+	r.Delete("/api/campaigns/{id}", s.handleCampaignDelete)
 
 	// 报告导出端点（新增）
 	r.Get("/api/reports", s.handleReportsList)
 	r.Get("/api/campaigns/{id}/report.json", s.handleReportJSON)
 	r.Get("/api/campaigns/{id}/report.md", s.handleReportMarkdown)
+	r.Get("/api/campaigns/{id}/events", s.handleCampaignEvents)
+	r.Post("/api/campaigns/{id}/report", s.handleReportGenerate)
 	r.Get("/api/campaigns/{id}/report.html", s.handleReportHTML)
 
 	// 工具管理 API
@@ -91,6 +102,7 @@ func (s *Server) Router() http.Handler {
 	// 工作台配置 API
 	r.Get("/api/config", s.handleConfigGet)
 	r.Post("/api/config", s.handleConfigSet)
+	r.Post("/api/providers/test", s.handleProviderTest) // 测试提供商连接 + 拉模型列表
 
 	// 工作流模板 API
 	r.Get("/api/workflows", s.handleWorkflowList)
@@ -195,6 +207,21 @@ func (s *Server) handleApprove(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, map[string]any{"ok": true})
 }
 
+// handleCampaignDelete —— 删除战役(对话 UI 的删除历史会话)。
+func (s *Server) handleCampaignDelete(w http.ResponseWriter, r *http.Request) {
+	idStr := chi.URLParam(r, "id")
+	var id int64
+	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil || id <= 0 {
+		http.Error(w, "无效的战役 ID", http.StatusBadRequest)
+		return
+	}
+	if err := s.store.DeleteCampaign(id); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
 // handleCampaigns —— 最近战役列表(回溯用)。
 func (s *Server) handleCampaigns(w http.ResponseWriter, r *http.Request) {
 	cs, err := s.store.ListCampaigns(20)
@@ -240,7 +267,7 @@ func originGuard(next http.Handler) http.Handler {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			u, err := url.Parse(origin)
-			if err != nil || u.Hostname() != hostnameOf(r.Host) {
+			if err != nil || u.Host != r.Host { // 完整 host:port 比较(修: 原只比 hostname, 异端口页面可操控本服务)
 				http.Error(w, "forbidden: cross-origin request rejected", http.StatusForbidden)
 				return
 			}
@@ -255,4 +282,10 @@ func hostnameOf(hostport string) string {
 		return h
 	}
 	return hostport
+}
+
+// handleApprovalsPending —— GET /api/approvals/pending: 当前挂起的审批 key 列表。
+// 前端 SSE 重连时先拉一次, 补回断线期间丢失的 hitl_request(修 #6)。
+func (s *Server) handleApprovalsPending(w http.ResponseWriter, r *http.Request) {
+	writeJSON(w, map[string]any{"pending": s.gate.Pending()})
 }

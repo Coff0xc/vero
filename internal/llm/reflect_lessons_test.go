@@ -12,7 +12,7 @@ import (
 // 并在后续决策 prompt 中可见 —— 这是 Reflexion 模式的核心闭环。
 
 func TestOnFailureAccumulatesLessons(t *testing.T) {
-	c := NewClaude(tools.NewRegistry(), 0.2)
+	c := NewClaude(tools.NewRegistry(), "", 0.2)
 	if _, ok := any(c).(core.Reflector); !ok {
 		t.Fatal("ClaudeLLM 应实现 core.Reflector")
 	}
@@ -72,7 +72,7 @@ func TestLessonsEmptyBlockOmitted(t *testing.T) {
 
 // 同工具去重: 同一工具多次失败只保留最新原因, 防 prompt 膨胀。
 func TestLessonDedupByTool(t *testing.T) {
-	c := NewClaude(tools.NewRegistry(), 0.2)
+	c := NewClaude(tools.NewRegistry(), "", 0.2)
 	c.OnFailure(core.Action{Tool: "nmap_scan", Args: map[string]any{"target": "10.0.0.5"}}, "timeout")
 	c.OnFailure(core.Action{Tool: "nmap_scan", Args: map[string]any{"target": "10.0.0.6"}}, "permission denied")
 	if len(c.lessons) != 1 {

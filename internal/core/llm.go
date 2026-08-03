@@ -46,6 +46,12 @@ type BattleReflector interface {
 	Reflect(goal string, g *AttackGraph, history []HistoryItem) string
 }
 
+// ThinkingReporter —— 可选能力(深度思考): 决策器最近一次决策的思维链
+// (reasoning_content), 内核每轮决策后广播 thinking 事件, 前端折叠展示思考过程。
+type ThinkingReporter interface {
+	LastThinking() string
+}
+
 // Plan —— 一次提议产出的多步计划: 按序执行, 某步失败/被拒即中断后续步。
 // 红队攻击链是依赖推进的(侦察→打点→凭证→横向), 一次给出整段计划让模型做全局推理,
 // 而非每轮只挤下一步 —— 这是对"单步决策"架构缺陷(#44)的核心增强。

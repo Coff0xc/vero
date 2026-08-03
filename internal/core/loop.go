@@ -100,6 +100,12 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 			}
 			acts = []Action{*a}
 		}
+		// 深度思考: 决策器带思维链时广播 thinking 事件(前端折叠展示思考过程)。
+		if tr, ok := llm.(ThinkingReporter); ok {
+			if t := tr.LastThinking(); t != "" {
+				emit(Event{Kind: "thinking", Data: map[string]any{"text": t}})
+			}
+		}
 		// 计划按序执行: 每步独立 HITL/证据/停滞检测; 某步失败或被拒立即中断后续步
 		// (计划是依赖链, 前提没立住后面跑了也是白跑)。
 		for i := range acts {

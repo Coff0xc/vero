@@ -89,3 +89,14 @@ func (w *WebGate) CancelAll() {
 		delete(w.pending, key)
 	}
 }
+
+// Pending —— 当前所有未裁决的审批请求(SSE 重连补缝用)。
+func (w *WebGate) Pending() []map[string]any {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	out := make([]map[string]any, 0, len(w.pending))
+	for key := range w.pending {
+		out = append(out, map[string]any{"key": key})
+	}
+	return out
+}

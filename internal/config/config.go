@@ -1,4 +1,4 @@
-// Package config —— 智能体工作台运行时配置(引擎/API key/模型/思考强度/预算)。
+// Package config —— 智能体工作台运行时配置(多提供商/引擎/key/模型/思考强度/预算)。
 //
 // 存储: <工作目录>/vero.config.json(0600, 密钥只写盘不回显)。
 // 读取优先级: 配置文件 > 环境变量 > 默认值。
@@ -13,30 +13,77 @@ import (
 type Engine string
 
 const (
-	EngineAuto   Engine = "auto"   // 有 key 用真实模型, 否则脚本
-	EngineScript Engine = "script" // 固定脚本(无 LLM)
-	EngineClaude Engine = "claude"
+	EngineAuto    Engine = "auto"   // 有 key 用真实模型, 否则脚本
+	EngineScript  Engine = "script" // 固定脚本(无 LLM)
+	EngineClaude  Engine = "claude"
 	EngineDeepSeek Engine = "deepseek"
 )
 
+// ProviderPreset —— 预置的 OpenAI 兼容提供商(设置面板一键填入)。
+type ProviderPreset struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	BaseURL string `json:"base_url"`
+}
+
+// Presets —— 常用 OpenAI 兼容提供商预置。
+var Presets = []ProviderPreset{
+	{ID: "deepseek", Name: "DeepSeek", BaseURL: "https://api.deepseek.com"},
+	{ID: "openai", Name: "OpenAI", BaseURL: "https://api.openai.com/v1"},
+	{ID: "kimi", Name: "Kimi (Moonshot)", BaseURL: "https://api.moonshot.cn/v1"},
+	{ID: "qwen", Name: "通义千问 (DashScope)", BaseURL: "https://dashscope.aliyuncs.com/compatible-mode/v1"},
+	{ID: "openrouter", Name: "OpenRouter", BaseURL: "https://openrouter.ai/api/v1"},
+	{ID: "ollama", Name: "Ollama (本地)", BaseURL: "http://localhost:11434/v1"},
+	{ID: "zhipu", Name: "智谱 GLM", BaseURL: "https://open.bigmodel.cn/api/paas/v4"},
+}
+
+// Provider —— 一个 OpenAI 兼容的模型提供商。
+type Provider struct {
+	ID      string `json:"id"`
+	Name    string `json:"name"`
+	BaseURL string `json:"base_url"`
+	APIKey  string `json:"api_key,omitempty"`
+	Model   string `json:"model"`             // 当前选用的模型
+	Reasoning bool `json:"supports_reasoning"` // 深度思考(返回 reasoning_content)
+	WebSearch bool `json:"web_search"`         // 联网搜索(提供商支持时)
+}
+
+// HasKey —— 是否已配置密钥(回显用)。
+func (p *Provider) HasKey() bool { return p.APIKey != "" }
+
 // Config —— 运行时配置。
 type Config struct {
-	Engine      Engine  `json:"engine"`
-	AnthropicKey string `json:"anthropic_key,omitempty"`
-	DeepSeekKey string  `json:"deepseek_key,omitempty"`
-	Model       string  `json:"model"`        // 空 = 各自引擎默认
-	Temperature float64 `json:"temperature"`  // 思考强度: 低=稳健, 高=发散
-	MaxBudget   int     `json:"max_budget"`   // 战役决策轮数上限
+	Engine       Engine     `json:"engine"`
+	AnthropicKey string     `json:"anthropic_key,omitempty"`
+	DeepSeekKey  string     `json:"deepseek_key,omitempty"`
+	Model        string     `json:"model"`      // 空 = 各自引擎默认(兼容旧字段)
+	Temperature  float64    `json:"temperature"`
+	MaxBudget    int        `json:"max_budget"`
+
+	// 多提供商(对话/战役决策): active_provider 为当前启用的 provider id。
+	Providers      []*Provider `json:"providers"`
+	ActiveProvider string      `json:"active_provider"`
+
+	// YOLO 模式: 跳过全部 HITL 审批(授权靶场/自动化用, 谨慎)。
+	YOLO bool `json:"yolo"`
+	// 深度思考: 决策时用 reasoning 模型并透传思维链(前端展示思考过程)。
+	DeepThinking bool `json:"deep_thinking"`
 }
 
 const path = "vero.config.json"
 
-// Default —— 出厂默认。
+// Default —— 出厂默认(含预置提供商骨架)。
 func Default() *Config {
+	provs := make([]*Provider, 0, len(Presets))
+	for _, pr := range Presets {
+		provs = append(provs, &Provider{ID: pr.ID, Name: pr.Name, BaseURL: pr.BaseURL})
+	}
 	return &Config{
-		Engine:      EngineAuto,
-		Temperature: 0.2,
-		MaxBudget:   10,
+		Engine:        EngineAuto,
+		Temperature:   0.2,
+		MaxBudget:     10,
+		Providers:     provs,
+		ActiveProvider: "deepseek",
 	}
 }
 
@@ -59,7 +106,24 @@ func Load() *Config {
 			c.Model = m
 		}
 	}
+	// 旧配置(无 providers 字段) -> 迁移出预置骨架。
+	if len(c.Providers) == 0 {
+		c.Providers = Default().Providers
+	}
 	return c
+}
+
+// Active —— 当前启用的提供商(未指定/不存在时回退 deepseek 或首个)。
+func (c *Config) Active() *Provider {
+	for _, p := range c.Providers {
+		if p.ID == c.ActiveProvider {
+			return p
+		}
+	}
+	if len(c.Providers) > 0 {
+		return c.Providers[0]
+	}
+	return nil
 }
 
 // Save —— 持久化(0600)。key 为空则保留原值(不清空), 避免表单缺字段误删密钥。
@@ -71,23 +135,56 @@ func (c *Config) Save() error {
 	return os.WriteFile(path, raw, 0o600)
 }
 
+// PublicProvider —— 回显给前端的提供商视图(密钥只给"是否已配置")。
+type PublicProvider struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	BaseURL   string `json:"base_url"`
+	Model     string `json:"model"`
+	HasKey    bool   `json:"has_key"`
+	Reasoning bool   `json:"supports_reasoning"`
+	WebSearch bool   `json:"web_search"`
+}
+
 // Public —— 回显给前端的视图: 密钥只给"是否已配置", 绝不回明文。
 type Public struct {
-	Engine       Engine  `json:"engine"`
-	Model        string  `json:"model"`
-	Temperature  float64 `json:"temperature"`
-	MaxBudget    int     `json:"max_budget"`
-	HasAnthropic bool    `json:"has_anthropic"`
-	HasDeepSeek  bool    `json:"has_deepseek"`
+	Engine         Engine            `json:"engine"`
+	Model          string            `json:"model"`
+	Temperature    float64           `json:"temperature"`
+	MaxBudget      int               `json:"max_budget"`
+	HasAnthropic   bool              `json:"has_anthropic"`
+	HasDeepSeek    bool              `json:"has_deepseek"`
+	YOLO           bool              `json:"yolo"`
+	DeepThinking   bool              `json:"deep_thinking"`
+	Providers      []PublicProvider  `json:"providers"`
+	ActiveProvider string            `json:"active_provider"`
+	Presets        []ProviderPreset  `json:"presets"`
 }
 
 func (c *Config) Public() Public {
+	pp := make([]PublicProvider, 0, len(c.Providers))
+	for _, p := range c.Providers {
+		pp = append(pp, PublicProvider{
+			ID:        p.ID,
+			Name:      p.Name,
+			BaseURL:   p.BaseURL,
+			Model:     p.Model,
+			HasKey:    p.HasKey(),
+			Reasoning: p.Reasoning,
+			WebSearch: p.WebSearch,
+		})
+	}
 	return Public{
-		Engine:       c.Engine,
-		Model:        c.Model,
-		Temperature:  c.Temperature,
-		MaxBudget:    c.MaxBudget,
-		HasAnthropic: c.AnthropicKey != "",
-		HasDeepSeek:  c.DeepSeekKey != "",
+		Engine:         c.Engine,
+		Model:          c.Model,
+		Temperature:    c.Temperature,
+		MaxBudget:      c.MaxBudget,
+		HasAnthropic:   c.AnthropicKey != "",
+		HasDeepSeek:    c.DeepSeekKey != "",
+		YOLO:           c.YOLO,
+		DeepThinking:   c.DeepThinking,
+		Providers:      pp,
+		ActiveProvider: c.ActiveProvider,
+		Presets:        Presets,
 	}
 }

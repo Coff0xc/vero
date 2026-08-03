@@ -266,3 +266,9 @@ func (d *DeepSeekLLM) Reflect(goal string, g *core.AttackGraph, history []core.H
 	d.lastReflection = tools.Clip(strings.TrimSpace(txt), 600)
 	return d.lastReflection
 }
+
+// Chat —— 对话式问答(对话智能): 基于战役上下文 + 多轮历史回答用户问题。
+// history 为 [role, content] 对(role: user|assistant), 支持多轮对话。
+func (d *DeepSeekLLM) Chat(context, question string, history [][2]string) (string, error) {
+	return d.chatText(chatSystem, ChatPrompt(context, question, history))
+}

@@ -87,3 +87,36 @@ func reflectPrompt(goal string, g *core.AttackGraph, history []core.HistoryItem)
 	return fmt.Sprintf("目标: %s\n\n当前攻击图:\n%s\n\n已执行动作摘要:\n%s\n\n战略反思:",
 		goal, g.Snapshot(), hb.String())
 }
+
+// chatSystem —— 对话式问答的系统指令: 基于真实战役上下文回答, 不臆造证据。
+const chatSystem = "你是 Vero 自主渗透助手的对话智能体(渗透测试专家)。基于提供的战役真实上下文回答用户问题。规则:\n" +
+	"1. 只依据上下文与安全知识回答; 不臆造上下文里不存在的发现或证据;\n" +
+	"2. 可解释漏洞原理/评估风险/给修复建议/建议下一步渗透动作;\n" +
+	"3. 上下文里 state=confirmed 的才是已坐实的发现, hypothesis 是待验证假设, 回答时区分;\n" +
+	"4. 用中文回答, 简洁专业, 可适度使用列表。"
+
+// ChatPrompt —— 组装问答任务(战役上下文 + 多轮历史 + 当前问题)。
+// context 来自服务端(攻击图快照/已执行工具摘要); history 为前端传来的多轮对话。
+func ChatPrompt(context, question string, history [][2]string) string {
+	var b strings.Builder
+	b.WriteString("战役上下文:\n" + context + "\n\n")
+	if len(history) > 0 {
+		b.WriteString("对话历史:\n")
+		for _, h := range history {
+			role := "用户"
+			if h[0] == "assistant" {
+				role = "助手"
+			}
+			b.WriteString(role + ": " + h[1] + "\n")
+		}
+		b.WriteString("\n")
+	}
+	b.WriteString("用户问题: " + question)
+	return b.String()
+}
+
+// Chatter —— 对话式问答能力(对话智能): 基于战役上下文 + 多轮历史回答用户问题。
+// DeepSeekLLM/ClaudeLLM 实现; server 的 /api/chat 用。
+type Chatter interface {
+	Chat(context, question string, history [][2]string) (string, error)
+}
