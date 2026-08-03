@@ -127,11 +127,11 @@ export function ChatSidebar({
       </div>
 
       {/* 运行状态 + 底部导航 */}
-      <div className="border-t border-line px-3 py-2.5">
+      <div className="border-t border-line/80 px-3 py-2.5 bg-panel2/40">
         <div className="flex items-center gap-2 mb-2 px-1">
           <span
-            className={`inline-block w-2 h-2 rounded-full ${
-              status === 'running' ? 'bg-signal animate-pulse' : status === 'done' ? 'bg-live' : 'bg-ghost'
+            className={`inline-block w-2 h-2 rounded-full shrink-0 ${
+              status === 'running' ? 'bg-signal ring-pulse' : status === 'done' ? 'bg-live shadow-glow-live' : 'bg-ghost'
             }`}
           />
           <span className="text-[10.5px] text-muted font-mono truncate">
@@ -144,8 +144,10 @@ export function ChatSidebar({
             <button
               key={n.id}
               onClick={() => onTab(n.id)}
-              className={`flex items-center gap-2 px-2.5 py-1.5 rounded-md text-[12px] transition-colors ${
-                activeTab === n.id ? 'bg-live/10 text-live' : 'text-muted hover:text-ink2 hover:bg-ink/40'
+              className={`flex items-center gap-2.5 px-2.5 py-1.5 rounded-md text-[12px] transition-all duration-150 ${
+                activeTab === n.id
+                  ? 'bg-live/12 text-live border border-live/25 shadow-inner-line font-medium'
+                  : 'text-muted hover:text-ink2 hover:bg-ink/50 border border-transparent'
               }`}
             >
               <span className="text-[13px]">{n.icon}</span>

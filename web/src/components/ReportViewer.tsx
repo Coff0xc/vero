@@ -82,7 +82,7 @@ export function ReportViewer() {
 
       <ul className="space-y-2">
         {reports.map((r) => (
-          <li key={r.campaign_id} className="border border-line rounded-sm bg-panel px-4 py-3 flex items-center justify-between gap-4">
+          <li key={r.campaign_id} className="border border-line rounded-lg bg-panel px-4 py-3 shadow-inner-line card-lift flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="font-mono text-xs text-ink2 truncate" title={r.campaign_id}>
                 战役 #{r.campaign_id}

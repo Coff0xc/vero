@@ -62,12 +62,16 @@ export function EvidenceDrawer() {
       aria-hidden={!open}
     >
       <div className="flex items-center justify-between p-4 pb-0 whitespace-nowrap">
-        <span className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">证据检视</span>
-        <button onClick={() => select(null)} className="text-muted hover:text-alert text-base" aria-label="关闭">
+        <span className="section-title font-disp text-[10px] uppercase text-muted">证据检视</span>
+        <button
+          onClick={() => select(null)}
+          className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center text-sm transition-colors"
+          aria-label="关闭"
+        >
           ✕
         </button>
       </div>
-      <div className="text-sm text-signal my-2.5 px-4 break-all">{selected ?? '—'}</div>
+      <div className="text-[12.5px] font-mono text-signal my-2.5 px-4 break-all leading-relaxed">{selected ?? '—'}</div>
       {node && (
         <div className="text-[11px] text-muted mb-3.5 px-4">
           <span className="mr-1.5">{NODE_TYPE_LABELS[node.type] ?? node.type}</span>

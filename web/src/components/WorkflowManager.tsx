@@ -88,7 +88,7 @@ export function WorkflowManager() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {workflows.map((wf) => (
-          <form key={wf.id} onSubmit={(e) => execute(e, wf.name)} className="border border-line rounded-sm bg-panel p-4 space-y-3">
+          <form key={wf.id} onSubmit={(e) => execute(e, wf.name)} className="border border-line rounded-lg bg-panel p-4 space-y-3 shadow-inner-line card-lift">
             <div className="flex items-start justify-between gap-3">
               <div>
                 <h3 className="font-mono text-sm text-ink2 break-all">{wf.name}</h3>

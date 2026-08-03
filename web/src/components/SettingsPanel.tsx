@@ -174,7 +174,7 @@ export function SettingsPanel() {
           <button
             type="submit"
             disabled={saving || loading}
-            className="px-4 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-live text-live hover:bg-live hover:text-ink transition disabled:opacity-50"
+            className="btn-accent px-4 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-md disabled:opacity-50"
           >
             {saving ? '保存中…' : '保存'}
           </button>
@@ -193,8 +193,8 @@ export function SettingsPanel() {
       )}
 
       {/* 决策引擎 */}
-      <section className="border border-line rounded-sm bg-panel p-4 space-y-3">
-        <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">决策引擎</div>
+      <section className="border border-line rounded-lg bg-panel p-4 shadow-inner-line space-y-3">
+        <div className="section-title font-disp text-[10px] uppercase text-muted">决策引擎</div>
         <div className="flex items-center gap-3">
           <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-engine">
             引擎
@@ -203,7 +203,7 @@ export function SettingsPanel() {
             id="cfg-engine"
             value={engine}
             onChange={(e) => setEngine(e.target.value)}
-            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm outline-none focus:border-signal"
+            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-md outline-none focus:border-signal focus:shadow-glow-signal transition-all duration-150"
           >
             <option value="auto">{ENGINE_ZH['auto']} — {ENGINE_DESC['auto']}</option>
             <option value="claude">{ENGINE_ZH['claude']} — {ENGINE_DESC['claude']}</option>
@@ -215,8 +215,8 @@ export function SettingsPanel() {
       </section>
 
       {/* API Key */}
-      <section className="border border-line rounded-sm bg-panel p-4 space-y-4">
-        <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">API Key</div>
+      <section className="border border-line rounded-lg bg-panel p-4 shadow-inner-line space-y-4">
+        <div className="section-title font-disp text-[10px] uppercase text-muted">API Key</div>
         <div className="space-y-1">
           <div className="flex items-center gap-2.5">
             <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-ak">
@@ -230,7 +230,7 @@ export function SettingsPanel() {
               placeholder={hasAnthropic ? '已配置 — 输入新值可替换' : '粘贴 ANTHROPIC_API_KEY'}
               autoComplete="new-password"
               spellCheck={false}
-              className="flex-1 min-w-0 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal"
+              className="flex-1 min-w-0 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal focus:shadow-glow-signal transition-all duration-150"
             />
             {keyBadge(hasAnthropic, anthropic)}
             <button
@@ -256,7 +256,7 @@ export function SettingsPanel() {
               placeholder={hasDeepSeek ? '已配置 — 输入新值可替换' : '粘贴 DEEPSEEK_API_KEY'}
               autoComplete="new-password"
               spellCheck={false}
-              className="flex-1 min-w-0 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal"
+              className="flex-1 min-w-0 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal focus:shadow-glow-signal transition-all duration-150"
             />
             {keyBadge(hasDeepSeek, deepseek)}
             <button
@@ -272,8 +272,8 @@ export function SettingsPanel() {
       </section>
 
       {/* 模型 + 思考强度 */}
-      <section className="border border-line rounded-sm bg-panel p-4 space-y-4">
-        <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">模型 + 思考强度</div>
+      <section className="border border-line rounded-lg bg-panel p-4 shadow-inner-line space-y-4">
+        <div className="section-title font-disp text-[10px] uppercase text-muted">模型 + 思考强度</div>
         <div className="flex items-center gap-3">
           <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-model">
             模型
@@ -282,7 +282,7 @@ export function SettingsPanel() {
             id="cfg-model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm outline-none focus:border-signal"
+            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-md outline-none focus:border-signal focus:shadow-glow-signal transition-all duration-150"
           >
             {modelOptions.map((o) => (
               <option key={o.value} value={o.value}>{o.label}</option>
@@ -309,8 +309,8 @@ export function SettingsPanel() {
       </section>
 
       {/* 决策轮数上限 */}
-      <section className="border border-line rounded-sm bg-panel p-4 space-y-3">
-        <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">决策预算</div>
+      <section className="border border-line rounded-lg bg-panel p-4 shadow-inner-line space-y-3">
+        <div className="section-title font-disp text-[10px] uppercase text-muted">决策预算</div>
         <div className="flex items-center gap-3">
           <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-budget">
             决策轮数上限
@@ -322,7 +322,7 @@ export function SettingsPanel() {
             max={200}
             value={maxBudget}
             onChange={(e) => setMaxBudget(Math.max(1, Number(e.target.value) || 1))}
-            className="w-28 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal"
+            className="w-28 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal focus:shadow-glow-signal transition-all duration-150"
           />
           <span className="text-[11px] text-muted">单次战役的决策迭代次数上限</span>
         </div>

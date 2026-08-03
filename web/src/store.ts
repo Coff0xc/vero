@@ -44,6 +44,8 @@ function fmt(e: SSEEvent): string {
     case 'error': return `⚠ ${e.data.msg}`
     case 'reflect': return `反思: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'thinking': return `思考: ${(e.data as unknown as { text?: string }).text ?? ''}`
+    case 'hitl':
+      return `${e.data.approved ? '✓ 已放行' : '✗ 已拒绝'} ${e.data.action}`
   }
 }
 
@@ -70,6 +72,8 @@ function metaOf(e: SSEEvent): LogLine['meta'] {
       return { rationale: (e.data as unknown as { text?: string }).text }
     case 'thinking':
       return { rationale: (e.data as unknown as { text?: string }).text }
+    case 'hitl':
+      return { tool: e.data.action, success: e.data.approved }
     default:
       return undefined
   }

@@ -68,10 +68,11 @@ export function HitlModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
-      <div className="bg-panel border border-alert border-t-[3px] rounded-md px-6 py-5 max-w-md w-full shadow-[0_0_40px_rgba(255,92,77,.18)]">
-        <div className="font-disp font-bold tracking-wider text-sm text-alert uppercase mb-1">
-          ⚠ 需要授权
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-panel border border-alert/70 border-t-[3px] rounded-lg px-6 py-5 max-w-md w-full shadow-[0_0_50px_rgba(255,92,77,.22)] card-pop">
+        <div className="font-disp font-bold tracking-wider text-sm text-alert uppercase mb-1 flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-alert animate-pulse" />
+          需要授权
         </div>
         <div className="text-[11px] text-muted mb-4">agent 请求执行高危动作, 等待操作员裁决</div>
 
@@ -122,15 +123,15 @@ export function HitlModal() {
           <div className="flex gap-2.5">
             <button
               onClick={() => decide(true)}
-              className="flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-sm uppercase border border-live text-live hover:bg-live hover:text-ink"
+              className="btn-accent flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase"
             >
-              批准执行
+              ✓ 批准执行
             </button>
             <button
               onClick={() => decide(false)}
-              className="flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-sm uppercase border border-muted text-muted hover:border-alert hover:text-alert"
+              className="btn-danger flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase border border-muted/60 text-muted hover:border-alert hover:text-alert"
             >
-              拒绝
+              ✗ 拒绝
             </button>
           </div>
           {dirty && (
@@ -138,10 +139,10 @@ export function HitlModal() {
               onClick={decideEdited}
               disabled={parsed === undefined}
               title={parsed === undefined ? '参数 JSON 非法, 修正后才能放行' : '仍以原参数执行(编辑为预览)'}
-              className={`w-full font-disp font-semibold tracking-wider text-sm py-2.5 rounded-sm uppercase border transition-colors ${
+              className={`w-full font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase border transition-all ${
                 parsed === undefined
                   ? 'border-line text-ghost cursor-not-allowed'
-                  : 'border-signal text-signal hover:bg-signal hover:text-ink'
+                  : 'border-signal text-signal hover:bg-signal hover:text-ink hover:shadow-glow-signal'
               }`}
             >
               以修改参数放行

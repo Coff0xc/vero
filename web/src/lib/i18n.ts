@@ -25,6 +25,7 @@ export const EVENT_LABELS: Record<string, string> = {
   error: '错误',
   reflect: '反思',
   thinking: '思考',
+  hitl: '审批',
 }
 
 // 工具级别 → 短标签(ToolManager 等复用)。

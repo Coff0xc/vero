@@ -154,7 +154,7 @@ export function ToolManager() {
           const installingPipKey = `${tool.Name}:pip`
           const busy = installing !== null || installAllBusy
           return (
-            <div key={tool.Name} className="border border-line rounded-sm p-4 space-y-2 bg-panel">
+            <div key={tool.Name} className="border border-line rounded-lg p-4 space-y-2 bg-panel shadow-inner-line card-lift">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-mono text-sm text-ink2 break-all">{tool.Name}</h3>
                 <span className={`px-2 py-0.5 text-[10px] rounded-sm whitespace-nowrap ${LEVEL_STYLE[tool.Level] ?? LEVEL_STYLE[0]}`}>
@@ -218,7 +218,7 @@ export function ToolManager() {
       </div>
 
       {verification && (
-        <div className="border border-line rounded-sm p-4 bg-panel">
+        <div className="border border-line rounded-lg p-4 bg-panel shadow-inner-line">
           <h3 className="font-disp text-xs tracking-wider uppercase text-ink2 mb-2">验证摘要</h3>
           <div className="text-xs text-muted space-y-1">
             <p>总工具数: {verification.length}</p>

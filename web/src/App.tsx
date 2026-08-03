@@ -50,9 +50,9 @@ export default function App() {
               </ErrorBoundary>
             </section>
             <section className="hidden lg:flex flex-col min-h-0 border-line">
-              <div className="text-[10px] font-disp tracking-[2.5px] uppercase text-muted px-3 pt-2 pb-1 flex items-center justify-between">
-                <span>攻击图 · 实时</span>
-                <span className="text-ghost lowercase tracking-normal font-mono">主路径高亮流动</span>
+              <div className="text-[10px] font-disp uppercase text-muted px-3 pt-2.5 pb-1.5 flex items-center justify-between border-b border-line/50">
+                <span className="section-title">攻击图 · 实时</span>
+                <span className="text-ghost/80 lowercase tracking-normal font-mono text-[9.5px]">主路径高亮流动</span>
               </div>
               <div className="relative flex-1 min-h-0">
                 <ErrorBoundary>
