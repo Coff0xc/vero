@@ -165,6 +165,8 @@ func main() {
 }
 
 // runSelfcheck —— 离线跑一场规划战役, 验证核心闭环(侦察→web→凭证→SMB失败→WMI→foothold)。
+// 用 NewSimPlanner 显式允许仿真工具(fake_scan/fake_dump): selfcheck 的目的就是离线验证内核闭环,
+// 不依赖外部真实工具; 生产默认路径(NewPlanner)只走真实工具, 无工具时明确停机。
 func runSelfcheck() {
 	reg := tools.NewRegistry()
 	tools.RegisterBuiltins(reg)
@@ -177,7 +179,7 @@ func runSelfcheck() {
 	reg.Register(&tools.Tool{Name: "wmiexec", Level: tools.LevelExploit,
 		Run: func(map[string]any) tools.ToolResult { return tools.ToolResult{Success: true, Stdout: "WMI shell obtained"} }})
 
-	g, trace := core.RunAgent("拿下 foothold", planner.NewPlanner("foothold"),
+	g, trace := core.RunAgent("拿下 foothold", planner.NewSimPlanner("foothold"),
 		reg, core.AutoApprove, core.DiscardEmit, 15)
 
 	foothold := false

