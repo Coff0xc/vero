@@ -1,4 +1,4 @@
-# Evidence-Driven AI Agent Benchmark
+﻿# Evidence-Driven AI Agent Benchmark
 
 ## 概述
 
@@ -50,7 +50,7 @@ benchmark/
 │   └── report_generator.py                # 报告生成
 │
 └── results/
-    ├── redcell_baseline.json              # Vero 结果
+    ├── VERO_baseline.json              # Vero 结果
     ├── cyberstrike_comparison.json        # 竞品对比
     └── analysis.md                        # 分析报告
 ```
@@ -130,7 +130,7 @@ curl http://localhost:8080/health
 
 ```bash
 # Vero
-./redcell.exe -target http://localhost:8080 -output results/redcell.json
+./VERO.exe -target http://localhost:8080 -output results/VERO.json
 
 # 竞品（模拟）
 python competitor_agent.py --target http://localhost:8080 --output results/competitor.json
@@ -142,7 +142,7 @@ python competitor_agent.py --target http://localhost:8080 --output results/compe
 cd benchmark/evaluator
 python evaluate.py \
   --ground-truth ../scenarios/CVE-2021-44228-log4shell/ground_truth.json \
-  --result ../../results/redcell.json \
+  --result ../../results/VERO.json \
   --output report.json
 ```
 

@@ -1,7 +1,7 @@
-# Vero 用户手册
+﻿# Vero 用户手册
 
-**版本**: 1.0.0  
-**更新日期**: 2026-07-28
+**版本**: 1.1.0  
+**更新日期**: 2026-08-03
 
 ---
 
@@ -11,10 +11,11 @@
 2. [核心概念](#核心概念)
 3. [工具列表](#工具列表)
 4. [命令行使用](#命令行使用)
-5. [场景包系统](#场景包系统)
-6. [安全注意事项](#安全注意事项)
-7. [故障排除](#故障排除)
-8. [API 参考](#api-参考)
+5. [Web 作战室](#web-作战室)
+6. [场景包系统](#场景包系统)
+7. [安全注意事项](#安全注意事项)
+8. [故障排除](#故障排除)
+9. [API 参考](#api-参考)
 
 ---
 
@@ -24,22 +25,22 @@
 
 ```bash
 # 下载预编译二进制
-wget https://github.com/your-org/redcell/releases/latest/redcell.exe
+wget https://github.com/your-org/VERO/releases/latest/VERO.exe
 
 # 或从源码构建
-git clone https://github.com/your-org/redcell
-cd redcell
-go build -o redcell.exe ./cmd/redcell
+git clone https://github.com/your-org/VERO
+cd VERO
+go build -o VERO.exe ./cmd/VERO
 ```
 
 ### 第一次运行
 
 ```bash
 # 自检模式 (无需外部依赖)
-.\redcell.exe -selfcheck
+.\VERO.exe -selfcheck
 
 # 启动 Web 作战室
-.\redcell.exe
+.\VERO.exe
 # 访问 http://127.0.0.1:8000
 ```
 
@@ -50,9 +51,14 @@ go build -o redcell.exe ./cmd/redcell
 export ANTHROPIC_API_KEY="sk-ant-..."
 export DEEPSEEK_API_KEY="sk-..."
 
+# 可选: 指定模型 (默认 claude-opus-4-8 / deepseek-chat)
+export VERO_MODEL="claude-opus-4-8"
+
 # 可选: Metasploit RPC
 msfrpcd -P password -U msf -a 127.0.0.1 -p 55553
 ```
+
+> **提示**: 上述 LLM 配置(决策引擎 / API key / 模型 / 思考强度 / 决策预算)也可在 Web 作战室「设置」页签中配置, 改动即时生效并持久化到本机 `vero.config.json`(0600, 密钥只写盘不回显), 无需重启。详见下文 [Web 作战室](#web-作战室)。
 
 ---
 
@@ -174,6 +180,8 @@ SMB/LDAP/Kerberos → 激活 nxc_smb_spray, nxc_ldap_enum, kerberoast
 | `nmap_scan` | 1 | Nmap 完整扫描 | `target: 10.0.0.5` |
 | `fake_scan` | 1 | 模拟扫描 (演示用) | `target: 10.0.0.5` |
 
+> **依赖与自动安装**: 多数工具依赖外部二进制。`nuclei` / `ffuf` 可在「工具管理」页签一键自动下载到 `tools/bin`(SHA256 白名单校验); Python 系工具(`nxc`→`netexec`、`impacket`、`pypykatz`、`secretsdump`、`lsass_dump`、`sam_dump`)可一键 `pip install --user` 安装。详见 [Web 作战室](#web-作战室)。
+
 ---
 
 ## 💻 命令行使用
@@ -182,13 +190,13 @@ SMB/LDAP/Kerberos → 激活 nxc_smb_spray, nxc_ldap_enum, kerberoast
 
 ```bash
 # 启动 Web 作战室 (默认端口 8000)
-.\redcell.exe
+.\VERO.exe
 
 # 指定端口
-.\redcell.exe -port 9000
+.\VERO.exe -port 9000
 
 # 指定数据库路径
-.\redcell.exe -db /path/to/redcell.db
+.\VERO.exe -db /path/to/VERO.db
 ```
 
 ### 独立工具模式
@@ -196,64 +204,114 @@ SMB/LDAP/Kerberos → 激活 nxc_smb_spray, nxc_ldap_enum, kerberoast
 #### 扫描类
 ```bash
 # TCP 端口扫描
-.\redcell.exe -scan 10.0.0.5
+.\VERO.exe -scan 10.0.0.5
 
 # Nmap 完整扫描
-.\redcell.exe -nmap 10.0.0.5
+.\VERO.exe -nmap 10.0.0.5
 
 # HTTP 指纹 + Nuclei 漏扫
-.\redcell.exe -webscan http://example.com
+.\VERO.exe -webscan http://example.com
 ```
 
 #### 云环境
 ```bash
 # AWS IMDS 元数据 (需在 EC2 内)
-.\redcell.exe -cloud-aws enum
+.\VERO.exe -cloud-aws enum
 
 # Azure IMDS 元数据 (需在 Azure VM 内)
-.\redcell.exe -cloud-azure enum
+.\VERO.exe -cloud-azure enum
 
 # GCP IMDS 元数据 (需在 GCP 内)
-.\redcell.exe -cloud-gcp enum
+.\VERO.exe -cloud-gcp enum
 
 # S3 bucket 公开访问检测
-.\redcell.exe -cloud-s3 my-bucket
+.\VERO.exe -cloud-s3 my-bucket
 ```
 
 #### 容器逃逸
 ```bash
 # Docker 容器逃逸检测 (需在容器内)
-.\redcell.exe -container-escape check
+.\VERO.exe -container-escape check
 
 # K8s ServiceAccount 提取 (需在 pod 内)
-.\redcell.exe -k8s-sa enum
+.\VERO.exe -k8s-sa enum
 ```
 
 #### Metasploit
 ```bash
 # 搜索 exploit 模块 (需 msfrpcd 运行)
-.\redcell.exe -msf-search ms17_010
+.\VERO.exe -msf-search ms17_010
 ```
 
 #### 自主渗透
 ```bash
 # LLM 驱动的自主渗透 (需 API key)
 export ANTHROPIC_API_KEY="sk-ant-..."
-.\redcell.exe -agent http://example.com
+.\VERO.exe -agent http://example.com
 ```
 
 ### 调试模式
 
 ```bash
 # 离线自检
-.\redcell.exe -selfcheck
+.\VERO.exe -selfcheck
 
 # 直接测试 SQLi 工具
-.\redcell.exe -exploit http://localhost:3000
+.\VERO.exe -exploit http://localhost:3000
 
 # HTTP 探测调试
-.\redcell.exe -probe http://example.com
+.\VERO.exe -probe http://example.com
 ```
+
+---
+
+## 🖥️ Web 作战室
+
+Web 作战室(默认 http://127.0.0.1:8000)共 5 个页签: 战役控制台 / 工具管理 / 工作流模板 / 报告 / 设置。本节介绍界面新增的配置、工具安装、中文展示与阶段进度能力。
+
+### 1. 工作台「设置」面板
+
+第 5 个页签「设置」用于在浏览器中配置决策引擎、API key、模型、思考强度与决策预算, 保存后即时生效并写入本机 `vero.config.json`(0600, 密钥只写盘不回显)。
+
+| 配置项 | 说明 |
+|--------|------|
+| 决策引擎 | 自动 / Claude / DeepSeek / 脚本 下拉选择(带中文说明); 自动 = 有 key 用真实模型, 否则脚本 |
+| ANTHROPIC_API_KEY | 密码框, 显示「已配置 / 未配置」徽标, 不回显明文; 留空 = 不修改, 显式清空用「清除」按钮 |
+| DEEPSEEK_API_KEY | 同上 |
+| 模型 | 留空 = 引擎默认(claude-opus-4-8 / deepseek-chat); 也可用环境变量 `VERO_MODEL` 覆盖 |
+| 思考强度 | 滑块 0~1, 低 = 稳健, 高 = 发散 |
+| 决策预算 | 单次战役决策迭代轮数上限 |
+
+- 引擎选择为 Claude/DeepSeek 但缺少对应 key 时, 发起战役会回退脚本模式(面板会给出提示)。
+- 「恢复默认」: 引擎=auto、思考强度=0.2、决策预算=10(模型名仅本地清空表单, 不写入配置文件)。
+- API: GET /api/config 返回 engine/model/temperature/max_budget 及密钥是否已配置(`has_anthropic`/`has_deepseek` 布尔), 密钥部分只回布尔、绝不回传明文。
+
+### 2. 工具自动下载安装
+
+「工具管理」页签在「验证工具」后, 缺失依赖的工具会给出对应的安装按钮:
+
+- **自动下载二进制**(nuclei / ffuf): 从官方 Release 下载到 `tools/bin`, SHA256 白名单校验, 防供应链投毒; 仅支持 amd64, 校验失败拒绝安装。
+- **一键 pip 安装**(nxc→netexec、impacket、pypykatz、secretsdump、lsass_dump、sam_dump): 执行 `pip install --user`, 优先 `python3`(Windows 兼容 `py`), 不污染系统环境; 遇到 PEP 668 托管环境自动追加 `--break-system-packages` 重试。
+- 顶部「全部自动安装」: 调 POST /api/tools/install-all 批量安装全部缺失工具(binary + pip), 串行执行, 单项失败不影响其余。
+- 安装后的 `tools/bin` 与 pip 用户 scripts 目录会注入进程 PATH(仅本进程, 不动系统 PATH)。
+- 验证接口 GET /api/tools/verify 对每个工具输出 `install_type` 三态: `binary`(可自动下载二进制) / `pip`(需 pip 安装) / `none`(无自动安装途径)。
+
+### 3. 全中文界面与思考展示
+
+信号流与全站文案改为中文(文案集中映射于 `web/src/lib/i18n.ts`):
+
+- 事件标签: 思考 / 工具 / 授权请求 / 计划 / 引擎 / 摘要 / 完成等。
+- 工具级别: L0-侦察 ~ L4-破坏; 口语化级别(如「利用级」); 攻击图节点状态: 已证实 / 待验证。
+- `step` 事件展开为两行: 「思考 L{级} · {工具}」+ 缩进「▍推理 {why}」。
+- `plan` 事件高亮显示整段计划推理 `rationale`(即 LLM 每步思考内容), 并显示计划步数。
+
+### 4. 战役阶段进度条
+
+战役控制台 KPI 面板下方显示战役阶段进度条: 待命 → 侦察 → 扫描 → 利用 → 完成。
+
+- 阶段由 SSE 事件(engine / step / tool / route / summary / done)推断, 只前进不后退。
+- 进度条下方实时显示当前动作与工具名(含 L 级别); 利用阶段(Level ≥ 2)以警示色高亮。
+- 战役未发起时显示「尚未发起战役」。
 
 ---
 
@@ -282,7 +340,7 @@ export ANTHROPIC_API_KEY="sk-ant-..."
 ```go
 package scenarios
 
-import "redcell/internal/tools"
+import "VERO/internal/tools"
 
 func CustomPack() Pack {
     return Pack{
@@ -402,12 +460,13 @@ go test ./internal/scenarios -v -run TestPackRegister
 **原因**: 缺少 LLM API key
 
 **解决**:
+> 也可在 Web 作战室「设置」页签配置 API key, 即时生效, 无需重启。
 ```bash
 # 使用 DeepSeek (更便宜)
 export DEEPSEEK_API_KEY="sk-..."
 
-# 或使用离线模式 (确定性规划器)
-.\redcell.exe -selfcheck
+# 或使用离线模式 (确定性规划器 / 脚本引擎)
+.\VERO.exe -selfcheck
 ```
 
 #### 3. Cloud 工具超时
@@ -440,7 +499,7 @@ curl -s --max-time 2 -H "Metadata-Flavor: Google" http://metadata.google.interna
 # 在 Docker 容器内运行
 docker run -v $(pwd):/app -w /app alpine sh
 # 容器内
-./redcell.exe -container-escape check
+./VERO.exe -container-escape check
 ```
 
 #### 5. Metasploit RPC 连接失败
@@ -457,6 +516,16 @@ curl -X POST http://127.0.0.1:55553/api/1.0/auth.login \
   -H "Content-Type: application/json" \
   -d '{"username":"msf","password":"password"}'
 ```
+
+#### 6. 工具不可用 (依赖缺失)
+
+**原因**: 工具依赖的外部二进制或 Python 包未安装
+
+**解决**:
+- 在「工具管理」页签点击「验证工具」, 缺失工具会显示对应的一键安装按钮。
+- `nuclei` / `ffuf`: 点击「自动安装(二进制)」下载到 `tools/bin`(仅 amd64, SHA256 白名单校验)。
+- Python 系工具(`nxc` / `impacket` / `pypykatz` / `secretsdump` / `lsass_dump` / `sam_dump`): 点击「一键安装(pip)」执行 `pip install --user`。
+- 批量场景: 顶部「全部自动安装」一次安装全部缺失工具, 单项失败不影响其余。
 
 ### 性能问题
 
@@ -489,11 +558,11 @@ go test ./internal/scenarios -bench=BenchmarkParse -benchtime=3s
 
 ```go
 import (
-    "redcell/internal/core"
-    "redcell/internal/tools"
-    "redcell/internal/scenarios"
-    "redcell/internal/llm"
-    "redcell/internal/planner"
+    "VERO/internal/core"
+    "VERO/internal/tools"
+    "VERO/internal/scenarios"
+    "VERO/internal/llm"
+    "VERO/internal/planner"
 )
 ```
 
@@ -572,10 +641,10 @@ violations := core.VerifyEvidence(g, trace)
 
 ## 🔗 资源链接
 
-- **GitHub**: https://github.com/your-org/redcell
-- **文档**: https://docs.redcell.io
-- **社区**: https://discord.gg/redcell
-- **问题报告**: https://github.com/your-org/redcell/issues
+- **GitHub**: https://github.com/your-org/VERO
+- **文档**: https://docs.VERO.io
+- **社区**: https://discord.gg/VERO
+- **问题报告**: https://github.com/your-org/VERO/issues
 
 ---
 
@@ -585,5 +654,5 @@ MIT License - 仅用于合法授权的安全测试。
 
 ---
 
-**最后更新**: 2026-07-28  
+**最后更新**: 2026-08-03  
 **维护者**: Vero Team

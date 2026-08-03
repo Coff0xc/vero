@@ -1,8 +1,9 @@
-# Vero 项目完成总索引
+﻿# Vero 项目完成总索引
 
 **项目完成日期**: 2026-07-28  
 **当前状态**: ✅ P0-P3 全部开发完成，生产就绪  
-**验证状态**: 代码验证 100%，环境验证脚本就绪
+**验证状态**: 代码验证 100%，环境验证脚本就绪  
+**最新版本**: v1.1.0 工作台增强 — 设置面板 / 工具自动安装 / 全中文界面与思考展示 / 战役阶段进度条
 
 ---
 
@@ -34,6 +35,9 @@
 - [x] CLI 集成完成 (32 参数)
 - [x] 攻击图引擎完成
 - [x] 解析器全部实现
+- [x] Web 工作台 5 Tab(战役控制台 / 工具管理 / 工作流模板 / 报告 / 设置)
+- [x] 工具自动安装(二进制 SHA256 白名单 + pip --user)
+- [x] 全中文界面与思考展示、战役阶段进度条
 
 ### 测试验证 (100%)
 - [x] 27 个单元测试 (100% 通过)
@@ -92,6 +96,40 @@ P3 容器逃逸: 3 工具
   7. ContainerPack     (容器)
 ```
 
+### 工作台功能 (v1.1.0 新增)
+
+**① 设置面板(工作台第 5 个 Tab「设置」)** —— 在线配置决策引擎 / API key / 模型 / 思考强度 / 决策预算:
+```
+后端: GET /api/config  返回 engine/model/temperature/max_budget/has_anthropic/has_deepseek
+      POST /api/config 可设 engine/anthropic_key/deepseek_key/clear_anthropic/clear_deepseek/model/temperature/max_budget
+前端: 决策引擎下拉(自动/Claude/DeepSeek/脚本, 带中文说明)
+      ANTHROPIC_API_KEY 与 DEEPSEEK_API_KEY 密码框(「已配置/未配置」徽标 + 清除按钮)
+      模型名(留空 = 引擎默认 claude-opus-4-8 / deepseek-chat)
+      思考强度滑块 0~1(低=稳健, 高=发散) + 决策预算(单次战役决策轮数上限) + 恢复默认
+```
+密钥只写盘 `vero.config.json`(0600), 前端只回「是否已配置」布尔, 绝不回显明文; 空串 = 不改, 显式清空用 `clear_*`。
+
+**② 工具自动下载安装** —— 解决「工具列表齐全但本机缺二进制, 能力悬空」:
+```
+二进制: nuclei (v3.3.9) / ffuf (v2.1.0) 一键下载到 tools/bin, SHA256 白名单校验防供应链投毒(仅 amd64)
+Python: nxc→netexec / impacket / pypykatz / secretsdump / lsass_dump / sam_dump 一键 pip --user 安装
+        (优先 python3, 其次 python, Windows 再试 py; PEP 668 自动追加 --break-system-packages 重试)
+接口:   POST /api/tools/install       {name, type:"binary"|"pip"} 类型校验
+        POST /api/tools/install-all   批量安装缺失工具(支持 {names,types} 过滤, 串行, 单项失败不影响其余)
+        GET  /api/tools/verify        可用性校验新增 install_type 三态(binary/pip/none)
+```
+Web「工具管理」页区分「自动下载二进制」/「一键 pip 安装」按钮, 顶部「全部自动安装」一键补齐。
+
+**③ 全中文界面与思考展示** —— `web/src/lib/i18n.ts` 集中中文文案映射:
+```
+事件标签(思考/工具/授权请求/计划…)、工具级别(利用级…)、节点状态(已证实/待验证)、引擎中文说明、战役阶段
+信号流 SignalStream 全中文; step 事件展开「思考 L{级} · 工具」+「▍推理 为什么」;
+plan 事件高亮整段计划推理 rationale(即 LLM 每步思考内容)
+```
+
+**④ 战役阶段进度条** —— `StageProgress`(待命→侦察→扫描→利用→完成), 由 SSE 事件推断(只前进不后退),
+实时显示当前动作与工具名, 整合进 KPI 面板。
+
 ### 性能指标
 ```
 解析器平均延迟: 938 ns/op  (目标 <20 µs) ✅
@@ -130,22 +168,32 @@ Goroutine 泄漏: 0           (验证通过)  ✅
 
 ### 方式 1: 本地编译运行
 ```bash
-go build -o redcell.exe ./cmd/redcell
-./redcell.exe -h
-./redcell.exe -nmap 192.168.1.1
+go build -o VERO.exe ./cmd/VERO
+./VERO.exe -h
+./VERO.exe -nmap 192.168.1.1
 ```
 
 ### 方式 2: Docker
 ```bash
-docker build -t redcell:v1.0.0 .
-docker run --rm redcell:v1.0.0 redcell -help
+docker build -t VERO:v1.0.0 .
+docker run --rm VERO:v1.0.0 VERO -help
 ```
 
 ### 方式 3: Kubernetes
 ```bash
 kubectl apply -f k8s-deployment.yaml
-kubectl -n redcell-system get pods
+kubectl -n VERO-system get pods
 ```
+
+### 方式 4: Web 工作台 (可视化)
+```bash
+go run ./cmd/vero                    # 启动后端(监听 127.0.0.1)
+cd web && npm install && npm run dev # 启动前端开发服务器 (Vite)
+```
+工作台含 5 个 Tab: 战役控制台 / 工具管理 / 工作流模板 / 报告 / 设置。
+
+> **配置 AI key / 模型 / 思考强度**: 既可用环境变量(`ANTHROPIC_API_KEY` / `DEEPSEEK_API_KEY` / `VERO_MODEL`)或
+> 直接编辑 `vero.config.json`, 也可在工作台「设置」页在线配置(密钥界面不回显明文)。
 
 **详细指南**: 参考 [DEPLOYMENT.md](DEPLOYMENT.md)
 
@@ -155,30 +203,34 @@ kubectl -n redcell-system get pods
 
 ### Web 渗透
 ```bash
-./redcell.exe -nmap target.com           # 端口扫描
-./redcell.exe -ffuf http://target.com    # 目录爆破
-./redcell.exe -sqlmap "http://..."       # SQL 注入 (HITL)
+./VERO.exe -nmap target.com           # 端口扫描
+./VERO.exe -ffuf http://target.com    # 目录爆破
+./VERO.exe -sqlmap "http://..."       # SQL 注入 (HITL)
 ```
 
 ### AD 攻击
 ```bash
-./redcell.exe -nxc-enum dc.corp.local                    # 域枚举
-./redcell.exe -nxc-spray dc.corp.local users.txt pass    # 凭证喷洒
-./redcell.exe -kerbrute dc.corp.local users.txt          # Kerberoasting
+./VERO.exe -nxc-enum dc.corp.local                    # 域枚举
+./VERO.exe -nxc-spray dc.corp.local users.txt pass    # 凭证喷洒
+./VERO.exe -kerbrute dc.corp.local users.txt          # Kerberoasting
 ```
 
 ### 云环境
 ```bash
-./redcell.exe -cloud-aws          # AWS IMDS
-./redcell.exe -cloud-azure        # Azure IMDS
-./redcell.exe -cloud-s3 bucket    # S3 扫描
+./VERO.exe -cloud-aws          # AWS IMDS
+./VERO.exe -cloud-azure        # Azure IMDS
+./VERO.exe -cloud-s3 bucket    # S3 扫描
 ```
 
 ### 容器逃逸
 ```bash
-./redcell.exe -container-escape check    # 逃逸检测
-./redcell.exe -k8s-sa extract            # K8s SA 令牌
+./VERO.exe -container-escape check    # 逃逸检测
+./VERO.exe -k8s-sa extract            # K8s SA 令牌
 ```
+
+> **工具依赖自动安装**: 缺失的 nuclei / ffuf 二进制可在工作台「工具管理」页一键下载(自动校验 SHA256,
+> 下载到 `tools/bin`); nxc / impacket / pypykatz / secretsdump 等 Python 系工具可一键 `pip --user` 安装;
+> 顶部「全部自动安装」批量补齐缺失工具, 无需手动装环境。
 
 **完整工具手册**: 参考 [USER_MANUAL.md](USER_MANUAL.md) 第 3 章
 
@@ -217,6 +269,7 @@ kubectl -n redcell-system get pods
 - [x] 性能基准达标
 - [x] 错误处理正确
 - [x] 环境检测正常
+- [x] 工具自动安装 API 验证(install_type 三态 binary/pip/none)
 
 ### 环境验证 ⏳ (脚本就绪)
 - [ ] Docker 测试 (需 Docker daemon)
@@ -266,6 +319,27 @@ Level 3 (Exploit) → 强制人工确认 ⚠️
 环境指纹 → 智能激活场景包 → 加载相应工具
 ```
 
+### 5. 密钥零明文回显
+```
+工作台「设置」页配 key: 只写盘 vero.config.json (0600)
+GET /api/config 只回 has_anthropic / has_deepseek 布尔, 前端绝不触碰明文
+空串 = 不改, 显式清空用 clear_* 字段
+```
+
+### 6. 工具自动安装防投毒
+```
+nuclei / ffuf 下载: 版本 + SHA256 双白名单锁定, 仅 amd64 支持, 校验失败直接拒绝安装
+pip 安装: --user 不污染系统环境, PEP 668 自动 --break-system-packages 重试
+下载代理: HTTPS_PROXY/HTTP_PROXY 环境变量 → Windows 兜底读 IE 注册表代理
+```
+
+### 7. 全中文思考可视化
+```
+信号流全中文; step 事件两行展示「思考 L{级} · 工具」+「▍推理 {why}」
+plan 事件高亮整段计划 rationale(LLM 每步思考内容)
+战役阶段进度条: 待命→侦察→扫描→利用→完成(SSE 推断, 只前进不后退)
+```
+
 **技术详解**: 参考 [PROJECT_SUMMARY.md](PROJECT_SUMMARY.md) 第 7 节
 
 ---
@@ -287,6 +361,11 @@ Level 3 (Exploit) → 强制人工确认 ⚠️
 - SecurityContext (runAsNonRoot)
 - NetworkPolicy (白名单)
 - RBAC (最小权限)
+
+**Web 工作台 (v1.1.0)**:
+- API key 以 0600 权限写盘, 界面只回「已配置/未配置」, 绝不回显明文
+- 工具自动下载 SHA256 白名单校验, 防供应链投毒
+- 自动安装仅限 amd64 平台, 其他架构拒绝下载
 
 **安全指南**: 参考 [USER_MANUAL.md](USER_MANUAL.md) 第 6 章
 
@@ -338,7 +417,7 @@ Level 3 (Exploit) → 强制人工确认 ⚠️
 ## 📧 项目信息
 
 **项目名称**: Vero 红队渗透测试智能体  
-**版本**: v1.0.0  
+**版本**: v1.1.0 (工作台增强)  
 **完成日期**: 2026-07-28  
 **开发状态**: ✅ 100% 完成  
 **生产就绪**: ✅ 90% (待环境验证)
@@ -371,6 +450,8 @@ Level 3 (Exploit) → 强制人工确认 ⚠️
 | 查看性能 | PROJECT_SUMMARY.md | 第 8 节 |
 | 验证测试 | TOOL_VERIFICATION_REPORT.md | 全文 |
 | 交付清单 | PROJECT_DELIVERY.md | 全文 |
+| 配置引擎/模型/思考强度 | 工作台「设置」页 + 本文档快速开始 | 本次更新 |
+| 自动安装缺失工具 | 工作台「工具管理」页 | 本次更新 |
 
 ---
 

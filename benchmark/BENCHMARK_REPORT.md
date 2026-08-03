@@ -1,4 +1,4 @@
-# Vero Benchmark 评估报告
+﻿# Vero Benchmark 评估报告
 
 **评估日期**: 2026-07-28  
 **场景**: CVE-2021-44228 (Log4Shell)  
@@ -236,11 +236,11 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 ## 📞 引用本研究
 
 ```bibtex
-@misc{redcell-benchmark-2026,
+@misc{VERO-benchmark-2026,
   title={Evidence-Driven AI Agents: A Benchmark for Trustworthy Autonomous Penetration Testing},
   author={Vero Team},
   year={2026},
-  url={https://github.com/your-repo/redcell},
+  url={https://github.com/your-repo/VERO},
   note={First benchmark to evaluate AI agent trustworthiness, not just capability}
 }
 ```
@@ -257,7 +257,7 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) error {
 
 ### A. 完整评估数据
 
-- [Vero 评估结果](../results/evaluation_redcell.json)
+- [Vero 评估结果](../results/evaluation_VERO.json)
 - [传统 Agent 评估结果](../results/evaluation_traditional.json)
 - [Ground Truth](../scenarios/CVE-2021-44228-log4shell/ground_truth.json)
 
@@ -269,21 +269,21 @@ cd benchmark/scenarios/CVE-2021-44228-log4shell
 docker-compose up -d
 
 # 2. 运行 Vero
-../../redcell.exe -target http://localhost:8080 -output ../../results/redcell_result.json
+../../VERO.exe -target http://localhost:8080 -output ../../results/VERO_result.json
 
 # 3. 评估
 cd ../../evaluator
 python evaluate.py \
   --ground-truth ../scenarios/CVE-2021-44228-log4shell/ground_truth.json \
-  --result ../results/redcell_result.json \
+  --result ../results/VERO_result.json \
   --output ../results/evaluation.json
 ```
 
 ### C. 联系我们
 
-- GitHub: https://github.com/your-repo/redcell
-- Email: redcell@example.com
-- Twitter: @redcell_ai
+- GitHub: https://github.com/your-repo/VERO
+- Email: VERO@example.com
+- Twitter: @VERO_ai
 
 ---
 

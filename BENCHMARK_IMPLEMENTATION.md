@@ -1,4 +1,4 @@
-# Evidence-Driven AI Agent Benchmark - 实施总结
+﻿# Evidence-Driven AI Agent Benchmark - 实施总结
 
 ## ✅ 已完成
 
@@ -146,9 +146,9 @@ benchmark/
 │   └── mock_results.py                    # Mock 数据生成
 │
 └── results/                               # 评估结果
-    ├── redcell_log4shell_baseline.json    # Vero 结果
+    ├── VERO_log4shell_baseline.json    # Vero 结果
     ├── traditional_log4shell_comparison.json  # 传统方法结果
-    ├── evaluation_redcell.json            # Vero 评估报告
+    ├── evaluation_VERO.json            # Vero 评估报告
     └── evaluation_traditional.json        # 传统方法评估报告
 ```
 

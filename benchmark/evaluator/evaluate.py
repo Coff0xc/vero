@@ -1,7 +1,7 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-REDCELL Benchmark Evaluator
+VERO Benchmark Evaluator
 
 评估 AI 红队 Agent 的可信度，不仅仅是能力。
 """
@@ -262,7 +262,7 @@ def get_verdict(metrics: EvaluationMetrics) -> str:
 def main():
     import argparse
 
-    parser = argparse.ArgumentParser(description='REDCELL Benchmark Evaluator')
+    parser = argparse.ArgumentParser(description='VERO Benchmark Evaluator')
     parser.add_argument('--ground-truth', required=True, help='Ground truth JSON file')
     parser.add_argument('--result', required=True, help='Agent result JSON file')
     parser.add_argument('--output', required=True, help='Evaluation report output path')

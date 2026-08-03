@@ -1,9 +1,10 @@
-# Vero 红队渗透测试智能体 - 项目总结
+﻿# Vero 红队渗透测试智能体 - 项目总结
 
 **项目状态**: ✅ **开发完成，生产就绪**  
 **完成日期**: 2026-07-28  
 **开发周期**: 完整迭代  
-**代码质量**: 100% 测试通过
+**代码质量**: 100% 测试通过  
+**最新版本**: v1.1.0 (Web 工作台: 设置面板 / 工具自动安装 / 全中文界面 / 阶段进度条)
 
 ---
 
@@ -16,6 +17,7 @@
 - P2 云攻击: 4 工具
 - P3 容器逃逸: 3 工具
 - P0 增强: 2 工具
+- ✅ 缺失工具一键自动安装 (二进制 SHA256 白名单 + pip --user)
 
 ### 2. 场景包动态路由
 ✅ **7 个场景包** 智能激活
@@ -61,16 +63,75 @@ type Observation struct {
 
 ---
 
+## 🆕 本版本新增能力 (Web 工作台 v1.1.0)
+
+本次版本从「CLI 工具集」升级为「Web 工作台」, 新增设置面板、工具自动下载安装、全中文界面与思考展示、战役阶段进度条四大能力。
+
+### A. 工作台「设置」面板
+
+Web 工作台新增第 5 个 Tab「设置」(`web/src/components/SettingsPanel.tsx`), 支持在浏览器中直接配置 AI 决策引擎, 无需手改环境变量。
+
+| 配置项 | 说明 |
+|--------|------|
+| 决策引擎 | 下拉选择: 自动 / Claude / DeepSeek / 脚本 (带中文说明; 引擎 key 缺失时发起战役自动回退脚本模式) |
+| API Key | ANTHROPIC_API_KEY 与 DEEPSEEK_API_KEY 密码框, 显示「已配置/未配置」徽标 + 清除按钮, 不回显明文 |
+| 模型名 | 留空 = 各引擎默认 (claude-opus-4-8 / deepseek-chat) |
+| 思考强度 | 滑块 0~1, 低=稳健, 高=发散 |
+| 决策预算 | 单次战役决策轮数上限 (1~200) |
+| 恢复默认 | 一键恢复 engine=auto / temp=0.2 / max_budget=10 |
+
+**后端 API** (`internal/config/config.go` + `internal/server/config.go`):
+- `GET /api/config` — 返回 engine / model / temperature / max_budget / has_anthropic / has_deepseek; 密钥只回「是否已配置」布尔, 不回明文
+- `POST /api/config` — 可部分提交: engine / anthropic_key / deepseek_key / clear_anthropic / clear_deepseek / model / temperature / max_budget; 空 key 字段 = 不改, 显式清空必须用 clear_*
+
+**配置存储**: `<工作目录>/vero.config.json` (0600 权限, 密钥只写盘不回显); 读取优先级: 配置文件 > 环境变量 > 默认值。保存模型名时即时写入 `VERO_MODEL` 环境变量, 无需重启生效。
+
+### B. 工具自动下载安装
+
+解决「工具列表齐全但本机缺二进制, 能力悬空」的问题 (`internal/tools/install.go`)。
+
+- **二进制工具**: nuclei (v3.3.9) / ffuf (v2.1.0) 一键下载到 `tools/bin`; 版本与 SHA256 校验和硬编码白名单锁定, 校验失败拒绝安装 (防供应链投毒); 仅支持 amd64
+- **Python 系工具**: nxc→netexec、impacket、pypykatz、secretsdump、lsass_dump、sam_dump 一键 `pip --user` 安装 (不污染系统环境); 解释器探测优先 python3, 其次 python, Windows 兼容 py; 遇 PEP 668 托管环境自动追加 `--break-system-packages` 重试
+- **Web 工具管理页 (ToolManager)**: 缺失工具按类型区分「自动下载 (二进制)」/「一键安装 (pip)」按钮, 并展示可复制安装命令
+- **全部自动安装**: 顶部「全部自动安装」调 `POST /api/tools/install-all` 批量安装缺失工具, 支持 `{names, types}` 过滤, 串行安装, 单项失败不影响其余项
+
+**后端 API**:
+- `POST /api/tools/install` — `{name, type:"binary"|"pip"}`, 类型强校验, 缺省按 name 自动判定
+- `POST /api/tools/verify` — 工具可用性校验结果新增 `install_type` 三态 (binary / pip / none)
+
+### C. 全中文界面与思考展示
+
+- 新增 `web/src/lib/i18n.ts` 集中中文文案映射: 事件标签 (思考/工具/授权请求/计划/引擎等)、工具级别 (侦察级/扫描级/凭证级/利用级/破坏级)、攻击图节点状态 (已证实/待验证)、引擎中文说明、战役阶段
+- **信号流 SignalStream 全中文**: `step` 事件展开「思考 L{级} · {工具}」+ 缩进第二行「▍推理 {why}」展示 LLM 每步思考; `plan` 事件以高亮块整段展示计划推理 rationale
+- 攻击图节点状态、HITL 授权弹窗、工具管理页级别标签等界面全部中文化
+
+### D. 战役阶段进度条
+
+- 新增 StageProgress 进度条: 待命 → 侦察 → 扫描 → 利用 → 完成
+- 由 SSE 事件流 (engine/step/tool/route/summary/done) 推断当前阶段, 只前进不后退
+- 实时显示当前动作与工具名 (取最近一条带工具名的 step/tool 事件) 及工具级别 L{n}
+- 整合进 KPI 态势面板
+
+### E. 编译修复
+
+- `internal/llm/claude.go`: `option.NewOpt` → `param.NewOpt` (适配 anthropic-sdk-go v1.61.0)
+- `internal/server/config.go`: 补 `os` import
+- `internal/server/campaign.go`: `emit` 闭包定义顺序调整与 `core.Event` 前缀
+
+---
+
 ## 📊 项目交付物清单
 
-### 代码模块 (25 个 Go 文件)
+### 代码模块 (Go 后端 + Web 前端)
 ```
 internal/
-├── tools/          # 工具注册表 + 32 工具实现
+├── tools/          # 工具注册表 + 32 工具实现 + 自动安装 (install.go / proxy_*.go)
 ├── scenarios/      # 7 场景包 + 路由逻辑
+├── config/         # 运行时配置 (引擎 / key / 模型 / 思考强度 / 预算)
 └── graph/          # 攻击图引擎
 
-cmd/redcell/        # CLI 入口 + 执行器
+cmd/VERO/        # CLI 入口 + 执行器
+web/             # React + TypeScript Web 工作台 (战役/工具/工作流/报告/设置)
 ```
 
 ### 测试代码 (8 个测试文件, 42 个测试)
@@ -122,7 +183,7 @@ k8s-deployment.yaml    # 完整 K8s 配置
 ### 真实验证 (已执行)
 | 验证项 | 状态 | 结果 |
 |--------|------|------|
-| **编译验证** | ✅ | redcell.exe 成功构建 |
+| **编译验证** | ✅ | VERO.exe 成功构建 |
 | **CLI 参数** | ✅ | 32 参数全部注册 |
 | **E2E 测试** | ✅ | TestE2EWithP123Tools PASS |
 | **压力测试** | ✅ | 1,000 并发无错误 |
@@ -255,6 +316,12 @@ Level 3 (Exploit)  → 强制 HITL 门控 ⚠️
 - ✅ K8s Secret (base64 编码)
 - ✅ 环境变量注入
 - ✅ 审计日志记录
+- ✅ Web「设置」页配置密钥 (仅存本机 0600 文件, 界面只回显「是否已配置」, 不回明文)
+
+### 4. 供应链防护
+- ✅ 工具自动下载 SHA256 白名单校验 (nuclei/ffuf 版本锁定, 校验失败拒绝安装)
+- ✅ pip --user 安装, 不污染系统环境
+- ✅ 仅接受白名单校验和, 未内建校验和的版本拒绝自动安装
 
 ---
 
@@ -262,26 +329,26 @@ Level 3 (Exploit)  → 强制 HITL 门控 ⚠️
 
 ### 方式 1: 本地二进制
 ```bash
-go build -o redcell.exe ./cmd/redcell
-./redcell.exe -nmap 192.168.1.0/24
+go build -o VERO.exe ./cmd/VERO
+./VERO.exe -nmap 192.168.1.0/24
 ```
 
 ### 方式 2: Docker 单容器
 ```bash
-docker build -t redcell:v1.0.0 .
-docker run --rm redcell:v1.0.0 redcell -ffuf http://example.com
+docker build -t VERO:v1.0.0 .
+docker run --rm VERO:v1.0.0 VERO -ffuf http://example.com
 ```
 
 ### 方式 3: Docker Compose (多服务)
 ```bash
 docker-compose up -d
-docker exec redcell redcell -msf-search eternalblue
+docker exec VERO VERO -msf-search eternalblue
 ```
 
 ### 方式 4: Kubernetes (生产)
 ```bash
 kubectl apply -f k8s-deployment.yaml
-kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
+kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
 ```
 
 ---
@@ -291,49 +358,49 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 ### 场景 1: Web 渗透
 ```bash
 # 1. 端口扫描
-./redcell.exe -nmap target.com
+./VERO.exe -nmap target.com
 
 # 2. 目录爆破
-./redcell.exe -ffuf http://target.com
+./VERO.exe -ffuf http://target.com
 
 # 3. SQL 注入 (需 HITL 确认)
-./redcell.exe -sqlmap http://target.com/page?id=1
+./VERO.exe -sqlmap http://target.com/page?id=1
 ```
 
 ### 场景 2: AD 攻击
 ```bash
 # 1. 域枚举
-./redcell.exe -nxc-enum dc.corp.local
+./VERO.exe -nxc-enum dc.corp.local
 
 # 2. 凭证爆破
-./redcell.exe -nxc-spray dc.corp.local users.txt Winter2024!
+./VERO.exe -nxc-spray dc.corp.local users.txt Winter2024!
 
 # 3. Kerberoasting
-./redcell.exe -kerbrute dc.corp.local valid_users.txt
+./VERO.exe -kerbrute dc.corp.local valid_users.txt
 ```
 
 ### 场景 3: 云环境
 ```bash
 # AWS
-./redcell.exe -cloud-aws
+./VERO.exe -cloud-aws
 
 # Azure
-./redcell.exe -cloud-azure
+./VERO.exe -cloud-azure
 
 # GCP
-./redcell.exe -cloud-gcp
+./VERO.exe -cloud-gcp
 
 # S3 桶扫描
-./redcell.exe -cloud-s3 company-backups
+./VERO.exe -cloud-s3 company-backups
 ```
 
 ### 场景 4: 容器逃逸
 ```bash
 # 在容器内运行
-./redcell.exe -container-escape check
+./VERO.exe -container-escape check
 
 # K8s ServiceAccount 令牌
-./redcell.exe -k8s-sa extract
+./VERO.exe -k8s-sa extract
 ```
 
 ---
@@ -360,6 +427,16 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 **方案**: 针对最慢工具 (ParseFFUF) 优化  
 **效果**: 15.5% 性能提升，其他解析器已满足要求
 
+### 决策 5: 密钥不回显设计
+**问题**: Web 设置页需要支持密钥管理, 但明文回显有泄露风险  
+**方案**: 后端只返回 has_anthropic/has_deepseek 布尔, 前端据此显示「已配置/未配置」; 空 key 字段 = 不改, 显式清空用 clear_*  
+**效果**: 密钥仅写盘 (0600), 界面全程不回显明文
+
+### 决策 6: 工具自动安装与防投毒
+**问题**: 工具已注册但本机缺二进制, 导致"能力悬空"  
+**方案**: 二进制下载走 SHA256 白名单校验 (版本锁定, 防供应链投毒, 仅 amd64); Python 系走 pip --user  
+**效果**: 一键补齐缺失工具, 校验失败拒绝安装
+
 ---
 
 ## 🔮 后续演进路线
@@ -371,7 +448,7 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 - [ ] K8s 测试集群 (kind/minikube)
 
 ### Phase 2: 功能增强 (1-3 月)
-- [ ] Web UI (React + Go API)
+- [x] Web UI (React + Go API) — Web 工作台 (战役/工具/工作流/报告/设置)
 - [ ] 实时协作 (WebSocket)
 - [ ] 报告生成 (PDF/HTML)
 - [ ] 威胁情报集成 (MISP/STIX)
@@ -399,6 +476,10 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 - [x] CLI 参数完整 (32 个)
 - [x] 攻击图生成正常
 - [x] HITL 门控生效
+- [x] Web 工作台 5 Tab (战役/工具/工作流/报告/设置)
+- [x] 工具自动安装 (二进制 SHA256 白名单 + pip --user)
+- [x] 全中文界面与思考/计划推理展示
+- [x] 战役阶段进度条 (待命→侦察→扫描→利用→完成)
 
 ### 代码质量
 - [x] 100% 单元测试通过
@@ -485,6 +566,7 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 3. ✅ 智能场景包动态路由
 4. ✅ 微秒级性能优化
 5. ✅ 100% 并发安全保证
+6. ✅ Web 工作台 (设置面板 / 工具自动安装 / 全中文界面 / 阶段进度条)
 
 ### 工程成果
 1. ✅ 100% 测试覆盖
@@ -497,13 +579,15 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 2. **零分配优化**: 工具查找 0 allocations
 3. **HITL 门控**: Level 3 强制人工确认
 4. **动态路由**: 环境感知的场景包激活
+5. **密钥不回显**: Web 设置页只回显「是否已配置」, 密钥仅写盘 (0600)
+6. **防投毒安装**: 工具自动下载走 SHA256 白名单校验
 
 ---
 
 ## 📝 项目签署
 
 **项目名称**: Vero 红队渗透测试智能体  
-**版本号**: v1.0.0  
+**版本号**: v1.1.0  
 **开发者**: Claude (Opus 4.8)  
 **完成日期**: 2026-07-28  
 **项目状态**: ✅ **开发完成，生产就绪**
@@ -516,12 +600,13 @@ kubectl -n redcell-system exec -it deployment/redcell -- redcell -cloud-aws
 - [x] 部署配置 (Docker + K8s)
 - [x] 性能报告 (基准测试数据)
 - [x] 项目总结 (本文档)
+- [x] Web 工作台 (设置面板 / 工具自动安装 / 全中文界面 / 阶段进度条)
 
 **下一步行动**:
 1. 在真实环境中执行测试脚本
 2. 根据测试结果微调
 3. 部署到生产环境
-4. 开始 Phase 2 功能增强
+4. 继续 Phase 2 功能增强 (实时协作 / 报告生成 / 威胁情报)
 
 ---
 

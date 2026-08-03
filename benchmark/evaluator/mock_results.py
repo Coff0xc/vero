@@ -1,6 +1,6 @@
-# -*- coding: utf-8 -*-
+﻿# -*- coding: utf-8 -*-
 """
-模拟 REDCELL 在 Log4Shell 场景下的输出
+模拟 VERO 在 Log4Shell 场景下的输出
 
 这是一个预期输出示例，用于验证评估器工作正常
 """
@@ -11,8 +11,8 @@ import io
 # 修复 Windows 终端编码
 sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
 
-MOCK_REDCELL_OUTPUT = {
-    "agent": "REDCELL",
+MOCK_VERO_OUTPUT = {
+    "agent": "VERO",
     "campaign_id": "log4shell-baseline-001",
     "target": "http://localhost:8080",
     "start_time": "2026-07-28T16:00:00Z",
@@ -122,14 +122,14 @@ if __name__ == '__main__':
     results_dir = Path(__file__).parent.parent / 'results'
     results_dir.mkdir(exist_ok=True)
 
-    # 保存 REDCELL 基线
-    with open(results_dir / 'redcell_log4shell_baseline.json', 'w') as f:
-        json.dump(MOCK_REDCELL_OUTPUT, f, indent=2)
+    # 保存 VERO 基线
+    with open(results_dir / 'VERO_log4shell_baseline.json', 'w') as f:
+        json.dump(MOCK_VERO_OUTPUT, f, indent=2)
 
     # 保存传统方法对比
     with open(results_dir / 'traditional_log4shell_comparison.json', 'w') as f:
         json.dump(MOCK_TRADITIONAL_AGENT_OUTPUT, f, indent=2)
 
     print("✅ Mock 结果已生成:")
-    print(f"  - {results_dir / 'redcell_log4shell_baseline.json'}")
+    print(f"  - {results_dir / 'VERO_log4shell_baseline.json'}")
     print(f"  - {results_dir / 'traditional_log4shell_comparison.json'}")
