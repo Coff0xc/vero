@@ -359,7 +359,7 @@ func newLLM(reg *tools.Registry, target string) core.LLM {
 	if os.Getenv("DEEPSEEK_API_KEY") != "" {
 		return llm.WithTarget(llm.NewDeepSeek(reg, "", 0.2), target)
 	}
-	return llm.WithTarget(llm.NewClaude(reg, 0.2), target)
+	return llm.WithTarget(llm.NewClaude(reg, "", 0.2), target)
 }
 
 func hasLLMKey() bool {

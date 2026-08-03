@@ -400,7 +400,7 @@ func runRealAgent(target string) {
 	if os.Getenv("DEEPSEEK_API_KEY") != "" {
 		base = llm.NewDeepSeek(reg, "", 0.2)
 	} else {
-		base = llm.NewClaude(reg, 0.2)
+		base = llm.NewClaude(reg, "", 0.2)
 		engine = "Claude"
 	}
 	chosen := llm.WithTarget(base, target)
