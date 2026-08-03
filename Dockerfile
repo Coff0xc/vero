@@ -37,15 +37,17 @@ RUN apk add --no-cache \
     unzip \
     && rm -rf /var/cache/apk/*
 
-# Install nuclei
+# Install nuclei (带 SHA256 校验: 供应链完整性, 修原版 wget 裸下不验)
 RUN wget -qO nuclei.zip https://github.com/projectdiscovery/nuclei/releases/download/v3.3.9/nuclei_3.3.9_linux_amd64.zip \
+    && echo "dfecedc31364d70b7291b347c74fd4d1d3185d30301c025b7490717d29daf28a  nuclei.zip" | sha256sum -c - \
     && unzip nuclei.zip \
     && mv nuclei /usr/local/bin/ \
     && rm nuclei.zip \
     && nuclei -update-templates
 
-# Install ffuf
+# Install ffuf (带 SHA256 校验)
 RUN wget -qO ffuf.tar.gz https://github.com/ffuf/ffuf/releases/download/v2.1.0/ffuf_2.1.0_linux_amd64.tar.gz \
+    && echo "fc2c82736c14dcbea4daf3d3cf3878c1c4773008ba45c2bc0fceba7d17b40bb5  ffuf.tar.gz" | sha256sum -c - \
     && tar xzf ffuf.tar.gz \
     && mv ffuf /usr/local/bin/ \
     && rm ffuf.tar.gz

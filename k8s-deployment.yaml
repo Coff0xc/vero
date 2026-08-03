@@ -15,11 +15,11 @@ metadata:
   name: vero-config
   namespace: vero
 data:
-  REDCELL_PORT: "8000"
-  REDCELL_DB: "/app/data/vero.db"
+  VERO_PORT: "8000"
+  VERO_DB: "/app/data/vero.db"
 
 ---
-# Secret (需要手动创建 API keys)
+# Secret (需要手动创建 API keys; MSF 密码必填, 不再放占位值)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -29,7 +29,7 @@ type: Opaque
 stringData:
   ANTHROPIC_API_KEY: ""  # 填入实际 key
   DEEPSEEK_API_KEY: ""   # 填入实际 key
-  MSF_PASSWORD: "change-me-in-production"
+  MSF_PASSWORD: ""       # 填入实际密码(勿用默认值; 缺失时 msf 工具明确报错而非弱口令)
 
 ---
 # PersistentVolumeClaim - 数据持久化
@@ -67,6 +67,7 @@ spec:
       labels:
         app: vero
     spec:
+      serviceAccountName: vero  # 绑定最小权限 SA(修原版定义了 SA 却未挂载, Pod 走默认 SA)
       securityContext:
         runAsUser: 1000
         runAsGroup: 1000
@@ -80,16 +81,16 @@ spec:
           name: http
           protocol: TCP
         env:
-        - name: REDCELL_PORT
+        - name: VERO_PORT
           valueFrom:
             configMapKeyRef:
               name: vero-config
-              key: REDCELL_PORT
-        - name: REDCELL_DB
+              key: VERO_PORT
+        - name: VERO_DB
           valueFrom:
             configMapKeyRef:
               name: vero-config
-              key: REDCELL_DB
+              key: VERO_DB
         - name: ANTHROPIC_API_KEY
           valueFrom:
             secretKeyRef:
@@ -101,6 +102,12 @@ spec:
             secretKeyRef:
               name: vero-secrets
               key: DEEPSEEK_API_KEY
+              optional: true
+        - name: VERO_MSF_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: vero-secrets
+              key: MSF_PASSWORD
               optional: true
         volumeMounts:
         - name: data
@@ -117,7 +124,7 @@ spec:
             cpu: "2000m"
         livenessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: http
           initialDelaySeconds: 30
           periodSeconds: 30
@@ -125,7 +132,7 @@ spec:
           failureThreshold: 3
         readinessProbe:
           httpGet:
-            path: /
+            path: /healthz
             port: http
           initialDelaySeconds: 10
           periodSeconds: 10
@@ -223,7 +230,14 @@ spec:
     ports:
     - protocol: TCP
       port: 55553  # Metasploit RPC (如果部署)
-  - to: []  # 允许访问外部 (LLM API, 目标系统)
+  # 仅允许出网到 LLM API 与目标系统; 明确封死云元数据地址(169.254.169.254),
+  # 修原版 `- to: []` 全放行且无元数据防护。
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.169.254/32
+        - 169.254.170.2/32
 
 ---
 # ServiceAccount (最小权限)
