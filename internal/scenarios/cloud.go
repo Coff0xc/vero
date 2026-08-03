@@ -289,8 +289,10 @@ func CloudPack() Pack {
 				Run: s3BucketEnum, Parse: ParseS3Bucket},
 		},
 		Fingerprint: func(s map[string]bool) bool {
-			// 云环境场景: 自动激活(侦察阶段始终尝试)
-			return true
+			// 云环境无标准服务指纹(IMDS 在元数据地址 169.254.169.254, 不是扫描服务)。
+			// 修: 原恒 true 在非云环境误显示"云场景已激活" —— 工具本身注册可用
+			// (LLM 可按需调用, 工具内部会快速判非云环境), 但路由展示不误导。
+			return false
 		},
 	}
 }

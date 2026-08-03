@@ -79,7 +79,7 @@ func artifactFor(name string) *toolArtifact {
 // ToolBinary(二进制名) 索引, 使 secretsdump/lsass_dump/sam_dump(ToolBinary=python3)
 // 的 pip 提示从未生效。
 var pipPackage = map[string]string{
-	"nxc":         "netexec",
+	"nxc":         "nxc", // 修: NetExec 改名后 PyPI 包名是 nxc, netexec 从未发布(pip 装必失败)
 	"impacket":    "impacket",
 	"pypykatz":    "pypykatz",
 	"secretsdump": "impacket",

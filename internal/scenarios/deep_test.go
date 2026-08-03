@@ -385,8 +385,16 @@ func TestCrossScenarioIntegration(t *testing.T) {
 			}
 		}
 
+		// 云包无服务指纹不激活路由, 但工具必须注册可用(LLM 可调用, 工具内部判环境)。
 		if !hasCloud {
-			t.Error("云环境应激活 CloudPack")
+			t.Log("CloudPack 未激活路由展示(预期: 云无服务指纹) — 校验工具注册替代")
+			reg := tools.NewRegistry()
+			NewManager().Register(reg, CloudPack())
+			for _, n := range []string{"aws_imds_enum", "azure_imds_enum", "gcp_imds_enum", "s3_bucket_enum"} {
+				if !reg.Has(n) {
+					t.Errorf("云工具 %s 未注册", n)
+				}
+			}
 		}
 		// container 需真实容器环境，此处不应激活
 		if hasContainer {

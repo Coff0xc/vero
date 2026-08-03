@@ -25,9 +25,7 @@ func TestPackRegisterAndRoute(t *testing.T) {
 	if !containsStr(webRoutes, "web") {
 		t.Fatalf("http 应路由到 web, got %v", webRoutes)
 	}
-	if !containsStr(webRoutes, "cloud") {
-		t.Fatalf("cloud 应总是激活, got %v", webRoutes)
-	}
+	// 云包无服务指纹, 不路由激活(工具仍注册可用)。
 
 	adRoutes := m.Route(map[string]bool{"ldap": true, "kerberos-sec": true})
 	if !containsStr(adRoutes, "ad") {
@@ -39,9 +37,10 @@ func TestPackRegisterAndRoute(t *testing.T) {
 		t.Fatalf("多指纹应激活多包 (至少 web/ad/cloud), got %v", multiRoutes)
 	}
 
+	// 云包无服务指纹: 无匹配时不应路由激活(工具仍注册可用)。
 	noMatchRoutes := m.Route(map[string]bool{"ssh": true})
-	if !containsStr(noMatchRoutes, "cloud") {
-		t.Fatalf("无匹配指纹仍应激活 cloud 包, got %v", noMatchRoutes)
+	if containsStr(noMatchRoutes, "cloud") {
+		t.Fatalf("无服务指纹不应激活 cloud 包, got %v", noMatchRoutes)
 	}
 }
 

@@ -226,9 +226,9 @@ func TestCloudPack(t *testing.T) {
 		}
 	}
 
-	// 验证指纹函数 (云场景始终激活)
-	services := map[string]bool{}
-	if !pack.Fingerprint(services) {
-		t.Error("云场景应始终激活")
+	// 云环境无标准服务指纹(IMDS 在元数据地址而非扫描服务): Fingerprint 应恒 false,
+	// 但工具始终注册可用(LLM 可按需调用, 工具内部快速判非云环境)。
+	if pack.Fingerprint(map[string]bool{}) {
+		t.Error("云包 Fingerprint 不应在无服务指纹时激活(误导路由展示)")
 	}
 }

@@ -1,6 +1,8 @@
 package server
 
 import (
+	"fmt"
+	"os"
 	"sync"
 
 	"github.com/Coff0xc/vero/internal/core"
@@ -34,14 +36,20 @@ func (b *Broker) Subscribe() (chan core.Event, func()) {
 	}
 }
 
-// Emit —— 广播一个事件。订阅者缓冲满就丢弃该事件, 保证战役不被慢客户端拖死。
+// Emit —— 广播一个事件。常规事件缓冲满丢弃(保证战役不被慢客户端拖死);
+// 审批类事件(hitl_request/hitl)缓冲满时记录告警 —— 不静默吞掉, 供排障;
+// 补偿机制: 断线/丢失的审批可经 GET /api/approvals/pending 补缝, 不会永久丢。
 func (b *Broker) Emit(e core.Event) {
 	b.mu.Lock()
 	defer b.mu.Unlock()
+	critical := e.Kind == "hitl_request" || e.Kind == "hitl"
 	for ch := range b.subs {
 		select {
 		case ch <- e:
 		default:
+			if critical {
+				fmt.Fprintf(os.Stderr, "[broker] 审批事件 %q 被慢消费者丢弃(缓冲满) — 前端可经 /api/approvals/pending 补缝\n", e.Kind)
+			}
 		}
 	}
 }

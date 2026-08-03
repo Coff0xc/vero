@@ -93,9 +93,12 @@ func (s *Server) handleToolInstall(w http.ResponseWriter, r *http.Request) {
 	s.installMu.Lock()
 	defer s.installMu.Unlock() // 单装/批量共用, 防并发下载
 
+	tools.EnsurePath() // 修 #6: 确保 bin 目录存在并注入进程 PATH, 否则安装后验证仍报不可用
+
 	switch body.Type {
 	case "binary":
-		path, err := tools.InstallBinary(body.Name)
+		binName := tools.InstallableBinary(body.Name) // 修 #5: 工具名→二进制名(ffuf_dir_brute→ffuf)
+		path, err := tools.InstallBinary(binName)
 		if err != nil {
 			writeJSONStatus(w, http.StatusInternalServerError, map[string]any{"ok": false, "name": body.Name, "type": body.Type, "error": "安装失败: " + err.Error()})
 			return
@@ -192,7 +195,8 @@ func (s *Server) handleToolInstallAll(w http.ResponseWriter, r *http.Request) {
 		item := installAllItem{Name: j.name, Type: j.typ}
 		switch j.typ {
 		case "binary":
-			path, err := tools.InstallBinary(j.name)
+			binName := tools.InstallableBinary(j.name) // 修 #5: 工具名→二进制名
+			path, err := tools.InstallBinary(binName)
 			if err != nil {
 				item.Error = err.Error()
 				break

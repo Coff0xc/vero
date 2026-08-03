@@ -56,8 +56,11 @@ func TestE2EWithP123Tools(t *testing.T) {
 			break
 		}
 	}
+	// 云包无服务指纹, 不要求路由激活; 但工具必须注册可用(LLM 可调用)。
 	if !cloudActive {
-		t.Error("CloudPack 应总是激活")
+		if !reg.Has("aws_imds_enum") {
+			t.Error("云工具应注册可用")
+		}
 	}
 
 	// Step 4: 验证 Parser 反幻觉机制
@@ -113,19 +116,19 @@ func TestScenarioPackRouting(t *testing.T) {
 		{
 			name:            "Web 环境",
 			services:        map[string]bool{"http": true},
-			expectedPacks:   []string{"web", "cloud"}, // cloud 总是激活
+			expectedPacks:   []string{"web"},
 			unexpectedPacks: []string{"container"},
 		},
 		{
 			name:            "AD 域环境",
 			services:        map[string]bool{"microsoft-ds": true, "ldap": true},
-			expectedPacks:   []string{"ad", "ad_enhanced", "cloud"},
+			expectedPacks:   []string{"ad", "ad_enhanced"},
 			unexpectedPacks: []string{"container"},
 		},
 		{
 			name:            "云环境 (无服务指纹)",
 			services:        map[string]bool{},
-			expectedPacks:   []string{"cloud"}, // cloud 总是激活
+			expectedPacks:   []string{}, // 云无服务指纹, 不路由激活
 			unexpectedPacks: []string{"container"},
 		},
 	}
