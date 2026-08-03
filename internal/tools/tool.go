@@ -108,3 +108,13 @@ func ArgStr(args map[string]any, key, def string) string {
 	}
 	return def
 }
+
+// Clip 安全截断到 n 字符(按 rune, 不切坏多字节); 不足 n 时原样返回, 绝不 panic。
+// 修 Python 遗留的裸切片 stdout[:500] 等 —— 输出短于 n 直接越界崩溃。
+func Clip(s string, n int) string {
+	r := []rune(s)
+	if len(r) > n {
+		return string(r[:n])
+	}
+	return s
+}

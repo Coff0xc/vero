@@ -1,0 +1,38 @@
+# 本地构建产物与二进制
+vero
+vero.exe
+redcell
+redcell.exe
+nuclei.exe
+*.exe
+*.dll
+
+# 运行时数据与密钥 —— 绝不能进镜像(修原版 COPY . . 全量拷入)
+.env
+.env.*
+*.db
+*.db-journal
+audit.jsonl
+rollback.jsonl
+*.log
+*.jsonl
+vero-report.md
+vero-report-*.md
+data/
+wordlists/
+audit/
+
+# 版本控制
+.git
+.gitignore
+
+# 文档(镜像不需要; 构建上下文变小)
+*.md
+!README.md
+
+# 前端依赖(构建阶段自行 npm install)
+web/node_modules/
+
+# Go 缓存与测试产物
+*.test
+coverage.out

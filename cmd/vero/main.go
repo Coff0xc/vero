@@ -1,11 +1,11 @@
-// Command redcell —— 自主红队渗透智能体作战室(单一二进制, embed 前端)。
+// Command vero —— 自主红队渗透智能体作战室(单一二进制, embed 前端)。
 //
 // 用法:
 //
-//	redcell                     启动作战室(默认 http://127.0.0.1:8000)
-//	redcell -port 9000          指定端口
-//	redcell -selfcheck          离线自检(跑内核闭环, 无需 API key)后退出
-//	redcell -probe <url>        真实工具闭环: curl 真实探测目标 HTTP 指纹后退出
+//	vero                        启动作战室(默认 http://127.0.0.1:8000)
+//	vero -port 9000             指定端口
+//	vero -selfcheck             离线自检(跑内核闭环, 无需 API key)后退出
+//	vero -probe <url>           真实工具闭环: curl 真实探测目标 HTTP 指纹后退出
 //
 // 有 ANTHROPIC_API_KEY 时战役用真实 Claude(opus)决策; 否则用确定性规划器离线跑通。
 package main
@@ -17,6 +17,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 
@@ -33,6 +34,9 @@ import (
 )
 
 func main() {
+	// 本地工具目录注入 PATH: 自动下载的 nuclei/ffuf 装到 tools/bin 后立即可用
+	tools.EnsurePath()
+
 	port := flag.Int("port", 8000, "监听端口")
 	dbPath := flag.String("db", "vero.db", "SQLite 数据库路径")
 	selfcheck := flag.Bool("selfcheck", false, "离线自检后退出")
@@ -56,6 +60,23 @@ func main() {
 	toolTest := flag.Bool("tooltest", false, "验证所有工具集成状态")
 
 	flag.Parse()
+
+	// 环境变量兜底(VERO_ 前缀; 修原版 docker/k8s 设了 REDCELL_PORT/REDCELL_DB 代码却不读):
+	// 命令行显式传参优先于环境变量。
+	setBy := map[string]bool{}
+	flag.Visit(func(f *flag.Flag) { setBy[f.Name] = true })
+	if !setBy["port"] {
+		if v := os.Getenv("VERO_PORT"); v != "" {
+			if p, err := strconv.Atoi(v); err == nil {
+				*port = p
+			}
+		}
+	}
+	if !setBy["db"] {
+		if v := os.Getenv("VERO_DB"); v != "" {
+			*dbPath = v
+		}
+	}
 
 	if *toolTest {
 		runToolTest()
@@ -137,7 +158,7 @@ func main() {
 
 	srv := server.New(st, auditor, sub)
 	addr := fmt.Sprintf("127.0.0.1:%d", *port)
-	fmt.Printf("REDCELL 作战室: http://%s  (Ctrl+C 停)\n", addr)
+	fmt.Printf("VERO 作战室: http://%s  (Ctrl+C 停)\n", addr)
 	if err := http.ListenAndServe(addr, srv.Router()); err != nil {
 		log.Fatal(err)
 	}
@@ -375,9 +396,9 @@ func runRealAgent(target string) {
 	var base core.LLM
 	engine := "DeepSeek"
 	if os.Getenv("DEEPSEEK_API_KEY") != "" {
-		base = llm.NewDeepSeek(reg)
+		base = llm.NewDeepSeek(reg, "", 0.2)
 	} else {
-		base = llm.NewClaude(reg)
+		base = llm.NewClaude(reg, 0.2)
 		engine = "Claude"
 	}
 	chosen := llm.WithTarget(base, target)

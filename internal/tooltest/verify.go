@@ -3,6 +3,9 @@ package tooltest
 
 import (
 	"fmt"
+	"net"
+	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -12,12 +15,15 @@ import (
 
 // ToolStatus —— 工具验证状态
 type ToolStatus struct {
-	Name      string        `json:"name"`
-	Level     int           `json:"level"`
-	Available bool          `json:"available"`
-	Error     string        `json:"error,omitempty"`
-	Duration  time.Duration `json:"duration"`
-	Tested    bool          `json:"tested"`
+	Name        string        `json:"name"`
+	Level       int           `json:"level"`
+	Available   bool          `json:"available"`
+	Error       string        `json:"error,omitempty"`
+	Duration    time.Duration `json:"duration"`
+	Tested      bool          `json:"tested"`
+	InstallType string        `json:"install_type"`           // 三态安装途径: binary|pip|none(恒输出)
+	Installable string        `json:"installable,omitempty"`  // 可自动安装的二进制名(nuclei/ffuf)
+	PipHint     string        `json:"pip_hint,omitempty"`     // 需手动 pip 的命令
 }
 
 // VerifyAll —— 验证所有已注册工具
@@ -32,44 +38,60 @@ func VerifyAll(reg *tools.Registry) []ToolStatus {
 			Tested: true,
 		}
 
-		start := time.Now()
-		result := verifyTool(tool)
-		status.Duration = time.Since(start)
-		status.Available = result.Success
-		if !result.Success {
-			status.Error = result.Stderr
-			if status.Error == "" {
-				status.Error = result.Stdout
-			}
+	start := time.Now()
+	result := verifyTool(tool)
+	status.Duration = time.Since(start)
+	status.Available = result.Success
+	// 三态安装途径恒输出(前端按钮与批量安装的唯一驱动)。
+	status.InstallType = tools.InstallType(name)
+	if !result.Success {
+		status.Error = result.Stderr
+		if status.Error == "" {
+			status.Error = result.Stdout
 		}
+		// 标注修复途径: 可自动下载的二进制 / 需手动 pip 的 Python 依赖
+		status.Installable = tools.InstallableBinary(name)
+		status.PipHint = tools.InstallPipHint(name)
+	}
 
-		results = append(results, status)
+	results = append(results, status)
 	}
 
 	return results
 }
 
-// verifyTool —— 验证单个工具（使用安全参数）
+// verifyTool —— 验证单个工具(非攻击性: 只探测依赖二进制是否就位 / RPC 端口可达)。
+// 修原版直接以攻击参数真实执行工具(对 127.0.0.1 发 SQLi/凭证喷洒等):
+// "验证可用性"不该真的发起攻击 —— 改为检查依赖, 语义等价且零风险。
 func verifyTool(tool *tools.Tool) tools.ToolResult {
-	// 根据工具名称使用安全的测试参数
-	args := GetSafeTestArgs(tool.Name)
-
-	// 设置超时保护
-	done := make(chan tools.ToolResult, 1)
-	go func() {
-		done <- tool.Run(args)
-	}()
-
-	select {
-	case result := <-done:
-		return result
-	case <-time.After(10 * time.Second):
-		return tools.ToolResult{
-			Success: false,
-			Stderr:  "timeout after 10s",
-			RC:      -1,
+	// Metasploit 工具: 仅 TCP 可达性探测(不调用任何 exploit)。
+	if strings.HasPrefix(tool.Name, "msf_") {
+		conn, err := net.DialTimeout("tcp", "127.0.0.1:55553", 2*time.Second)
+		if err != nil {
+			return tools.ToolResult{Success: false, Stderr: "msfrpcd 未运行 (127.0.0.1:55553)", RC: -1}
 		}
+		_ = conn.Close()
+		return tools.ToolResult{Success: true, Stdout: "msfrpcd reachable"}
 	}
+
+	// K8s 工具: 检查 ServiceAccount 凭证文件(pod 内才存在)。
+	if tool.Name == "k8s_sa_enum" {
+		if _, err := os.Stat("/var/run/secrets/kubernetes.io/serviceaccount/token"); err != nil {
+			return tools.ToolResult{Success: false, Stderr: "非 Pod 环境: 无 ServiceAccount token", RC: -1}
+		}
+		return tools.ToolResult{Success: true, Stdout: "ServiceAccount token present"}
+	}
+
+	// 其余工具: 检查其依赖的命令是否存在于 PATH(不执行工具本身)。
+	binary := tools.ToolBinary(tool.Name)
+	if binary == "" {
+		return tools.ToolResult{Success: true, Stdout: "no external dependency"}
+	}
+	path, err := exec.LookPath(binary)
+	if err != nil {
+		return tools.ToolResult{Success: false, Stderr: fmt.Sprintf("%s 未安装 (command not found)", binary), RC: -1}
+	}
+	return tools.ToolResult{Success: true, Stdout: path}
 }
 
 // getSafeTestArgs —— 为每个工具提供安全的测试参数（导出供 CLI 使用）
