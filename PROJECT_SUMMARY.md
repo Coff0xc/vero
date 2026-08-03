@@ -11,12 +11,15 @@
 ## 🎯 核心成就
 
 ### 1. 工具体系完整性
-✅ **32 个渗透工具** 全部实现并验证
-- P0 基础: 22 工具 (Web + AD + 后渗透)
-- P1 Metasploit: 1 工具
-- P2 云攻击: 4 工具
-- P3 容器逃逸: 3 工具
-- P0 增强: 2 工具
+✅ **30+ 个工具** 全部实现并验证（26 个场景包工具 + 内核扫描器；本机实际可用性以 `./vero -tooltest` 实测为准）
+- Web 场景包: 5 工具 (http_probe / web_vuln_scan / ffuf_dir_brute / ffuf_vhost_enum / exploit_sqli)
+- AD 场景包: 2 工具 (smb_enum / kerberoast)
+- AD 增强包 (NetExec): 6 工具 (nxc_asrep / nxc_ldap_computers / nxc_ldap_enum / nxc_smb_shares / nxc_smb_spray / nxc_wmi_exec)
+- 云攻击包: 4 工具 (aws_imds_enum / azure_imds_enum / gcp_imds_enum / s3_bucket_enum)
+- 容器逃逸包: 3 工具 (docker_escape_check / k8s_sa_enum / k8s_node_exploit)
+- Metasploit 包: 3 工具 (msf_search / msf_execute / msf_get_sessions)
+- 后渗透包: 3 工具 (lsass_dump / sam_dump / secretsdump)
+- 内核自带: nmap_scan / nmap_ping / port_scan (fake_scan/fake_dump 仅离线自检用)
 - ✅ 缺失工具一键自动安装 (二进制 SHA256 白名单 + pip --user)
 
 ### 2. 场景包动态路由
@@ -125,7 +128,7 @@ Web 工作台新增第 5 个 Tab「设置」(`web/src/components/SettingsPanel.t
 ### 代码模块 (Go 后端 + Web 前端)
 ```
 internal/
-├── tools/          # 工具注册表 + 32 工具实现 + 自动安装 (install.go / proxy_*.go)
+├── tools/          # 工具注册表 + 30+ 工具实现 + 自动安装 (install.go / proxy_*.go)
 ├── scenarios/      # 7 场景包 + 路由逻辑
 ├── config/         # 运行时配置 (引擎 / key / 模型 / 思考强度 / 预算)
 └── graph/          # 攻击图引擎
@@ -134,7 +137,7 @@ cmd/VERO/        # CLI 入口 + 执行器
 web/             # React + TypeScript Web 工作台 (战役/工具/工作流/报告/设置)
 ```
 
-### 测试代码 (8 个测试文件, 42 个测试)
+### 测试代码 (29 个测试文件, 106 个测试用例)
 ```
 container_test.go      # P3 容器工具测试 (3)
 e2e_test.go            # 端到端集成 (3)
@@ -151,10 +154,10 @@ test-cloud-tools.sh    # 云 IMDS 工具 (4 场景)
 test-metasploit.sh     # Metasploit 集成 (5 场景)
 ```
 
-### 文档系统 (110+ 页)
+### 文档系统
 ```
-USER_MANUAL.md         # 用户手册 (60 页)
-DEPLOYMENT.md          # 部署文档 (50 页)
+USER_MANUAL.md         # 用户手册
+DEPLOYMENT.md          # 部署文档
 ALL_TASKS_COMPLETION.md    # 任务完成报告
 REAL_ENV_TEST_REPORT.md    # 环境测试报告
 PROJECT_DELIVERY.md        # 交付清单
@@ -184,7 +187,7 @@ k8s-deployment.yaml    # 完整 K8s 配置
 | 验证项 | 状态 | 结果 |
 |--------|------|------|
 | **编译验证** | ✅ | VERO.exe 成功构建 |
-| **CLI 参数** | ✅ | 32 参数全部注册 |
+| **CLI 参数** | ✅ | 17 个参数全部注册 |
 | **E2E 测试** | ✅ | TestE2EWithP123Tools PASS |
 | **压力测试** | ✅ | 1,000 并发无错误 |
 | **性能基准** | ✅ | 平均 938 ns/op |
@@ -471,9 +474,9 @@ kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
 ## ✅ 验收检查表
 
 ### 功能完整性
-- [x] 32 工具全部实现
+- [x] 30+ 工具全部实现
 - [x] 7 场景包注册
-- [x] CLI 参数完整 (32 个)
+- [x] CLI 参数完整 (17 个)
 - [x] 攻击图生成正常
 - [x] HITL 门控生效
 - [x] Web 工作台 5 Tab (战役/工具/工作流/报告/设置)
@@ -537,10 +540,7 @@ kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
   - 压力测试:      4 个
   - 通过率:      100%
 
-工具总数:        32 个
-  - Level 1:      15 个
-  - Level 2:      10 个
-  - Level 3:       7 个
+工具总数:        30+ 个 (26 场景包 + 内核扫描器; 以 ./vero -tooltest 实测为准)
 
 场景包总数:       7 个
   - P0 基础:       4 个
@@ -548,9 +548,7 @@ kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
   - P2 云攻击:      1 个
   - P3 容器:       1 个
 
-文档页数:       110+ 页
-  - 用户手册:     60 页
-  - 部署文档:     50 页
+文档:          README / USER_MANUAL / DEPLOYMENT / PROJECT_SUMMARY / BENCHMARK
 
 开发周期:       完整迭代
 项目状态:       ✅ 生产就绪
@@ -571,7 +569,7 @@ kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
 ### 工程成果
 1. ✅ 100% 测试覆盖
 2. ✅ 完整的部署方案 (Docker + K8s)
-3. ✅ 110+ 页技术文档
+3. ✅ 完整文档体系 (README / USER_MANUAL / DEPLOYMENT / PROJECT_SUMMARY / BENCHMARK)
 4. ✅ 生产级安全加固
 
 ### 创新点
@@ -593,10 +591,10 @@ kubectl -n VERO-system exec -it deployment/VERO -- VERO -cloud-aws
 **项目状态**: ✅ **开发完成，生产就绪**
 
 **交付物确认**:
-- [x] 源代码 (25 个 Go 文件)
-- [x] 测试代码 (8 个测试文件, 42 个测试)
+- [x] 源代码 (77 个 Go 文件)
+- [x] 测试代码 (29 个测试文件, 106 个测试用例)
 - [x] 环境测试脚本 (3 个 Bash 脚本)
-- [x] 技术文档 (110+ 页)
+- [x] 技术文档 (README / USER_MANUAL / DEPLOYMENT / PROJECT_SUMMARY / BENCHMARK)
 - [x] 部署配置 (Docker + K8s)
 - [x] 性能报告 (基准测试数据)
 - [x] 项目总结 (本文档)

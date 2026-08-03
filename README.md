@@ -132,7 +132,7 @@ host:10.0.0.5 → service:10.0.0.5:80 → finding:sqli → cred:admin → footho
 
 You can trace **exactly how** each finding was discovered.
 
-### 4. 26 Built-in Tools
+### 4. 30+ Built-in Tools
 
 **Network**: nmap, masscan, rustscan  
 **Web**: nuclei, ffuf, sqlmap, nikto  
@@ -141,6 +141,8 @@ You can trace **exactly how** each finding was discovered.
 **Container**: docker, kubectl, trivy  
 **AD**: bloodhound, crackmapexec (nxc), mimikatz, kerberoast  
 **Post-Exploit**: lsass, sam, secretsdump  
+
+> 上表为本工具支持调用的系统命令（依赖本机安装）；已注册工具含 26 个场景包工具 + 内核扫描器（nmap/port_scan）等 30+ 个。**本机实际可用性以 `./vero -tooltest` 实测为准**。
 
 ### 5. 7 Scenario Packs
 
@@ -232,7 +234,7 @@ container-escape: Docker escape → K8s SA extraction
 - **[User Manual](USER_MANUAL.md)** - Complete guide (60 pages)
 - **[Deployment Guide](DEPLOYMENT.md)** - Docker/K8s setup (50 pages)
 - **[Project Summary](PROJECT_SUMMARY.md)** - Technical architecture
-- **[Benchmark](benchmark/)** - Trustworthiness evaluation framework
+- **[Benchmark](benchmark/)** - Trustworthiness evaluation framework (docker-compose 靶场 + 评估脚本, 详见 benchmark/README)
 
 ---
 
@@ -244,7 +246,7 @@ Check which tools are available on your system:
 ./vero -tooltest
 ```
 
-Example output:
+Example output (本机实际数字以实测为准):
 ```
 ═══ Tool Verification ═══
 
@@ -328,11 +330,11 @@ MIT License - See [LICENSE](LICENSE)
 
 ## 📊 Project Stats
 
-- **26 tools** integrated
+- **30+ tools** integrated (26 scenario-pack tools + kernel scanners; 以 `./vero -tooltest` 实测为准)
 - **7 scenario packs** available
 - **5 workflow templates** predefined
 - **3 web components** (ToolManager, WorkflowManager, ReportViewer)
-- **110+ pages** of documentation
+- **Documentation**: README / USER_MANUAL / DEPLOYMENT / PROJECT_SUMMARY / BENCHMARK
 
 ---
 
@@ -444,7 +446,7 @@ host:10.0.0.5 → service:10.0.0.5:80 → finding:sqli → cred:admin → footho
 
 可以追溯**每个发现是如何**被发现的。
 
-### 4. 26 个内置工具
+### 4. 30+ 个内置工具
 
 **网络**: nmap, masscan, rustscan  
 **Web**: nuclei, ffuf, sqlmap, nikto  
@@ -453,6 +455,8 @@ host:10.0.0.5 → service:10.0.0.5:80 → finding:sqli → cred:admin → footho
 **容器**: docker, kubectl, trivy  
 **AD**: bloodhound, crackmapexec (nxc), mimikatz, kerberoast  
 **后渗透**: lsass, sam, secretsdump  
+
+> 上表为本工具支持调用的系统命令（依赖本机安装）；已注册工具含 26 个场景包工具 + 内核扫描器（nmap/port_scan）等 30+ 个。**本机实际可用性以 `./vero -tooltest` 实测为准**。
 
 ### 5. 7 个场景包
 
@@ -522,7 +526,7 @@ container-escape: Docker 逃逸 → K8s SA 提取
 └─────────────────┬───────────────────────┘
                   │
 ┌─────────────────▼───────────────────────┐
-│         工具 (32 个内置)                 │
+│         工具 (30+ 个内置)                 │
 │   网络 | Web | 利用 | 云 | AD            │
 └─────────────────────────────────────────┘
 ```
@@ -534,7 +538,7 @@ container-escape: Docker 逃逸 → K8s SA 提取
 - **[用户手册](USER_MANUAL.md)** - 完整指南（60 页）
 - **[部署指南](DEPLOYMENT.md)** - Docker/K8s 配置（50 页）
 - **[项目摘要](PROJECT_SUMMARY.md)** - 技术架构
-- **[基准测试](benchmark/)** - 可信度评估框架
+- **[基准测试](benchmark/)** - 可信度评估框架（docker-compose 靶场 + 评估脚本, 详见 benchmark/README）
 
 ---
 
@@ -546,7 +550,7 @@ container-escape: Docker 逃逸 → K8s SA 提取
 ./vero -tooltest
 ```
 
-示例输出：
+示例输出（实际数字以本机实测为准）：
 ```
 ═══ 工具验证 ═══
 
@@ -630,11 +634,11 @@ MIT License - 见 [LICENSE](LICENSE)
 
 ## 📊 项目统计
 
-- **26 个工具**已集成
+- **30+ 个工具**已集成（26 个场景包工具 + 内核扫描器；以 `./vero -tooltest` 实测为准）
 - **7 个场景包**可用
 - **5 个工作流模板**预定义
 - **3 个 Web 组件** (ToolManager, WorkflowManager, ReportViewer)
-- **110+ 页**文档
+- **文档**: README / USER_MANUAL / DEPLOYMENT / PROJECT_SUMMARY / BENCHMARK
 
 ---
 
@@ -643,7 +647,7 @@ MIT License - 见 [LICENSE](LICENSE)
 ### ✅ 已实现
 
 - 证据驱动架构
-- 26 个工具集成
+- 30+ 个工具集成（以 ./vero -tooltest 实测为准）
 - 7 个场景包
 - 5 个工作流模板
 - Web UI (5 个 Tab: 战役控制台/工具管理/工作流模板/报告/设置)
