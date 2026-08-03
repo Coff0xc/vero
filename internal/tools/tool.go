@@ -29,11 +29,15 @@ type ToolResult struct {
 
 // Observation —— parser 从 stdout 提取的一条结构化观测。
 // Excerpt 是逐字来源片段, 是"证据逐字回查"的锚点: confirmed 节点的证据必须能在工具输出里逐字找到。
+// Severity/Technique/Tactic 由 parser 结构化填充(不从 label 解析), 进图时写入 Node。
 type Observation struct {
-	Kind    string // host/service/cred/finding
-	Key     string // 唯一标识, 如 "10.0.0.5:22"
-	Label   string
-	Excerpt string // 逐字来源片段
+	Kind      string // host/service/cred/finding
+	Key       string // 唯一标识, 如 "10.0.0.5:22"
+	Label     string
+	Excerpt   string // 逐字来源片段
+	Severity  string // critical/high/medium/low/info(与 Node.Severity 对齐, 报告直接读它)
+	Technique string // MITRE ATT&CK technique ID(如 T1190); 未映射留空
+	Tactic    string // MITRE ATT&CK tactic(如 initial-access); 未映射留空
 }
 
 // RunFunc 执行工具; ParseFunc 把 stdout 结构化。

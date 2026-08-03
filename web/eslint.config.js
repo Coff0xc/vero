@@ -14,7 +14,7 @@ export default [
       parser: tsParser,
       ecmaVersion: 'latest',
       sourceType: 'module',
-      globals: { window: 'readonly', document: 'readonly', console: 'readonly', fetch: 'readonly', EventSource: 'readonly', HTMLDivElement: 'readonly' },
+      globals: { window: 'readonly', document: 'readonly', console: 'readonly', fetch: 'readonly', EventSource: 'readonly', HTMLDivElement: 'readonly', CanvasRenderingContext2D: 'readonly' },
     },
     plugins: {
       '@typescript-eslint': ts,

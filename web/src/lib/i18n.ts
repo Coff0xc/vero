@@ -1,5 +1,5 @@
 // 全站中文文案映射 —— 集中管理, 展示层专用。
-// 注意: EVENT_KINDS / kind 标识 / NodeState 枚举值(confirmed/hypothesis)必须保持英文,
+// 注意: EVENT_KINDS / kind 标识 / NodeState 枚举值(confirmed/hypothesis/refuted)必须保持英文,
 // parseEvent 校验与 store switch 依赖英文值; 中文只出现在这里的 label 与 fmt() 文本里。
 
 // 事件 kind → 中文徽标标签(信号流与各处复用)。
@@ -20,6 +20,9 @@ export const EVENT_LABELS: Record<string, string> = {
   workflow_cancelled: '工作流取消',
   tool_result: '工具结果',
   tool_error: '工具错误',
+  path: '路径',
+  phase: '阶段',
+  error: '错误',
 }
 
 // 工具级别 → 短标签(ToolManager 等复用)。
@@ -32,6 +35,7 @@ export const LEVEL_ZH = ['侦察级', '扫描级', '凭证级', '利用级', '�
 export const NODE_STATE_LABELS: Record<string, string> = {
   confirmed: '已证实',
   hypothesis: '待验证',
+  refuted: '已证伪',
 }
 
 // 配置引擎枚举 → 中文说明。

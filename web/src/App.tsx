@@ -9,8 +9,9 @@ import { ToolManager } from './components/ToolManager'
 import { WorkflowManager } from './components/WorkflowManager'
 import { ReportViewer } from './components/ReportViewer'
 import { SettingsPanel } from './components/SettingsPanel'
+import { FindingsTable } from './components/FindingsTable'
 import { ErrorBoundary } from './components/ErrorBoundary'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
 type Tab = 'campaign' | 'tools' | 'workflows' | 'reports' | 'settings'
 
@@ -25,6 +26,40 @@ const TABS: { id: Tab; label: string }[] = [
 export default function App() {
   useSSE()
   const [activeTab, setActiveTab] = useState<Tab>('campaign')
+
+  // 键盘快捷键:
+  //   Ctrl/Cmd+1..5 → 切换 5 个 Tab(阻止浏览器原生切标签行为)。
+  //   Ctrl/Cmd+F     → 事件流区聚焦搜索框(存在且可见时; 否则放行浏览器查找)。
+  // 注: 用结构化收窄而非 DOM 全局类型名(KeyboardEvent/HTMLInputElement),
+  //     以避开 eslint.config 里手写 DOM 全局白名单之外的名字。
+  useEffect(() => {
+    const onKey = (raw: unknown) => {
+      const ev = raw as {
+        ctrlKey?: boolean
+        metaKey?: boolean
+        altKey?: boolean
+        shiftKey?: boolean
+        key?: string
+        preventDefault?: () => void
+      }
+      if (!(ev.ctrlKey || ev.metaKey) || ev.altKey || ev.shiftKey) return
+      const idx = Number(ev.key)
+      if (idx >= 1 && idx <= TABS.length) {
+        ev.preventDefault?.()
+        setActiveTab(TABS[idx - 1].id)
+        return
+      }
+      if ((ev.key ?? '').toLowerCase() === 'f') {
+        const el = document.getElementById('signal-search')
+        if (el && el.offsetWidth > 0) {
+          ev.preventDefault?.()
+          el.focus()
+        }
+      }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   return (
     <div className="flex flex-col h-screen overflow-hidden">
@@ -66,16 +101,22 @@ export default function App() {
             <SignalStream />
           </ErrorBoundary>
         </section>
-        <section className="relative min-h-0 flex">
-          <div className="flex-1 relative min-w-0">
+        <section className="relative min-h-0 flex flex-col">
+          <div className="relative min-h-0 flex flex-1">
+            <div className="flex-1 relative min-w-0">
+              <ErrorBoundary>
+                <AttackGraph />
+              </ErrorBoundary>
+            </div>
             <ErrorBoundary>
-              <AttackGraph />
+              <EvidenceDrawer />
             </ErrorBoundary>
           </div>
           <ErrorBoundary>
-            <EvidenceDrawer />
+            <FindingsTable />
           </ErrorBoundary>
-        </section>      </main>
+        </section>
+      </main>
 
       <main className={`flex-1 overflow-auto bg-panel2 ${activeTab === 'tools' ? '' : 'hidden'}`}>
         <ErrorBoundary>

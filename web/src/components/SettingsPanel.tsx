@@ -11,6 +11,20 @@ interface KeyState {
   cleared: boolean // 已点「清除」(待保存)
 }
 
+// 各引擎的合法模型选项(空值 = 引擎默认; 保留自定义值以兼容历史配置)。
+const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
+  claude: [
+    { value: '', label: '默认 (claude-opus-4-8)' },
+    { value: 'claude-opus-4-8', label: 'claude-opus-4-8' },
+    { value: 'claude-sonnet-5', label: 'claude-sonnet-5' },
+  ],
+  deepseek: [
+    { value: '', label: '默认 (deepseek-chat)' },
+    { value: 'deepseek-chat', label: 'deepseek-chat' },
+    { value: 'deepseek-reasoner', label: 'deepseek-reasoner' },
+  ],
+}
+
 export function SettingsPanel() {
   const applyConfig = useStore((s) => s.applyConfig)
 
@@ -119,6 +133,14 @@ export function SettingsPanel() {
     if (engine === 'claude' && !hasAnthropic) return '未配置 ANTHROPIC_API_KEY, 发起战役将回退脚本模式。'
     if (engine === 'deepseek' && !hasDeepSeek) return '未配置 DEEPSEEK_API_KEY, 发起战役将回退脚本模式。'
     return null
+  })()
+
+  // 模型下拉选项: 按引擎显示合法模型, 兼容历史自定义值。
+  const modelOptions = (() => {
+    const opts = MODEL_OPTIONS[engine] ?? MODEL_OPTIONS.claude
+    const all = [...opts]
+    if (model !== '' && !opts.some((o) => o.value === model)) all.push({ value: model, label: `${model} (自定义)` })
+    return all
   })()
 
   const keyBadge = (configured: boolean, ks: KeyState) => {
@@ -251,14 +273,16 @@ export function SettingsPanel() {
           <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-model">
             模型
           </label>
-          <input
+          <select
             id="cfg-model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            placeholder="留空 = 引擎默认 claude-opus-4-8 / deepseek-chat"
-            spellCheck={false}
-            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm font-mono outline-none focus:border-signal"
-          />
+            className="flex-1 bg-panel2 border border-line text-ink2 text-xs px-2.5 py-2 rounded-sm outline-none focus:border-signal"
+          >
+            {modelOptions.map((o) => (
+              <option key={o.value} value={o.value}>{o.label}</option>
+            ))}
+          </select>
         </div>
         <div className="flex items-center gap-3">
           <label className="w-16 text-xs text-ink2 shrink-0" htmlFor="cfg-temp">

@@ -1,6 +1,7 @@
 import { useStore } from '../store'
 import { useEffect, useState } from 'react'
 import { StageProgress } from './StageProgress'
+import { stageLabel } from '../lib/i18n'
 
 // 服务名截断: 过长不撑破布局(修原版 join 后无限长)。
 function clipList(items: string[], max: number): string {
@@ -12,7 +13,12 @@ function clipList(items: string[], max: number): string {
 export function KpiPanel() {
   const kpi = useStore((s) => s.kpi)
   const status = useStore((s) => s.status)
+  const stage = useStore((s) => s.stage)
+  const log = useStore((s) => s.log)
   const [flashKey, setFlashKey] = useState(0)
+
+  // 当前动作: 取最近一条带工具名的 step/tool 事件。
+  const current = [...log].reverse().find((l) => (l.kind === 'step' || l.kind === 'tool') && l.meta?.tool)
 
   // KPI 变化时触发一次闪烁动画(修原版数字变化无任何提示)。
   useEffect(() => {
@@ -50,6 +56,24 @@ export function KpiPanel() {
             </div>
             <div className="text-[10px] text-muted mt-1 tracking-wider">证据违规</div>
           </div>
+        </div>
+
+        {/* 当前阶段 / 当前动作行 */}
+        <div className="mt-2.5 flex items-center gap-2 text-[11px] leading-5 text-muted min-w-0">
+          <span className="shrink-0">阶段</span>
+          <b className="text-live shrink-0">{stageLabel(stage)}</b>
+          <span className="text-line/70 shrink-0">·</span>
+          <span className="shrink-0">动作</span>
+          {current ? (
+            <span className="min-w-0 flex items-center gap-1">
+              <b className="font-mono text-ink2 truncate">{current.meta!.tool}</b>
+              {typeof current.meta!.level === 'number' && (
+                <span className="text-muted shrink-0">L{current.meta!.level}</span>
+              )}
+            </span>
+          ) : (
+            <span className="shrink-0">{status === 'running' ? '等待规划…' : '—'}</span>
+          )}
         </div>
 
         {/* 服务 / 激活场景行 */}

@@ -330,10 +330,12 @@ func ParseMSFExecute(stdout string, args map[string]any) []tools.Observation {
 	// 如果输出含 "job_id", 说明 exploit 已启动
 	if strings.Contains(stdout, "job_id") {
 		return []tools.Observation{{
-			Kind:    "finding",
-			Key:     target + ":exploit_launched",
-			Label:   "[high] Exploit launched successfully",
-			Excerpt: "job_id:",
+			Kind:      "finding",
+			Key:       target + ":exploit_launched",
+			Label:     "[high] Exploit launched successfully",
+			Excerpt:   "job_id:",
+			Technique: "T1021.002", // SMB/Windows 管理共享(横向移动到据点)
+			Tactic:    "lateral-movement",
 		}}
 	}
 
@@ -350,10 +352,12 @@ func ParseMSFSessions(stdout string, args map[string]any) []tools.Observation {
 		// 匹配: [1] shell @ 192.168.1.100:4444
 		if strings.HasPrefix(line, "[") && strings.Contains(line, "@") {
 			obs = append(obs, tools.Observation{
-				Kind:    "shell",
-				Key:     "shell:" + line,
-				Label:   fmt.Sprintf("[critical] Active shell: %s", line),
-				Excerpt: line,
+				Kind:      "shell",
+				Key:       "shell:" + line,
+				Label:     fmt.Sprintf("[critical] Active shell: %s", line),
+				Excerpt:   line,
+				Technique: "T1021.002", // SMB/Windows 管理共享(横向移动建立据点)
+				Tactic:    "lateral-movement",
 			})
 		}
 	}

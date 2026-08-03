@@ -57,8 +57,13 @@ func GenerateTimeline(g *core.AttackGraph) *Timeline {
 			continue
 		}
 
+		// 修假时间戳: 用节点真实创建时刻(UTC), 兜底旧数据才用 now。
+		ts := time.Now()
+		if node.CreatedAt > 0 {
+			ts = time.Unix(node.CreatedAt, 0)
+		}
 		event := TimelineEvent{
-			Timestamp:   time.Now(), // 实际应该从节点的时间戳获取
+			Timestamp:   ts,
 			NodeID:      id,
 			Description: node.Label,
 		}
@@ -95,57 +100,49 @@ func GenerateTimeline(g *core.AttackGraph) *Timeline {
 }
 
 // GenerateAttackPath —— 从攻击图生成可视化路径
+// 修启发式推断: 直接用攻击图里 State==confirmed 的真实边(host-runs-service 等),
+// 不再 O(n^2) 遍历所有节点对靠类型猜边。
 func GenerateAttackPath(g *core.AttackGraph) *AttackPath {
-	path := &AttackPath{
-		Nodes: []PathNode{},
-		Edges: []PathEdge{},
-	}
+	path := &AttackPath{Nodes: []PathNode{}, Edges: []PathEdge{}}
 
-	// 构建节点
 	for id, node := range g.Nodes {
 		if node.State != core.StateConfirmed {
 			continue
 		}
-
-		pathNode := PathNode{
+		path.Nodes = append(path.Nodes, PathNode{
 			ID:       id,
 			Type:     node.Type,
 			Label:    node.Label,
 			Critical: isCriticalNode(node),
 			Evidence: extractEvidenceKeys(node),
-		}
-		path.Nodes = append(path.Nodes, pathNode)
+		})
 	}
 
-	// 构建边
-	for id, node := range g.Nodes {
-		if node.State != core.StateConfirmed {
+	for _, e := range g.Edges {
+		if e.State != core.StateConfirmed {
 			continue
 		}
-
-		// 遍历图的所有边来找到父节点关系
-		for fromID, fromNode := range g.Nodes {
-			if fromNode.State != core.StateConfirmed {
-				continue
-			}
-			// 检查是否有从 fromID 到 id 的边
-			// 简化实现：通过节点关系推断
-			if fromID != id {
-				edge := PathEdge{
-					From:   fromID,
-					To:     id,
-					Label:  inferEdgeLabel(fromNode.Type, node.Type),
-					Method: inferMethod(node),
-				}
-				// 只添加有意义的边
-				if shouldIncludeEdge(fromNode, node) {
-					path.Edges = append(path.Edges, edge)
-				}
-			}
+		from, ok1 := g.Nodes[e.Src]
+		to, ok2 := g.Nodes[e.Dst]
+		if !ok1 || !ok2 || from.State != core.StateConfirmed || to.State != core.StateConfirmed {
+			continue
 		}
+		path.Edges = append(path.Edges, PathEdge{
+			From:   e.Src,
+			To:     e.Dst,
+			Label:  e.Rel,
+			Method: edgeEvidenceTool(e),
+		})
 	}
-
 	return path
+}
+
+// edgeEvidenceTool —— 从边的证据里取第一个工具名作为利用方法(对应 edge.Method)。
+func edgeEvidenceTool(e *core.Edge) string {
+	if len(e.Evidence) > 0 && e.Evidence[0].Tool != "" {
+		return e.Evidence[0].Tool
+	}
+	return "unknown"
 }
 
 // isCriticalFinding —— 判断是否为关键发现

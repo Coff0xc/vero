@@ -32,3 +32,10 @@ func (t *targetInjector) OnReject() {
 		r.OnReject()
 	}
 }
+
+// OnFailure —— 透传 Reflector 能力: 内核在失败/被拒时回传的动作+原因, 原样交给被包装的决策器。
+func (t *targetInjector) OnFailure(action core.Action, reason string) {
+	if rf, ok := t.inner.(core.Reflector); ok {
+		rf.OnFailure(action, reason)
+	}
+}

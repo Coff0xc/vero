@@ -21,11 +21,12 @@ const DeepSeekModel = "deepseek-chat"
 // DeepSeekLLM —— DeepSeek 决策器: OpenAI 兼容 function calling 强制结构化输出 action。
 // 复用 ReAct 上下文(buildReActPrompt) 与 systemPrompt。key 走环境变量 DEEPSEEK_API_KEY。
 type DeepSeekLLM struct {
-	apiKey string
-	model  string
-	temp   float64
-	reg    *tools.Registry
-	client *http.Client
+	apiKey  string
+	model   string
+	temp    float64
+	reg     *tools.Registry
+	client  *http.Client
+	lastErr string // 最近一次决策失败原因(API 错误/无效模型等), 供内核暴露给前端
 }
 
 // NewDeepSeek —— apiKey 为空则从 DEEPSEEK_API_KEY 环境变量读。temp 为思考强度(0~1)。
@@ -45,6 +46,9 @@ func NewDeepSeek(reg *tools.Registry, apiKey string, temp float64) *DeepSeekLLM 
 		client: &http.Client{Timeout: 90 * time.Second},
 	}
 }
+
+// LastError —— 实现 core.ErrorReporter: 返回最近一次决策失败原因(供内核向前端暴露)。
+func (d *DeepSeekLLM) LastError() string { return d.lastErr }
 
 func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
 	p := d.proposePlan(goal, g, history)
@@ -99,12 +103,14 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 	for attempt := 0; attempt < 3; attempt++ { // 抗网络抖动: 失败重试, 不因单次波动中断战役
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, deepSeekURL, bytes.NewReader(raw))
 		if err != nil {
+			d.lastErr = "DeepSeek API 请求构造失败: " + err.Error()
 			return nil
 		}
 		req.Header.Set("Authorization", "Bearer "+d.apiKey)
 		req.Header.Set("Content-Type", "application/json")
 		resp, err := d.client.Do(req)
 		if err != nil {
+			d.lastErr = "DeepSeek API 请求失败: " + err.Error()
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 			continue
 		}
@@ -112,12 +118,14 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		// 密钥类错误重试无意义, 直接放弃并告警; 服务端错误退避重试。
 		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
 			_ = resp.Body.Close()
-			fmt.Fprintf(os.Stderr, "[deepseek] API 拒绝访问 (HTTP %d): 检查 DEEPSEEK_API_KEY\n", resp.StatusCode)
+			d.lastErr = fmt.Sprintf("DeepSeek API 拒绝访问 (HTTP %d), 请检查 API key", resp.StatusCode)
+			fmt.Fprintf(os.Stderr, "[deepseek] %s\n", d.lastErr)
 			return nil
 		}
 		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
 			_ = resp.Body.Close()
-			fmt.Fprintf(os.Stderr, "[deepseek] API 返回 HTTP %d, 第 %d 次重试\n", resp.StatusCode, attempt+1)
+			d.lastErr = fmt.Sprintf("DeepSeek API 返回 HTTP %d (可能模型名无效, 应使用 deepseek-chat / deepseek-reasoner)", resp.StatusCode)
+			fmt.Fprintf(os.Stderr, "[deepseek] HTTP %d, 第 %d 次重试\n", resp.StatusCode, attempt+1)
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 			continue
 		}
@@ -127,8 +135,12 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 			ok = true
 			break
 		}
+		d.lastErr = "DeepSeek API 响应解析失败: " + derr.Error()
 	}
 	if !ok || len(out.Choices) == 0 || len(out.Choices[0].Message.ToolCalls) == 0 {
+		if d.lastErr == "" {
+			d.lastErr = "DeepSeek 未返回有效动作计划(检查模型名/密钥/网络)"
+		}
 		return nil
 	}
 
@@ -142,6 +154,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		} `json:"plan"`
 	}
 	if err := json.Unmarshal([]byte(out.Choices[0].Message.ToolCalls[0].Function.Arguments), &d2); err != nil {
+		d.lastErr = "DeepSeek 返回的动作计划无法解析: " + err.Error()
 		return nil
 	}
 	p := &core.Plan{Rationale: d2.Rationale}

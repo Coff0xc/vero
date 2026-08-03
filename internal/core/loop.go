@@ -41,12 +41,24 @@ func RunAgent(goal string, llm LLM, reg *tools.Registry, approve Approve, emit E
 	return RunAgentCtx(context.Background(), goal, llm, reg, approve, emit, budget)
 }
 
+// emitNoActions —— 决策器判定结束时广播: 若决策器记录了失败原因(如 API 错误/无效模型名),
+// 先广播 error 事件(前端红字展示), 再广播 done。
+func emitNoActions(emit EmitFunc, llm LLM) {
+	if er, ok := llm.(ErrorReporter); ok && er.LastError() != "" {
+		emit(Event{Kind: "error", Data: map[string]any{"msg": er.LastError()}})
+	}
+	emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
+}
+
 // RunAgentCtx —— 带取消上下文的主循环: 每步检查 ctx, 战役可被操作员中途停止(不再永久卡死)。
 func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, budget int) (*AttackGraph, []string) {
 	g := NewAttackGraph()
 	var history []HistoryItem
 	var trace []string
 	lastSig, stall, prevNodeCount := "", 0, 0
+	// 显式阶段状态机: init→recon→scan→exploit→done。按成功工具杀伤级推进, 每推进一次广播 phase 事件。
+	phase := "init"
+	emit(Event{Kind: "phase", Data: map[string]any{"phase": "init"}})
 
 	for step := 0; step < budget; step++ {
 		if ctx.Err() != nil { // 取消: 立即停, 保留已确认证据
@@ -59,7 +71,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 		if pl, ok := llm.(Planner); ok {
 			p := pl.ProposePlan(goal, g, history)
 			if p == nil || len(p.Actions) == 0 {
-				emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
+				emitNoActions(emit, llm)
 				break
 			}
 			if len(p.Actions) > 1 {
@@ -71,7 +83,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 		} else {
 			a := llm.Propose(goal, g, history)
 			if a == nil {
-				emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
+				emitNoActions(emit, llm)
 				break
 			}
 			acts = []Action{*a}
@@ -82,12 +94,17 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 			if ctx.Err() != nil {
 				break
 			}
-			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount,
+			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount, &phase,
 				llm, reg, approve, emit, step, &acts[i])
 			if !cont {
 				break
 			}
 		}
+	}
+	// 战役结束(预算耗尽/无动作/取消/停滞): 广播 done 阶段, 前端据此收尾。
+	if phase != "done" {
+		phase = "done"
+		emit(Event{Kind: "phase", Data: map[string]any{"phase": "done"}})
 	}
 	return g, trace
 }
@@ -95,7 +112,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 // runAction —— 执行单个动作(注册校验/HITL 门控/执行/图更新/停滞检测), 返回是否继续后续动作。
 // false = 该步未成功执行(未知工具/被拒/失败), 计划模式下中断剩余步骤。
 func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trace *[]string,
-	lastSig *string, stall *int, prevNodeCount *int,
+	lastSig *string, stall *int, prevNodeCount *int, phase *string,
 	llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, step int, action *Action) bool {
 
 	tool, ok := reg.Get(action.Tool)
@@ -103,6 +120,9 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		emit(Event{Kind: "tool", Data: map[string]any{"tool": action.Tool, "success": false, "stdout": "unknown tool: " + action.Tool}})
 		if r, ok := llm.(Rejecter); ok {
 			r.OnReject()
+		}
+		if rf, ok := llm.(Reflector); ok { // 结构化反思: 把具体失败原因回传决策器
+			rf.OnFailure(*action, "unknown tool: "+action.Tool)
 		}
 		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
 		return false
@@ -118,6 +138,9 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		if r, ok := llm.(Rejecter); ok {
 			r.OnReject() // 被拒 -> 让规划器换路, 不空转
 		}
+		if rf, ok := llm.(Reflector); ok { // 结构化反思: HITL 拒绝原因回传决策器
+			rf.OnFailure(*action, "未通过人工审批(HITL 拒绝)")
+		}
 		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
 		return false
 	}
@@ -132,10 +155,15 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		if r, ok := llm.(Rejecter); ok {
 			r.OnReject() // 失败 -> 让规划器换路
 		}
+		if rf, ok := llm.(Reflector); ok { // 结构化反思: 失败原因(stderr/stdout 首行)回传决策器
+			rf.OnFailure(*action, resultReason(res))
+		}
 	}
 	if !res.Success {
 		return false // 计划模式: 失败即中断后续依赖步骤
 	}
+	// 成功 -> 按工具杀伤级推进阶段状态机(init→recon→scan→exploit)。
+	advancePhase(emit, phase, level)
 	applyObservations(g, tool, action, res, emit)
 
 	// claim: 声称默认 hypothesis(不可信), 独立验证才 confirm
@@ -145,19 +173,35 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		emitGraph(emit, g, cid, "hypothesis")
 	}
 	// claim 即验证: 本动作 verifies 某 claim -> confirm
+	// 并补 rel="verifies" 的 confirmed 边(目标 host -> claim), 给 FindPath 提供真实边。
 	if v := tools.ArgStr(action.Args, "verifies", ""); v != "" {
 		cid := "claim:" + v
 		if _, ok := g.Nodes[cid]; ok {
 			_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+			if host := "host:" + tools.ArgStr(action.Args, "target", "?"); g.Nodes[host] != nil && !g.HasEdge(host, "verifies", cid) {
+				g.Edges = append(g.Edges, &Edge{
+					Src: host, Rel: "verifies", Dst: cid, State: StateConfirmed,
+					Evidence: []Evidence{{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)}},
+				})
+				emit(Event{Kind: "edge", Data: map[string]any{"src": host, "dst": cid, "rel": "verifies"}})
+			}
 			emitGraph(emit, g, cid, "confirm")
 		}
 	}
 	// 规划产出: 规划步成功 -> 建 produces 类型节点(confirmed, 证据=工具输出)
+	// 并补 rel="produces" 的 confirmed 边(上一阶段节点 -> 产物), 给 FindPath 提供真实攻击链边。
 	if action.Produces != "" {
 		pt := tools.ArgStr(action.Args, "target", "?")
 		pid := action.Produces + ":" + pt
 		g.UpsertNode(&Node{ID: pid, Type: action.Produces, Label: pt})
 		_, _ = g.Confirm(pid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+		if prev := prevStageNode(g, action.Produces); prev != "" && !g.HasEdge(prev, "produces", pid) {
+			g.Edges = append(g.Edges, &Edge{
+				Src: prev, Rel: "produces", Dst: pid, State: StateConfirmed,
+				Evidence: []Evidence{{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)}},
+			})
+			emit(Event{Kind: "edge", Data: map[string]any{"src": prev, "dst": pid, "rel": "produces"}})
+		}
 		emitGraph(emit, g, pid, "confirm")
 	}
 	*history = append(*history, HistoryItem{Outcome: "done", Action: *action, Result: &res})
@@ -183,7 +227,8 @@ func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res too
 	}
 	for _, o := range tool.Parse(res.Stdout, action.Args) {
 		nid := o.Kind + ":" + o.Key
-		g.UpsertNode(&Node{ID: nid, Type: o.Kind, Label: o.Label})
+		// TTP/severity 走结构化字段(parser 填的), 不从 label 解析; 报告直接读 Node.Severity。
+		g.UpsertNode(&Node{ID: nid, Type: o.Kind, Label: o.Label, Severity: o.Severity, Technique: o.Technique, Tactic: o.Tactic})
 		_, _ = g.Confirm(nid, Evidence{Tool: action.Tool, Excerpt: o.Excerpt})
 		if o.Kind == "service" {
 			host := strings.SplitN(o.Key, ":", 2)[0]
@@ -208,11 +253,12 @@ func emitGraph(emit EmitFunc, g *AttackGraph, nid, key string) {
 	if !ok {
 		return
 	}
-	ev := n.Evidence
-	if len(ev) > 3 {
-		ev = ev[len(ev)-3:]
-	}
-	emit(Event{Kind: "graph", Data: map[string]any{key: nid, "type": n.Type, "evidence": ev}})
+	// 完整证据链 + 状态 + 结构化字段(severity/technique/tactic/confidence): 不再截断,
+	// 前端按 state 只升不降合并。
+	emit(Event{Kind: "graph", Data: map[string]any{
+		key: nid, "type": n.Type, "state": n.State, "evidence": n.Evidence,
+		"severity": n.Severity, "technique": n.Technique, "tactic": n.Tactic, "confidence": n.Confidence,
+	}})
 }
 
 func truncate(s string, n int) string {
@@ -221,4 +267,75 @@ func truncate(s string, n int) string {
 		return string(r[:n])
 	}
 	return s
+}
+
+// resultReason —— 工具执行失败的原因摘要(供 Reflector.OnFailure 做结构化反思):
+// 优先 stderr 首行, 否则 stdout 首行。
+func resultReason(res tools.ToolResult) string {
+	if first := firstLine(res.Stderr); first != "" {
+		return first
+	}
+	if first := firstLine(res.Stdout); first != "" {
+		return first
+	}
+	return "工具失败(无输出)"
+}
+
+// firstLine —— 取字符串首行(去首尾空白)。
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return s
+}
+
+// attackChainStages —— 攻击链阶段顺序: produces 节点按此连成推进边(service→web_shell→cred→foothold→shell)。
+// 与前端 CHAIN 对齐; 真实规划链(planner/LLM produces)都走这条链。
+var attackChainStages = []string{"service", "web_shell", "cred", "foothold", "shell"}
+
+// prevStageNode —— produces 产物类型 stageType 的上一阶段已 confirmed 节点(按插入序取首个)。
+// 用于把 produces 节点连成攻击链边(如 service -produces-> web_shell -produces-> cred -produces-> foothold)。
+func prevStageNode(g *AttackGraph, stageType string) string {
+	prev := ""
+	for i, t := range attackChainStages {
+		if t == stageType {
+			if i > 0 {
+				prev = attackChainStages[i-1]
+			}
+			break
+		}
+	}
+	if prev == "" {
+		return ""
+	}
+	for _, id := range g.Order {
+		n := g.Nodes[id]
+		if n.Type == prev && n.State == StateConfirmed {
+			return id
+		}
+	}
+	return ""
+}
+
+// advancePhase —— 显式阶段状态机: 按成功工具杀伤级推进 init→recon→scan→exploit。
+// L0-1→recon, L2→scan, L3+→exploit; 只前进不回退(exploit 达成后不再降级)。
+// 每推进一次广播 phase 事件, 供前端展示当前攻击阶段。
+func advancePhase(emit EmitFunc, phase *string, level int) {
+	target := "recon"
+	switch {
+	case level >= tools.LevelExploit: // L3+
+		target = "exploit"
+	case level >= tools.LevelCred: // L2
+		target = "scan"
+	default: // L0-L1
+		target = "recon"
+	}
+	if *phase == "exploit" {
+		return // 已到 exploit, 不回退
+	}
+	if *phase != target {
+		*phase = target
+		emit(Event{Kind: "phase", Data: map[string]any{"phase": target}})
+	}
 }

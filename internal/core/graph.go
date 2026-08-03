@@ -11,6 +11,7 @@ package core
 import (
 	"fmt"
 	"strings"
+	"time"
 )
 
 // 节点/边状态。
@@ -20,19 +21,27 @@ const (
 	StateRefuted    = "refuted"    // 已证伪
 )
 
-// Evidence —— 一条证据: 来自哪个工具、逐字来源片段(证据回查的锚点)。
+// Evidence —— 一条证据: 来自哪个工具、逐字来源片段(证据回查的锚点)、捕获时间与置信度。
 type Evidence struct {
-	Tool    string `json:"tool"`
-	Excerpt string `json:"excerpt"`
+	Tool       string  `json:"tool"`
+	Excerpt    string  `json:"excerpt"`
+	At         int64   `json:"at,omitempty"`         // 捕获时间(UTC unix), 供时间线/报告可信度(修假时间戳)
+	Confidence float64 `json:"confidence,omitempty"` // 0..1, 该条证据置信度
 }
 
 // Node —— 攻击图节点(host/service/cred/finding/foothold)。
 type Node struct {
-	ID       string     `json:"id"`
-	Type     string     `json:"type"`
-	Label    string     `json:"label"`
-	State    string     `json:"state"`
-	Evidence []Evidence `json:"evidence"`
+	ID         string     `json:"id"`
+	Type       string     `json:"type"`
+	Label      string     `json:"label"`
+	State      string     `json:"state"`
+	Severity   string     `json:"severity,omitempty"`   // critical/high/medium/low/info(结构化, 不从 label 解析)
+	Technique  string     `json:"technique,omitempty"`  // MITRE ATT&CK technique ID(如 T1190)
+	Tactic     string     `json:"tactic,omitempty"`     // MITRE ATT&CK tactic(如 initial-access)
+	Confidence float64    `json:"confidence,omitempty"` // 0..1, 节点证据的平均置信度
+	CreatedAt  int64      `json:"created_at,omitempty"` // 首次创建(UTC unix), 修报告假时间戳
+	UpdatedAt  int64      `json:"updated_at,omitempty"` // 最近更新
+	Evidence   []Evidence `json:"evidence"`
 }
 
 // Edge —— 攻击图边。
@@ -57,15 +66,21 @@ func NewAttackGraph() *AttackGraph {
 
 // UpsertNode 插入或合并节点(已存在则并入证据, 不覆盖状态)。
 func (g *AttackGraph) UpsertNode(n *Node) *Node {
+	now := time.Now().Unix()
 	if cur, ok := g.Nodes[n.ID]; ok {
 		if len(n.Evidence) > 0 {
 			cur.Evidence = append(cur.Evidence, n.Evidence...)
 		}
+		cur.UpdatedAt = now
 		return cur
 	}
 	if n.State == "" {
 		n.State = StateHypothesis
 	}
+	if n.CreatedAt == 0 {
+		n.CreatedAt = now
+	}
+	n.UpdatedAt = now
 	g.Nodes[n.ID] = n
 	g.Order = append(g.Order, n.ID)
 	return n
@@ -80,8 +95,16 @@ func (g *AttackGraph) Confirm(id string, ev Evidence) (*Node, error) {
 	if ev == (Evidence{}) {
 		return nil, fmt.Errorf("confirm(%s): 缺 evidence, 拒绝写入", id)
 	}
+	now := time.Now().Unix()
+	if ev.At == 0 {
+		ev.At = now
+	}
 	n.Evidence = append(n.Evidence, ev)
 	n.State = StateConfirmed
+	n.UpdatedAt = now
+	if n.CreatedAt == 0 {
+		n.CreatedAt = now
+	}
 	return n, nil
 }
 
@@ -93,6 +116,64 @@ func (g *AttackGraph) HasEdge(src, rel, dst string) bool {
 		}
 	}
 	return false
+}
+
+// FindPath —— 沿 State==confirmed 的边 BFS 找从 startID 到任意 goalType 节点的最短路径。
+// 返回节点 id 列表(含起止); 找不到返回 nil。
+// 边与两端节点都必须 confirmed(evidence 约束): 只有坐实的推进才算攻击链,
+// hypothesis 的边/节点不进主路径 —— 这是"抗幻觉"在主路径计算上的延续。
+func (g *AttackGraph) FindPath(startID, goalType string) []string {
+	start := g.Nodes[startID]
+	if start == nil || start.State != StateConfirmed {
+		return nil
+	}
+	// 起止同型: 单节点即路径。
+	if start.Type == goalType {
+		return []string{startID}
+	}
+	// 邻接表: 只收录 confirmed 边且两端节点均 confirmed。
+	adj := map[string][]string{}
+	for _, e := range g.Edges {
+		if e.State != StateConfirmed {
+			continue
+		}
+		s, d := g.Nodes[e.Src], g.Nodes[e.Dst]
+		if s == nil || d == nil || s.State != StateConfirmed || d.State != StateConfirmed {
+			continue
+		}
+		adj[e.Src] = append(adj[e.Src], e.Dst)
+	}
+	prev := map[string]string{}
+	visited := map[string]bool{startID: true}
+	queue := []string{startID}
+	var goal string
+	for len(queue) > 0 {
+		cur := queue[0]
+		queue = queue[1:]
+		if g.Nodes[cur].Type == goalType {
+			goal = cur
+			break
+		}
+		for _, nxt := range adj[cur] {
+			if visited[nxt] {
+				continue
+			}
+			visited[nxt] = true
+			prev[nxt] = cur
+			queue = append(queue, nxt)
+		}
+	}
+	if goal == "" {
+		return nil
+	}
+	path := []string{goal}
+	for cur := prev[goal]; cur != ""; cur = prev[cur] {
+		path = append([]string{cur}, path...)
+		if cur == startID {
+			break
+		}
+	}
+	return path
 }
 
 // Snapshot —— 喂给 LLM 的紧凑状态视图(每轮现组, 不塞全历史)。

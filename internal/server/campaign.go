@@ -121,6 +121,12 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 	emit(core.Event{Kind: "route", Data: map[string]any{
 		"services": sortedKeys(services), "activated": sm.Route(services)}})
 
+	// 主路径: 从首个 confirmed service 节点沿 confirmed 边 BFS 到 foothold(找不到再试 cred)。
+	// produces/verifies 边由内核补(规划链/claim 验证), 非空则广播 path 事件供前端高亮攻击链。
+	if p := mainPath(g); len(p) > 0 {
+		emit(core.Event{Kind: "path", Data: map[string]any{"nodes": p}})
+	}
+
 	conf, hypo := 0, 0
 	for _, n := range g.Nodes {
 		switch n.State {
@@ -150,4 +156,28 @@ func sortedKeys(m map[string]bool) []string {
 	}
 	sort.Strings(ks)
 	return ks
+}
+
+// mainPath —— 主攻击路径: 从任一 confirmed service 节点出发, 沿 confirmed 边 BFS 到 foothold,
+// 找不到再试 cred; 取首个非空路径(service 按插入序优先, 路径由 FindPath 保证最短)。
+func mainPath(g *core.AttackGraph) []string {
+	// 先找 confirmed service 节点(按插入序); 每个都试 foothold。
+	var serviceIDs []string
+	for _, id := range g.Order {
+		if n := g.Nodes[id]; n.Type == "service" && n.State == core.StateConfirmed {
+			serviceIDs = append(serviceIDs, id)
+		}
+	}
+	for _, sid := range serviceIDs {
+		if p := g.FindPath(sid, "foothold"); len(p) > 0 {
+			return p
+		}
+	}
+	// foothold 无路 -> 退而求其次找 cred(凭证路径)。
+	for _, sid := range serviceIDs {
+		if p := g.FindPath(sid, "cred"); len(p) > 0 {
+			return p
+		}
+	}
+	return nil
 }

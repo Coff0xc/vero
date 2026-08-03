@@ -8,11 +8,25 @@ export type EventKind =
   | 'plan'
   | 'workflow_start' | 'workflow_stage' | 'workflow_complete' | 'workflow_cancelled'
   | 'tool_result' | 'tool_error'
+  | 'path' | 'phase'
+  | 'error'
 
 export interface EngineData { engine: string; target: string }
 export interface StepData { step: number; tool: string; args: Record<string, unknown>; level: number; why?: string }
 export interface ToolData { tool: string; success: boolean; stdout?: string; stderr?: string; level?: number }
-export interface GraphData { confirm?: string; hypothesis?: string; type?: string; evidence?: Evidence[] }
+export interface GraphData {
+  confirm?: string
+  hypothesis?: string
+  type?: string
+  state?: NodeState
+  evidence?: Evidence[]
+  severity?: string
+  technique?: string
+  tactic?: string
+  confidence?: number
+  created_at?: number
+  updated_at?: number
+}
 export interface EdgeData { src: string; dst: string; rel: string }
 export interface HitlData { key: string; tool: string; args: Record<string, unknown>; level: number; why?: string }
 export interface RouteData { services: string[]; activated: string[] }
@@ -24,6 +38,9 @@ export interface WorkflowStageData { stage: string; desc?: string }
 export interface WorkflowDoneData { workflow: string; target: string }
 export interface ToolResultData { tool: string; success: boolean; stdout?: string; stderr?: string }
 export interface ToolErrorData { tool: string; error: string }
+export interface PathData { nodes: string[] } // 主路径: 连通节点 id 序列
+export interface PhaseData { phase: string } // init/recon/scan/exploit/done
+export interface ErrorData { msg: string }
 
 // SSEEvent —— 判别联合: kind 决定 data 的确切形状。
 export type SSEEvent =
@@ -43,26 +60,39 @@ export type SSEEvent =
   | { kind: 'workflow_cancelled'; data: WorkflowDoneData }
   | { kind: 'tool_result'; data: ToolResultData }
   | { kind: 'tool_error'; data: ToolErrorData }
+  | { kind: 'path'; data: PathData }
+  | { kind: 'phase'; data: PhaseData }
+  | { kind: 'error'; data: ErrorData }
 
 export const EVENT_KINDS: readonly EventKind[] = [
   'engine', 'step', 'tool', 'graph', 'edge', 'hitl_request',
   'route', 'summary', 'done', 'plan',
   'workflow_start', 'workflow_stage', 'workflow_complete', 'workflow_cancelled',
   'tool_result', 'tool_error',
+  'path', 'phase',
+  'error',
 ]
 
 export interface Evidence {
   tool: string
   excerpt: string
+  at?: number // 捕获时间(unix 秒)
+  confidence?: number // 0..1
 }
 
-export type NodeState = 'confirmed' | 'hypothesis'
+export type NodeState = 'confirmed' | 'hypothesis' | 'refuted'
 
 export interface GraphNode {
   id: string
   type: string
   state: NodeState
   evidence: Evidence[]
+  severity?: string // critical/high/medium/low/info
+  technique?: string // MITRE ATT&CK technique ID(如 T1190)
+  tactic?: string // MITRE ATT&CK tactic(如 initial-access)
+  confidence?: number // 0..1
+  createdAt?: number // unix 秒
+  updatedAt?: number // unix 秒
 }
 
 export interface GraphEdge {
@@ -92,6 +122,7 @@ export interface LogLine {
   id: number
   kind: EventKind
   text: string
+  ts: number // 事件到达时间戳(unix ms), 瀑布树用其计算工具/步骤耗时
   // 结构化字段: step.why / plan.rationale 等必须保留, 不能只压成一行文本。
   // SignalStream 据此做两行推理展示 / 计划高亮块; 缺省字段需渲染健壮。
   meta?: {

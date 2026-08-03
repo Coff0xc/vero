@@ -52,12 +52,12 @@ func (m *Manager) Route(services map[string]bool) []string {
 // ---------- web 包 ----------
 
 func httpProbe(args map[string]any) tools.ToolResult {
-	return tools.Sh([]string{"curl", "-sI", tools.ArgStr(args, "target", "")}, 30*time.Second)
+	return tools.Sh([]string{"curl", "-sI", "-k", "--max-time", "15", normalizeURL(tools.ArgStr(args, "target", ""))}, 30*time.Second)
 }
 
 // webVuln —— 真实 nuclei 漏扫(聚焦 tech/exposure/misconfig 标签快扫, JSON 输出便于 parse)。
 func webVuln(args map[string]any) tools.ToolResult {
-	return tools.Sh([]string{"nuclei", "-u", tools.ArgStr(args, "target", ""),
+	return tools.Sh([]string{"nuclei", "-u", normalizeURL(tools.ArgStr(args, "target", "")),
 		"-tags", "tech,exposure,misconfig", "-silent", "-j", "-timeout", "5"}, 300*time.Second)
 }
 
@@ -83,6 +83,7 @@ func ParseHTTP(out string, args map[string]any) []tools.Observation {
 
 // ParseNuclei —— 解析 nuclei -j (JSONL) 输出: 每个 finding 提取 模板/严重级/命中位置。
 // Excerpt 用 matched-at(在原始 JSON 里逐字存在), 保证证据可逐字回查。
+// Severity 用 nuclei 的结构化 info.severity(不从 label 解析); tech 指纹类模板标 T1190/initial-access。
 func ParseNuclei(out string, args map[string]any) []tools.Observation {
 	var obs []tools.Observation
 	for _, line := range strings.Split(out, "\n") {
@@ -94,8 +95,9 @@ func ParseNuclei(out string, args map[string]any) []tools.Observation {
 			TemplateID string `json:"template-id"`
 			MatchedAt  string `json:"matched-at"`
 			Info       struct {
-				Name     string `json:"name"`
-				Severity string `json:"severity"`
+				Name     string   `json:"name"`
+				Severity string   `json:"severity"`
+				Tags     []string `json:"tags"`
 			} `json:"info"`
 		}
 		if json.Unmarshal([]byte(line), &f) != nil || f.TemplateID == "" {
@@ -105,14 +107,32 @@ func ParseNuclei(out string, args map[string]any) []tools.Observation {
 		if at == "" {
 			at = f.TemplateID
 		}
+		// TTP: tech 指纹类模板 -> T1190(利用面向公网的暴露应用, initial-access)。
+		var technique, tactic string
+		if containsTag(f.Info.Tags, "tech") {
+			technique, tactic = "T1190", "initial-access"
+		}
 		obs = append(obs, tools.Observation{
-			Kind:    "finding",
-			Key:     f.TemplateID + "@" + at,
-			Label:   fmt.Sprintf("[%s] %s", f.Info.Severity, f.Info.Name),
-			Excerpt: at,
+			Kind:      "finding",
+			Key:       f.TemplateID + "@" + at,
+			Label:     fmt.Sprintf("[%s] %s", f.Info.Severity, f.Info.Name),
+			Excerpt:   at,
+			Severity:  f.Info.Severity,
+			Technique: technique,
+			Tactic:    tactic,
 		})
 	}
 	return obs
+}
+
+// containsTag —— 切片是否含指定标签(nuclei info.tags 匹配用)。
+func containsTag(tags []string, want string) bool {
+	for _, t := range tags {
+		if strings.EqualFold(t, want) {
+			return true
+		}
+	}
+	return false
 }
 
 // exploitSQLiLogin —— L3 真实利用: 对登录接口发 SQLi payload(经典 ' OR 1=1--), 尝试认证绕过。
@@ -132,6 +152,23 @@ func exploitSQLiLogin(args map[string]any) tools.ToolResult {
 		"--retry", "3", "--retry-delay", "2", "--retry-all-errors", // 前置工具(nuclei)过载靶场后自动重试
 		"-X", "POST", target + "/rest/user/login", "-H", "Content-Type: application/json",
 		"--data", "@" + f.Name()}, 90*time.Second)
+}
+
+// normalizeURL —— 目标 URL 归一化: 无 scheme 补 http; host:443 自动识别为 https
+// (避免 curl 无 scheme 时用 http 打 https 端口导致探测失败)。
+func normalizeURL(t string) string {
+	t = strings.TrimSpace(t)
+	if t == "" {
+		return ""
+	}
+	if !strings.Contains(t, "://") {
+		if strings.HasPrefix(t, "443:") || regexp.MustCompile(`^[^/:]+:443(/|$)`).MatchString(t) {
+			t = "https://" + t
+		} else {
+			t = "http://" + t
+		}
+	}
+	return t
 }
 
 // baseURL —— 归一化到 scheme://host:port(去 path/query), 缺 scheme 补 http。
@@ -168,10 +205,13 @@ func ParseSQLi(out string, args map[string]any) []tools.Observation {
 	}
 	t := tools.ArgStr(args, "target", "?")
 	return []tools.Observation{{
-		Kind:    "finding",
-		Key:     t + ":sqli:login-bypass",
-		Label:   "[critical] SQLi 登录绕过成功(获得 admin token)",
-		Excerpt: ex,
+		Kind:      "finding",
+		Key:       t + ":sqli:login-bypass",
+		Label:     "[critical] SQLi 登录绕过成功(获得 admin token)",
+		Excerpt:   ex,
+		Severity:  "critical",
+		Technique: "T1190", // 利用面向公网的暴露应用
+		Tactic:    "initial-access",
 	}}
 }
 

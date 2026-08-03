@@ -22,6 +22,14 @@ func sevOf(label string) string {
 	return "info"
 }
 
+// sevOfNode —— finding 严重级: 优先读结构化 Node.Severity(parser 填的), 兼容旧 label 前缀。
+func sevOfNode(n *core.Node) string {
+	if n.Severity != "" {
+		return n.Severity
+	}
+	return sevOf(n.Label)
+}
+
 func titleOf(label string) string {
 	if strings.HasPrefix(label, "[") {
 		if i := strings.Index(label, "]"); i > 0 {
@@ -46,12 +54,12 @@ func Markdown(target string, g *core.AttackGraph, violations int, ts string) str
 		}
 	}
 	sort.SliceStable(findings, func(i, j int) bool {
-		return sevRank[sevOf(findings[i].Label)] < sevRank[sevOf(findings[j].Label)]
+		return sevRank[sevOfNode(findings[i])] < sevRank[sevOfNode(findings[j])]
 	})
 
 	crit := 0
 	for _, f := range findings {
-		if s := sevOf(f.Label); s == "critical" || s == "high" {
+		if s := sevOfNode(f); s == "critical" || s == "high" {
 			crit++
 		}
 	}

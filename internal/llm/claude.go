@@ -28,10 +28,11 @@ const systemPrompt = "你是授权红队渗透智能体, 按 ReAct 范式工作:
 
 // ClaudeLLM —— 真实模型决策器: ReAct 轨迹 + tool_use 强制结构化输出多步计划。
 type ClaudeLLM struct {
-	client anthropic.Client
-	model  string
-	temp   float64
-	reg    *tools.Registry
+	client  anthropic.Client
+	model   string
+	temp    float64
+	reg     *tools.Registry
+	lastErr string // 最近一次决策失败原因, 供内核暴露给前端
 }
 
 // NewClaude —— 需要 ANTHROPIC_API_KEY(SDK 默认从环境读)。reg 提供 allowlist。
@@ -51,6 +52,9 @@ func modelFromEnv() string {
 	}
 	return os.Getenv("REDCELL_MODEL")
 }
+
+// LastError —— 实现 core.ErrorReporter: 返回最近一次决策失败原因。
+func (c *ClaudeLLM) LastError() string { return c.lastErr }
 
 // Propose —— 单步模式(只实现 core.LLM 的旧契约): 取计划首步。
 func (c *ClaudeLLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
@@ -115,6 +119,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 		},
 	})
 	if err != nil {
+		c.lastErr = "Claude API 请求失败: " + err.Error()
 		return nil
 	}
 	for _, block := range msg.Content {
@@ -129,6 +134,7 @@ func (c *ClaudeLLM) proposePlan(goal string, g *core.AttackGraph, history []core
 				} `json:"plan"`
 			}
 			if err := json.Unmarshal(v.Input, &d); err != nil {
+				c.lastErr = "Claude 返回的动作计划无法解析: " + err.Error()
 				return nil
 			}
 			p := &core.Plan{Rationale: d.Rationale}
@@ -153,6 +159,12 @@ func buildReActPrompt(goal string, g *core.AttackGraph, history []core.HistoryIt
 		tr.WriteString("(尚未执行任何动作)\n")
 	}
 	for i, h := range history {
+		if i < len(history)-3 {
+			// 更早步骤: 压成一行 "tool→成功/失败", 不带完整观察 —— 省 token 且保留轨迹骨架。
+			fmt.Fprintf(&tr, "[%d] %s(%s) → %s\n", i+1, h.Action.Tool, briefArgs(h.Action.Args), outcomeZh(h))
+			continue
+		}
+		// 最近 3 步: 保留完整观察, 让模型基于"到底发生了什么"推理下一步。
 		fmt.Fprintf(&tr, "[%d] %s(%s) → %s\n", i+1, h.Action.Tool, briefArgs(h.Action.Args), outcomeZh(h))
 		if h.Result != nil {
 			obs := strings.TrimSpace(h.Result.Stdout)
@@ -169,12 +181,56 @@ func buildReActPrompt(goal string, g *core.AttackGraph, history []core.HistoryIt
 		fmt.Fprintf(&tl, "  %s (L%d): %s\n", s.Name, s.Level, s.Desc)
 	}
 	return fmt.Sprintf(
-		"目标: %s\n\n已执行动作与观察(ReAct 轨迹):\n%s\n当前攻击图:\n%s\n\n可用工具(名/杀伤级/能力):\n%s\n"+
+		"目标: %s\n\n%s已执行动作与观察(ReAct 轨迹):\n%s\n当前攻击图:\n%s\n\n可用工具(名/杀伤级/能力):\n%s\n"+
 			"基于以上观察推理, 给出 2~4 步有序计划(plan): 按依赖排序的推进链(侦察→打点→凭证→横向)。"+
 			"规则: 若某工具已多次执行却无新进展, 换工具或换角度, 不要重复无效动作; "+
 			"发现可利用点应推进到利用(不要停在侦察); "+
 			"只计划当前已具备前提的步骤(前序失败后续不会执行); 目标达成就给空 plan。",
-		goal, tr.String(), g.Snapshot(), tl.String())
+		goal, lessonsBlock(history), tr.String(), g.Snapshot(), tl.String())
+}
+
+// lessonsBlock —— 结构化反思注入(对应 Reflexion/RedAgent 的失败教训):
+// 扫描 history 中 Outcome=="rejected" 或 Result.Success==false 的项, 汇总为
+// "已尝试但失败/被拒的动作: tool(args 摘要) → 原因(stderr/stdout 首行)",
+// 放在"目标"之后、"已执行动作"之前, 让模型从源头避免重复无效动作。
+// 若没有失败/被拒项则返回空串(不输出该块)。
+func lessonsBlock(history []core.HistoryItem) string {
+	var failed []string
+	for _, h := range history {
+		if h.Outcome != "rejected" && (h.Result == nil || h.Result.Success) {
+			continue
+		}
+		failed = append(failed, fmt.Sprintf("%s(%s) → %s", h.Action.Tool, briefArgs(h.Action.Args), failureReason(h)))
+	}
+	if len(failed) == 0 {
+		return ""
+	}
+	return "上轮教训(避免重复失败): 已尝试但失败/被拒的动作: " + strings.Join(failed, "; ") + "\n"
+}
+
+// failureReason —— 历史失败/被拒项的原因摘要: 被拒说明未执行; 失败优先 stderr 首行, 否则 stdout 首行。
+func failureReason(h core.HistoryItem) string {
+	if h.Outcome == "rejected" {
+		return "被拒(未执行)"
+	}
+	if h.Result != nil {
+		if first := firstLine(h.Result.Stderr); first != "" {
+			return "失败: " + first
+		}
+		if first := firstLine(h.Result.Stdout); first != "" {
+			return "失败: " + first
+		}
+	}
+	return "失败(无输出)"
+}
+
+// firstLine —— 取字符串首行(去首尾空白)。
+func firstLine(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.IndexByte(s, '\n'); i >= 0 {
+		return strings.TrimSpace(s[:i])
+	}
+	return s
 }
 
 // briefArgs —— 动作参数的紧凑展示(优先 target, 否则 JSON)。
