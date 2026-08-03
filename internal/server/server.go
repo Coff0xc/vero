@@ -5,9 +5,13 @@
 package server
 
 import (
+	"context"
 	"encoding/json"
 	"io/fs"
+	"net"
 	"net/http"
+	"net/url"
+	"os"
 	"strings"
 	"sync"
 
@@ -15,6 +19,7 @@ import (
 	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/Coff0xc/vero/internal/audit"
+	"github.com/Coff0xc/vero/internal/config"
 	"github.com/Coff0xc/vero/internal/scenarios"
 	"github.com/Coff0xc/vero/internal/store"
 	"github.com/Coff0xc/vero/internal/tools"
@@ -30,7 +35,11 @@ type Server struct {
 	webFS     fs.FS
 
 	mu   sync.Mutex
-	busy bool // 同一时刻只跑一个战役
+	busy bool             // 同一时刻只跑一个战役
+	stop context.CancelFunc // 当前战役的取消句柄(操作员点"停止"时触发)
+
+	installMu sync.Mutex // 工具自动安装防并发
+	cfg       *config.Config
 }
 
 // New —— 组装 server。webFS 为前端静态资源(embed 或 os.DirFS), 其根含 index.html。
@@ -38,6 +47,11 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 	broker := NewBroker()
 	sm := scenarios.NewManager()
 	scenarios.RegisterDefaults(sm, tools.NewRegistry()) // manager 仅用于 Route 展示
+	cfg := config.Load()
+	if cfg.Model != "" { // 配置的模型名 -> 引擎侧 VERO_MODEL(兼容 env)
+		_ = os.Setenv("VERO_MODEL", cfg.Model)
+	}
+	tools.EnsurePath()
 	return &Server{
 		broker:    broker,
 		gate:      NewWebGate(broker),
@@ -45,6 +59,7 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 		auditor:   auditor,
 		scenarios: sm,
 		webFS:     webFS,
+		cfg:       cfg,
 	}
 }
 
@@ -52,9 +67,12 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
+	r.Use(originGuard) // 跨站防护: 非本源的浏览器请求一律 403(SSE 监听 / 任意页面触发攻击)
 	r.Get("/events", s.handleEvents)
 	r.Post("/start", s.handleStart)
 	r.Post("/approve", s.handleApprove)
+	r.Post("/cancel", s.handleCancel)
+	r.Get("/healthz", s.handleHealth)
 	r.Get("/api/campaigns", s.handleCampaigns)
 
 	// 报告导出端点（新增）
@@ -65,7 +83,14 @@ func (s *Server) Router() http.Handler {
 
 	// 工具管理 API
 	r.Get("/api/tools", s.handleToolList)
-	r.Post("/api/tools/verify", s.handleToolVerify)
+	r.Get("/api/tools/verify", s.handleToolVerify)  // 契约改为 GET
+	r.Post("/api/tools/verify", s.handleToolVerify) // 兼容旧调用
+	r.Post("/api/tools/install", s.handleToolInstall)
+	r.Post("/api/tools/install-all", s.handleToolInstallAll)
+
+	// 工作台配置 API
+	r.Get("/api/config", s.handleConfigGet)
+	r.Post("/api/config", s.handleConfigSet)
 
 	// 工作流模板 API
 	r.Get("/api/workflows", s.handleWorkflowList)
@@ -122,17 +147,41 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.busy = true
+	ctx, cancel := context.WithCancel(context.Background())
+	s.stop = cancel
 	s.mu.Unlock()
 
 	go func() {
 		defer func() {
 			s.mu.Lock()
 			s.busy = false
+			s.stop = nil
 			s.mu.Unlock()
 		}()
-		s.RunCampaign(body.Target)
+		s.RunCampaign(ctx, body.Target)
 	}()
 	writeJSON(w, map[string]any{"ok": true})
+}
+
+// handleCancel —— 操作员停止当前战役(取消上下文; 核心循环与 HITL 等待都会响应)。
+func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	stop := s.stop
+	s.mu.Unlock()
+	if stop != nil {
+		stop()
+	}
+	writeJSON(w, map[string]any{"ok": true})
+}
+
+// handleHealth —— 真实健康检查: 探活 SQLite + 确认 HTTP 层可用。
+// 修 docker-compose 只查 SPA 页面 200 的假健康: DB 挂了页面照样 200。
+func (s *Server) handleHealth(w http.ResponseWriter, r *http.Request) {
+	if err := s.store.Ping(); err != nil {
+		http.Error(w, `{"status":"unhealthy","error":"`+err.Error()+`"}`, http.StatusServiceUnavailable)
+		return
+	}
+	writeJSON(w, map[string]any{"status": "ok"})
 }
 
 // handleApprove —— 操作员对某待审批动作裁决。
@@ -181,4 +230,29 @@ func (s *Server) handleStatic() http.Handler {
 func writeJSON(w http.ResponseWriter, v any) {
 	w.Header().Set("Content-Type", "application/json")
 	_ = json.NewEncoder(w).Encode(v)
+}
+
+// originGuard —— 跨站防护中间件: 浏览器发出的请求必带 Origin。
+// Origin 与本服务不同源的请求直接 403(阻止任意网页: 偷听 SSE / 触发战役 / 冒名审批)。
+// 非浏览器客户端(curl/健康检查)不带 Origin, 不受影响。
+func originGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		origin := r.Header.Get("Origin")
+		if origin != "" {
+			u, err := url.Parse(origin)
+			if err != nil || u.Hostname() != hostnameOf(r.Host) {
+				http.Error(w, "forbidden: cross-origin request rejected", http.StatusForbidden)
+				return
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// hostnameOf —— 从 "host:port" 里剥离端口取 hostname。
+func hostnameOf(hostport string) string {
+	if h, _, err := net.SplitHostPort(hostport); err == nil {
+		return h
+	}
+	return hostport
 }

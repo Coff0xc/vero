@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"fmt"
 	"net/http"
 	"os"
 	"time"
@@ -14,7 +15,7 @@ import (
 
 const deepSeekURL = "https://api.deepseek.com/chat/completions"
 
-// DeepSeekModel —— 默认模型(OpenAI 兼容 function calling); 可用 REDCELL_MODEL 覆盖。
+// DeepSeekModel —— 默认模型(OpenAI 兼容 function calling); 可用 VERO_MODEL 覆盖(兼容 REDCELL_MODEL)。
 const DeepSeekModel = "deepseek-chat"
 
 // DeepSeekLLM —— DeepSeek 决策器: OpenAI 兼容 function calling 强制结构化输出 action。
@@ -22,25 +23,44 @@ const DeepSeekModel = "deepseek-chat"
 type DeepSeekLLM struct {
 	apiKey string
 	model  string
+	temp   float64
 	reg    *tools.Registry
 	client *http.Client
 }
 
-func NewDeepSeek(reg *tools.Registry) *DeepSeekLLM {
-	model := os.Getenv("REDCELL_MODEL")
+// NewDeepSeek —— apiKey 为空则从 DEEPSEEK_API_KEY 环境变量读。temp 为思考强度(0~1)。
+func NewDeepSeek(reg *tools.Registry, apiKey string, temp float64) *DeepSeekLLM {
+	if apiKey == "" {
+		apiKey = os.Getenv("DEEPSEEK_API_KEY")
+	}
+	model := modelFromEnv()
 	if model == "" {
 		model = DeepSeekModel
 	}
 	return &DeepSeekLLM{
-		apiKey: os.Getenv("DEEPSEEK_API_KEY"),
+		apiKey: apiKey,
 		model:  model,
+		temp:   temp,
 		reg:    reg,
 		client: &http.Client{Timeout: 90 * time.Second},
 	}
 }
 
 func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
-	names := d.reg.Names()
+	p := d.proposePlan(goal, g, history)
+	if p == nil || len(p.Actions) == 0 {
+		return nil
+	}
+	return &p.Actions[0]
+}
+
+// ProposePlan —— 多步规划: 一次请求输出整段有序计划(核心增强, #44)。
+func (d *DeepSeekLLM) ProposePlan(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Plan {
+	return d.proposePlan(goal, g, history)
+}
+
+func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Plan {
+	props, required := actSchema(d.reg.Names())
 	body := map[string]any{
 		"model": d.model,
 		"messages": []map[string]any{
@@ -51,21 +71,17 @@ func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.H
 			"type": "function",
 			"function": map[string]any{
 				"name":        "act",
-				"description": "选择下一个要执行的 action",
+				"description": "选择下一段要执行的动作计划",
 				"parameters": map[string]any{
-					"type": "object",
-					"properties": map[string]any{
-						"tool":      map[string]any{"type": "string", "enum": names},
-						"args":      map[string]any{"type": "object", "description": "工具参数, 通常含 target"},
-						"rationale": map[string]any{"type": "string"},
-						"claim":     map[string]any{"type": "string"},
-					},
-					"required": []string{"tool", "args", "rationale"},
+					"type":       "object",
+					"properties": props,
+					"required":   required,
 				},
 			},
 		}},
 		"tool_choice": map[string]any{"type": "function", "function": map[string]any{"name": "act"}},
-		"max_tokens":  1024,
+		"max_tokens":  2048,
+		"temperature": d.temp,
 	}
 	raw, _ := json.Marshal(body)
 	var out struct {
@@ -92,6 +108,19 @@ func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.H
 			time.Sleep(time.Duration(attempt+1) * time.Second)
 			continue
 		}
+		// 检查状态码: 401/403(密钥问题)与 5xx/429(服务端问题)不再静默当作"没动作"。
+		// 密钥类错误重试无意义, 直接放弃并告警; 服务端错误退避重试。
+		if resp.StatusCode == http.StatusUnauthorized || resp.StatusCode == http.StatusForbidden {
+			_ = resp.Body.Close()
+			fmt.Fprintf(os.Stderr, "[deepseek] API 拒绝访问 (HTTP %d): 检查 DEEPSEEK_API_KEY\n", resp.StatusCode)
+			return nil
+		}
+		if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+			_ = resp.Body.Close()
+			fmt.Fprintf(os.Stderr, "[deepseek] API 返回 HTTP %d, 第 %d 次重试\n", resp.StatusCode, attempt+1)
+			time.Sleep(time.Duration(attempt+1) * time.Second)
+			continue
+		}
 		derr := json.NewDecoder(resp.Body).Decode(&out)
 		_ = resp.Body.Close()
 		if derr == nil {
@@ -104,16 +133,23 @@ func (d *DeepSeekLLM) Propose(goal string, g *core.AttackGraph, history []core.H
 	}
 
 	var d2 struct {
-		Tool      string         `json:"tool"`
-		Args      map[string]any `json:"args"`
-		Rationale string         `json:"rationale"`
-		Claim     string         `json:"claim"`
+		Rationale string `json:"rationale"`
+		Plan      []struct {
+			Tool      string         `json:"tool"`
+			Args      map[string]any `json:"args"`
+			Rationale string         `json:"rationale"`
+			Claim     string         `json:"claim"`
+		} `json:"plan"`
 	}
 	if err := json.Unmarshal([]byte(out.Choices[0].Message.ToolCalls[0].Function.Arguments), &d2); err != nil {
 		return nil
 	}
-	if d2.Args == nil {
-		d2.Args = map[string]any{}
+	p := &core.Plan{Rationale: d2.Rationale}
+	for _, a := range d2.Plan {
+		if a.Args == nil {
+			a.Args = map[string]any{}
+		}
+		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim})
 	}
-	return &core.Action{Tool: d2.Tool, Args: d2.Args, Rationale: d2.Rationale, Claim: d2.Claim}
+	return p
 }

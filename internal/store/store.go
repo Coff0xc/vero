@@ -62,6 +62,11 @@ func Open(path string) (*Store, error) {
 
 func (s *Store) Close() error { return s.db.Close() }
 
+// Ping —— 健康检查探活(SQLite 真实可达性, 而非仅 HTTP 层)。
+func (s *Store) Ping() error {
+	return s.db.Ping()
+}
+
 // StartCampaign —— 开一个战役, 返回 id。
 func (s *Store) StartCampaign(goal string) (int64, error) {
 	res, err := s.db.Exec("INSERT INTO campaigns(goal, started_at) VALUES(?, ?)", goal, time.Now().Unix())
@@ -128,6 +133,28 @@ func (s *Store) ListCampaigns(limit int) ([]Campaign, error) {
 		out = append(out, c)
 	}
 	return out, rows.Err()
+}
+
+// CountFindings —— 统计某战役最新快照里 confirmed 的 finding 节点数。
+// ListCampaigns 不加载攻击图, 报告列表需要它做轻量统计(避免为每行反序列化全图)。
+func (s *Store) CountFindings(campaignID int64) int {
+	var nodesJSON string
+	err := s.db.QueryRow(
+		`SELECT nodes FROM graph_snapshots WHERE campaign_id = ? ORDER BY ts DESC LIMIT 1`, campaignID).Scan(&nodesJSON)
+	if err != nil {
+		return 0
+	}
+	var nodes map[string]*core.Node
+	if json.Unmarshal([]byte(nodesJSON), &nodes) != nil {
+		return 0
+	}
+	n := 0
+	for _, node := range nodes {
+		if node.Type == "finding" && node.State == core.StateConfirmed {
+			n++
+		}
+	}
+	return n
 }
 
 // GetCampaign —— 获取单个战役详情（包含最新攻击图快照）。

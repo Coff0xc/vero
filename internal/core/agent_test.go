@@ -118,3 +118,109 @@ func TestEvidenceConstraintRejectsEmpty(t *testing.T) {
 		t.Fatal("无证据 confirm 应抛错")
 	}
 }
+
+// planLLM —— 测试内的多步规划决策器(实现 Planner 接口, 每次给一段计划, 耗尽返回 nil)。
+type planLLM struct {
+	plans []*Plan
+	i     int
+}
+
+func (p *planLLM) Propose(_ string, _ *AttackGraph, _ []HistoryItem) *Action { return nil }
+
+func (p *planLLM) ProposePlan(_ string, _ *AttackGraph, _ []HistoryItem) *Plan {
+	if p.i >= len(p.plans) {
+		return nil
+	}
+	pl := p.plans[p.i]
+	p.i++
+	return pl
+}
+
+// 7) 多步计划: 按序执行整段计划; 某步失败 -> 中断后续步(依赖链)。
+func TestPlanExecutesInOrderAndAbortsOnFailure(t *testing.T) {
+	reg := testReg()
+	var executed []string
+	mark := func(name string) func(map[string]any) tools.ToolResult {
+		return func(map[string]any) tools.ToolResult {
+			executed = append(executed, name)
+			return tools.ToolResult{Success: true, Stdout: "ok: " + name}
+		}
+	}
+	reg.Register(&tools.Tool{Name: "fail_tool", Level: tools.LevelScan,
+		Run: func(map[string]any) tools.ToolResult { return tools.ToolResult{Success: false, Stderr: "boom"} }})
+	reg.Register(&tools.Tool{Name: "never_tool", Level: tools.LevelScan, Run: mark("never_tool")})
+
+	g, _ := RunAgent("x", &planLLM{plans: []*Plan{{Rationale: "链", Actions: []Action{
+		{Tool: "fake_scan", Args: map[string]any{"target": "10.0.0.5"}},
+		{Tool: "fail_tool", Args: map[string]any{"target": "10.0.0.5"}},
+		{Tool: "never_tool", Args: map[string]any{"target": "10.0.0.5"}},
+	}}}}, reg, AutoApprove, DiscardEmit, 5)
+
+	for _, name := range executed {
+		if name == "never_tool" {
+			t.Fatal("计划中途失败后, 后续步骤不应执行(依赖链中断)")
+		}
+	}
+	if _, ok := g.Nodes["host:10.0.0.5"]; !ok {
+		t.Fatal("计划首步(成功)应更新攻击图")
+	}
+}
+
+// 8) 多步计划: HITL 拒绝 -> 中断剩余步骤, 且拒绝动作不入图。
+func TestPlanHitlDenyAbortsRemaining(t *testing.T) {
+	reg := testReg()
+	reg.Register(&tools.Tool{Name: "exploit_a", Level: tools.LevelExploit,
+		Run: func(map[string]any) tools.ToolResult { return tools.ToolResult{Success: true, Stdout: "shell-a"} }})
+	reg.Register(&tools.Tool{Name: "exploit_b", Level: tools.LevelExploit,
+		Run: func(map[string]any) tools.ToolResult { return tools.ToolResult{Success: true, Stdout: "shell-b"} }})
+	var ran []string
+
+	g, _ := RunAgent("x", &planLLM{plans: []*Plan{{Rationale: "双利用", Actions: []Action{
+		{Tool: "fake_scan", Args: map[string]any{"target": "10.0.0.5"}},
+		{Tool: "exploit_a", Args: map[string]any{"target": "10.0.0.5"}, Produces: "web_shell"},
+		{Tool: "exploit_b", Args: map[string]any{"target": "10.0.0.5"}, Produces: "foothold"},
+	}}}}, reg, func(_ Action, l int) bool {
+		ran = append(ran, "hitl")
+		return false // 拒绝 exploit_a
+	}, DiscardEmit, 5)
+
+	if len(ran) != 1 {
+		t.Fatalf("只应触发一次 HITL(拒绝后计划中断), got %d", len(ran))
+	}
+	for _, id := range g.Order {
+		if g.Nodes[id].Type == "foothold" {
+			t.Fatal("被拒计划的后续步骤不应产出节点")
+		}
+	}
+}
+
+// 9) 计划中断后: 决策器可再次给出新计划(动态重规划), 战役继续推进。
+func TestPlanCanReproposeAfterAbort(t *testing.T) {
+	reg := testReg()
+	reg.Register(&tools.Tool{Name: "fail_tool", Level: tools.LevelScan,
+		Run: func(map[string]any) tools.ToolResult { return tools.ToolResult{Success: false, Stderr: "boom"} }})
+
+	// 第一段计划: 扫描成功、fail_tool 失败(中断); 第二段计划: 重规划后只扫描。
+	llm := &planLLM{plans: []*Plan{
+		{Rationale: "第一段", Actions: []Action{
+			{Tool: "fake_scan", Args: map[string]any{"target": "10.0.0.5"}},
+			{Tool: "fail_tool", Args: map[string]any{"target": "10.0.0.5"}},
+		}},
+		{Rationale: "重规划", Actions: []Action{
+			{Tool: "fake_scan", Args: map[string]any{"target": "10.0.0.5"}},
+		}},
+	}}
+	var steps []string
+	g, _ := RunAgent("x", llm, reg, AutoApprove, func(e Event) {
+		if e.Kind == "step" {
+			steps = append(steps, e.Data["tool"].(string))
+		}
+	}, 5)
+
+	if len(steps) != 3 || steps[2] != "fake_scan" {
+		t.Fatalf("计划中断后应重规划并继续执行, 轨迹应为 [fake_scan fail_tool fake_scan], got %v", steps)
+	}
+	if _, ok := g.Nodes["host:10.0.0.5"]; !ok {
+		t.Fatal("重规划后的执行应继续更新攻击图")
+	}
+}

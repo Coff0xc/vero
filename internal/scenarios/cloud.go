@@ -127,7 +127,7 @@ func s3BucketEnum(args map[string]any) tools.ToolResult {
 			listResult := tools.Sh([]string{"curl", "-s", url}, 10*time.Second)
 			if listResult.Success && strings.Contains(listResult.Stdout, "<ListBucketResult>") {
 				output.WriteString("[!] Bucket listing enabled\n")
-				output.WriteString(listResult.Stdout[:500] + "...\n")
+				output.WriteString(tools.Clip(listResult.Stdout, 500) + "...\n")
 			}
 		} else if strings.Contains(stdout, "403 Forbidden") {
 			output.WriteString("\n[+] Bucket exists but access denied (private)\n")

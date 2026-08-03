@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -179,6 +180,18 @@ func (m *MSFClient) GetSessions() ([]map[string]any, error) {
 	return sessions, nil
 }
 
+// msfPassword —— 读取 MSF RPC 密码: 环境变量 VERO_MSF_PASSWORD 优先(REDCELL_MSF_PASSWORD 兼容),
+// 无则用显式参数。修原版硬编码默认 "msf" 弱口令: 未配置时明确报错, 拒绝静默用弱口令。
+func msfPassword(args map[string]any) string {
+	if p := os.Getenv("VERO_MSF_PASSWORD"); p != "" {
+		return p
+	}
+	if p := os.Getenv("REDCELL_MSF_PASSWORD"); p != "" {
+		return p
+	}
+	return tools.ArgStr(args, "msf_password", "")
+}
+
 // ---------- 工具适配器 ----------
 
 // msfSearchExploit —— 工具: 搜索 Metasploit exploit (按 CVE/关键词)。
@@ -189,7 +202,10 @@ func msfSearchExploit(args map[string]any) tools.ToolResult {
 	}
 
 	baseURL := tools.ArgStr(args, "msf_url", "http://127.0.0.1:55553")
-	password := tools.ArgStr(args, "msf_password", "msf")
+	password := msfPassword(args)
+	if password == "" {
+		return tools.ToolResult{Success: false, Stderr: "msf_search: 未配置密码, 请设置环境变量 VERO_MSF_PASSWORD", RC: -1}
+	}
 
 	client, err := NewMSFClient(baseURL, password)
 	if err != nil {
@@ -223,7 +239,10 @@ func msfExecuteExploit(args map[string]any) tools.ToolResult {
 	}
 
 	baseURL := tools.ArgStr(args, "msf_url", "http://127.0.0.1:55553")
-	password := tools.ArgStr(args, "msf_password", "msf")
+	password := msfPassword(args)
+	if password == "" {
+		return tools.ToolResult{Success: false, Stderr: "msf_execute: 未配置密码, 请设置环境变量 VERO_MSF_PASSWORD", RC: -1}
+	}
 
 	client, err := NewMSFClient(baseURL, password)
 	if err != nil {
@@ -254,7 +273,10 @@ func msfExecuteExploit(args map[string]any) tools.ToolResult {
 // msfGetSessions —— 工具: 列出当前 Metasploit sessions。
 func msfGetSessions(args map[string]any) tools.ToolResult {
 	baseURL := tools.ArgStr(args, "msf_url", "http://127.0.0.1:55553")
-	password := tools.ArgStr(args, "msf_password", "msf")
+	password := msfPassword(args)
+	if password == "" {
+		return tools.ToolResult{Success: false, Stderr: "msf_get_sessions: 未配置密码, 请设置环境变量 VERO_MSF_PASSWORD", RC: -1}
+	}
 
 	client, err := NewMSFClient(baseURL, password)
 	if err != nil {

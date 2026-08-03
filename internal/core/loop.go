@@ -2,6 +2,7 @@ package core
 
 import (
 	"bufio"
+	"context"
 	"fmt"
 	"os"
 	"strings"
@@ -37,94 +38,142 @@ func CLIApprove(a Action, level int) bool {
 // RunAgent —— 主循环(对应 Python run_agent)。
 // 返回攻击图与工具输出 trace(所有工具原始 stdout, 是证据逐字回查的真相源)。
 func RunAgent(goal string, llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, budget int) (*AttackGraph, []string) {
+	return RunAgentCtx(context.Background(), goal, llm, reg, approve, emit, budget)
+}
+
+// RunAgentCtx —— 带取消上下文的主循环: 每步检查 ctx, 战役可被操作员中途停止(不再永久卡死)。
+func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, budget int) (*AttackGraph, []string) {
 	g := NewAttackGraph()
 	var history []HistoryItem
 	var trace []string
 	lastSig, stall, prevNodeCount := "", 0, 0
 
 	for step := 0; step < budget; step++ {
-		action := llm.Propose(goal, g, history)
-		if action == nil {
-			emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
+		if ctx.Err() != nil { // 取消: 立即停, 保留已确认证据
+			emit(Event{Kind: "done", Data: map[string]any{"reason": "战役已被操作员取消"}})
 			break
 		}
-		tool, ok := reg.Get(action.Tool)
-		if !ok { // allowlist: 未注册工具直接拒(内核不执行图外指令)
-			emit(Event{Kind: "tool", Data: map[string]any{"tool": action.Tool, "success": false, "stdout": "unknown tool: " + action.Tool}})
-			if r, ok := llm.(Rejecter); ok {
-				r.OnReject()
-			}
-			history = append(history, HistoryItem{Outcome: "rejected", Action: *action})
-			continue
-		}
-		level := tool.Level
-		emit(Event{Kind: "step", Data: map[string]any{
-			"step": step, "tool": action.Tool, "args": action.Args, "level": level, "why": action.Rationale,
-		}})
-
-		// HITL 门控: L3+ 动作必须人工批准
-		if level >= HITLThreshold && !approve(*action, level) {
-			emit(Event{Kind: "hitl", Data: map[string]any{"action": action.Tool, "approved": false}})
-			if r, ok := llm.(Rejecter); ok {
-				r.OnReject() // 被拒 -> 让规划器换路, 不空转
-			}
-			history = append(history, HistoryItem{Outcome: "rejected", Action: *action})
-			continue
-		}
-
-		res := tool.Run(action.Args)
-		trace = append(trace, res.Stdout)
-		emit(Event{Kind: "tool", Data: map[string]any{
-			"tool": action.Tool, "level": level, "args": action.Args,
-			"success": res.Success, "stdout": truncate(res.Stdout, 400), "stderr": truncate(res.Stderr, 200),
-		}})
-		if !res.Success {
-			if r, ok := llm.(Rejecter); ok {
-				r.OnReject() // 失败 -> 让规划器换路
-			}
-		}
-
-		if res.Success {
-			applyObservations(g, tool, action, res, emit)
-
-			// claim: 声称默认 hypothesis(不可信), 独立验证才 confirm
-			if action.Claim != "" {
-				cid := "claim:" + action.Claim
-				g.UpsertNode(&Node{ID: cid, Type: "finding", Label: action.Claim, State: StateHypothesis})
-				emitGraph(emit, g, cid, "hypothesis")
-			}
-			// claim 即验证: 本动作 verifies 某 claim -> confirm
-			if v := tools.ArgStr(action.Args, "verifies", ""); v != "" {
-				cid := "claim:" + v
-				if _, ok := g.Nodes[cid]; ok {
-					_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
-					emitGraph(emit, g, cid, "confirm")
-				}
-			}
-			// 规划产出: 规划步成功 -> 建 produces 类型节点(confirmed, 证据=工具输出)
-			if action.Produces != "" {
-				pt := tools.ArgStr(action.Args, "target", "?")
-				pid := action.Produces + ":" + pt
-				g.UpsertNode(&Node{ID: pid, Type: action.Produces, Label: pt})
-				_, _ = g.Confirm(pid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
-				emitGraph(emit, g, pid, "confirm")
-			}
-		}
-		history = append(history, HistoryItem{Outcome: "done", Action: *action, Result: &res})
-
-		// 停滞检测: 连续重复(tool+args)且攻击图无新增 -> 停止空转(防 LLM 分析瘫痪/无效循环)
-		sig := action.Tool + "|" + fmt.Sprint(action.Args)
-		if sig == lastSig && len(g.Nodes) == prevNodeCount {
-			if stall++; stall >= 2 {
-				emit(Event{Kind: "done", Data: map[string]any{"reason": "检测到重复无进展动作, 停止空转"}})
+		// 决策: 支持多步规划的 LLM 一次给一段计划(链式推理);
+		// 老式 LLM 仍按单步 Propose。两者都返回 nil = 决策器认为该结束了。
+		var acts []Action
+		if pl, ok := llm.(Planner); ok {
+			p := pl.ProposePlan(goal, g, history)
+			if p == nil || len(p.Actions) == 0 {
+				emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
 				break
 			}
+			if len(p.Actions) > 1 {
+				emit(Event{Kind: "plan", Data: map[string]any{
+					"count": len(p.Actions), "rationale": p.Rationale,
+				}})
+			}
+			acts = p.Actions
 		} else {
-			stall = 0
+			a := llm.Propose(goal, g, history)
+			if a == nil {
+				emit(Event{Kind: "done", Data: map[string]any{"reason": "no more actions"}})
+				break
+			}
+			acts = []Action{*a}
 		}
-		lastSig, prevNodeCount = sig, len(g.Nodes)
+		// 计划按序执行: 每步独立 HITL/证据/停滞检测; 某步失败或被拒立即中断后续步
+		// (计划是依赖链, 前提没立住后面跑了也是白跑)。
+		for i := range acts {
+			if ctx.Err() != nil {
+				break
+			}
+			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount,
+				llm, reg, approve, emit, step, &acts[i])
+			if !cont {
+				break
+			}
+		}
 	}
 	return g, trace
+}
+
+// runAction —— 执行单个动作(注册校验/HITL 门控/执行/图更新/停滞检测), 返回是否继续后续动作。
+// false = 该步未成功执行(未知工具/被拒/失败), 计划模式下中断剩余步骤。
+func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trace *[]string,
+	lastSig *string, stall *int, prevNodeCount *int,
+	llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, step int, action *Action) bool {
+
+	tool, ok := reg.Get(action.Tool)
+	if !ok { // allowlist: 未注册工具直接拒(内核不执行图外指令)
+		emit(Event{Kind: "tool", Data: map[string]any{"tool": action.Tool, "success": false, "stdout": "unknown tool: " + action.Tool}})
+		if r, ok := llm.(Rejecter); ok {
+			r.OnReject()
+		}
+		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
+		return false
+	}
+	level := tool.Level
+	emit(Event{Kind: "step", Data: map[string]any{
+		"step": step, "tool": action.Tool, "args": action.Args, "level": level, "why": action.Rationale,
+	}})
+
+	// HITL 门控: L3+ 动作必须人工批准
+	if level >= HITLThreshold && !approve(*action, level) {
+		emit(Event{Kind: "hitl", Data: map[string]any{"action": action.Tool, "approved": false}})
+		if r, ok := llm.(Rejecter); ok {
+			r.OnReject() // 被拒 -> 让规划器换路, 不空转
+		}
+		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
+		return false
+	}
+
+	res := tool.Run(action.Args)
+	*trace = append(*trace, res.Stdout)
+	emit(Event{Kind: "tool", Data: map[string]any{
+		"tool": action.Tool, "level": level, "args": action.Args,
+		"success": res.Success, "stdout": truncate(res.Stdout, 400), "stderr": truncate(res.Stderr, 200),
+	}})
+	if !res.Success {
+		if r, ok := llm.(Rejecter); ok {
+			r.OnReject() // 失败 -> 让规划器换路
+		}
+	}
+	if !res.Success {
+		return false // 计划模式: 失败即中断后续依赖步骤
+	}
+	applyObservations(g, tool, action, res, emit)
+
+	// claim: 声称默认 hypothesis(不可信), 独立验证才 confirm
+	if action.Claim != "" {
+		cid := "claim:" + action.Claim
+		g.UpsertNode(&Node{ID: cid, Type: "finding", Label: action.Claim, State: StateHypothesis})
+		emitGraph(emit, g, cid, "hypothesis")
+	}
+	// claim 即验证: 本动作 verifies 某 claim -> confirm
+	if v := tools.ArgStr(action.Args, "verifies", ""); v != "" {
+		cid := "claim:" + v
+		if _, ok := g.Nodes[cid]; ok {
+			_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+			emitGraph(emit, g, cid, "confirm")
+		}
+	}
+	// 规划产出: 规划步成功 -> 建 produces 类型节点(confirmed, 证据=工具输出)
+	if action.Produces != "" {
+		pt := tools.ArgStr(action.Args, "target", "?")
+		pid := action.Produces + ":" + pt
+		g.UpsertNode(&Node{ID: pid, Type: action.Produces, Label: pt})
+		_, _ = g.Confirm(pid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+		emitGraph(emit, g, pid, "confirm")
+	}
+	*history = append(*history, HistoryItem{Outcome: "done", Action: *action, Result: &res})
+
+	// 停滞检测: 连续重复(tool+args)且攻击图无新增 -> 停止空转(防 LLM 分析瘫痪/无效循环)
+	sig := action.Tool + "|" + fmt.Sprint(action.Args)
+	if sig == *lastSig && len(g.Nodes) == *prevNodeCount {
+		if *stall++; *stall >= 2 {
+			emit(Event{Kind: "done", Data: map[string]any{"reason": "检测到重复无进展动作, 停止空转"}})
+			return false
+		}
+	} else {
+		*stall = 0
+	}
+	*lastSig, *prevNodeCount = sig, len(g.Nodes)
+	return true
 }
 
 // applyObservations —— parser 驱动图: 结构化 observation -> 节点/边 + 证据绑定。

@@ -59,7 +59,7 @@ func Markdown(target string, g *core.AttackGraph, violations int, ts string) str
 	var b strings.Builder
 	fmt.Fprintf(&b, "# 渗透测试报告 — %s\n\n", target)
 	if ts != "" {
-		fmt.Fprintf(&b, "> 生成时间: %s · 引擎: REDCELL\n\n", ts)
+		fmt.Fprintf(&b, "> 生成时间: %s · 引擎: VERO\n\n", ts)
 	}
 
 	b.WriteString("## 执行摘要\n\n")

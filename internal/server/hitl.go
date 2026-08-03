@@ -1,6 +1,7 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"sync"
 	"time"
@@ -31,6 +32,11 @@ func NewWebGate(b *Broker) *WebGate {
 
 // Approve —— core.Approve 实现: 发 hitl_request, 阻塞等操作员(超时默认拒绝)。
 func (w *WebGate) Approve(a core.Action, level int) bool {
+	return w.ApproveCtx(context.Background(), a, level)
+}
+
+// ApproveCtx —— 带取消的审批: 战役被取消时立即解除阻塞, 避免 HITL 等待挂死战役收尾。
+func (w *WebGate) ApproveCtx(ctx context.Context, a core.Action, level int) bool {
 	w.mu.Lock()
 	w.seq++
 	key := fmt.Sprintf("hitl-%d", w.seq) // 自增 key: 确定性、无碰撞(不用时间戳)
@@ -46,6 +52,11 @@ func (w *WebGate) Approve(a core.Action, level int) bool {
 	case ok := <-g.ch:
 		return ok
 	case <-time.After(HITLTimeout):
+		w.mu.Lock()
+		delete(w.pending, key)
+		w.mu.Unlock()
+		return false
+	case <-ctx.Done(): // 取消战役: 默认拒绝并解除等待
 		w.mu.Lock()
 		delete(w.pending, key)
 		w.mu.Unlock()

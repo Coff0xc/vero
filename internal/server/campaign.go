@@ -1,18 +1,30 @@
 package server
 
 import (
+	"context"
 	"fmt"
 	"os"
 	"sort"
 	"strings"
 	"time"
 
+	"github.com/Coff0xc/vero/internal/config"
 	"github.com/Coff0xc/vero/internal/core"
 	"github.com/Coff0xc/vero/internal/llm"
 	"github.com/Coff0xc/vero/internal/report"
 	"github.com/Coff0xc/vero/internal/scenarios"
 	"github.com/Coff0xc/vero/internal/tools"
 )
+
+// scriptLLM —— 脚本模式决策器(无 key 时的确定性动作序列)。
+func scriptLLM(reg *tools.Registry, target string) core.LLM {
+	return llm.NewMock([]core.Action{
+		{Tool: "port_scan", Args: map[string]any{"target": target}, Rationale: "端口扫描"},
+		{Tool: "http_probe", Args: map[string]any{"target": target}, Rationale: "HTTP 指纹"},
+		{Tool: "web_vuln_scan", Args: map[string]any{"target": target}, Rationale: "漏洞扫描"},
+		{Tool: "exploit_sqli", Args: map[string]any{"target": target}, Rationale: "SQLi 利用尝试"},
+	})
+}
 
 // buildLiveRegistry —— 真实工具集: Go 原生端口扫描 + web/AD 场景包(curl/nuclei/exploit)。
 func buildLiveRegistry() (*tools.Registry, *scenarios.Manager) {
@@ -26,7 +38,8 @@ func buildLiveRegistry() (*tools.Registry, *scenarios.Manager) {
 
 // RunCampaign —— 对 target 跑一场真实战役: 真实工具 + (DeepSeek/Claude 自主 或 真实工具脚本)决策,
 // SSE 广播, Web HITL 门控, 落盘渗透报告。这是 Web 作战室的真实后端(不再是 mock demo)。
-func (s *Server) RunCampaign(target string) {
+// ctx 由 handleStart 提供: 操作员点"停止"即取消, 核心循环与 HITL 等待都会立即响应。
+func (s *Server) RunCampaign(ctx context.Context, target string) {
 	s.gate.CancelAll()
 	if target == "" {
 		target = "http://localhost:3000"
@@ -34,27 +47,9 @@ func (s *Server) RunCampaign(target string) {
 
 	reg, sm := buildLiveRegistry()
 
-	var chosen core.LLM
-	engine := "脚本(无 key)"
-	switch {
-	case os.Getenv("DEEPSEEK_API_KEY") != "":
-		chosen = llm.WithTarget(llm.NewDeepSeek(reg), target)
-		engine = "DeepSeek 自主"
-	case os.Getenv("ANTHROPIC_API_KEY") != "":
-		chosen = llm.WithTarget(llm.NewClaude(reg), target)
-		engine = "Claude 自主"
-	default:
-		chosen = llm.NewMock([]core.Action{
-			{Tool: "port_scan", Args: map[string]any{"target": target}, Rationale: "端口扫描"},
-			{Tool: "http_probe", Args: map[string]any{"target": target}, Rationale: "HTTP 指纹"},
-			{Tool: "web_vuln_scan", Args: map[string]any{"target": target}, Rationale: "漏洞扫描"},
-			{Tool: "exploit_sqli", Args: map[string]any{"target": target}, Rationale: "SQLi 利用尝试"},
-		})
-	}
-
 	cid, _ := s.store.StartCampaign("侦察 " + target)
-	s.broker.Emit(core.Event{Kind: "engine", Data: map[string]any{"engine": engine, "target": target}})
 
+	// emit —— 事件广播闭包: 审计 + 落库 + SSE。必须在决策引擎选择前定义(引擎选择也会广播事件)。
 	emit := func(e core.Event) {
 		if e.Kind == "tool" { // 审计挂到 tool 事件(执行后), 回填 success —— 修 Python 原 success 恒 null 缺陷
 			lvl, _ := e.Data["level"].(int)
@@ -66,8 +61,56 @@ func (s *Server) RunCampaign(target string) {
 		_ = s.store.SaveEvent(cid, e)
 		s.broker.Emit(e)
 	}
+
+	// 决策引擎: 工作台配置决定(引擎/key/思考强度/预算), 不再只看环境变量。
+	var chosen core.LLM
+	engine := "脚本(无 key)"
+	cfg := s.cfg
+	switch cfg.Engine {
+	case config.EngineScript:
+		chosen = scriptLLM(reg, target)
+		engine = "脚本(固定)"
+	case config.EngineClaude:
+		if cfg.AnthropicKey == "" {
+			emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置 ANTHROPIC_API_KEY, 回退脚本模式"}})
+			chosen = scriptLLM(reg, target)
+			engine = "脚本(key 缺失回退)"
+		} else {
+			chosen = llm.WithTarget(llm.NewClaude(reg, cfg.Temperature), target)
+			engine = "Claude 自主"
+		}
+	case config.EngineDeepSeek:
+		if cfg.DeepSeekKey == "" {
+			emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置 DEEPSEEK_API_KEY, 回退脚本模式"}})
+			chosen = scriptLLM(reg, target)
+			engine = "脚本(key 缺失回退)"
+		} else {
+			chosen = llm.WithTarget(llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature), target)
+			engine = "DeepSeek 自主"
+		}
+	default: // auto: 有 key 用真实模型, 否则脚本
+		switch {
+		case cfg.DeepSeekKey != "":
+			chosen = llm.WithTarget(llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature), target)
+			engine = "DeepSeek 自主"
+		case cfg.AnthropicKey != "":
+			chosen = llm.WithTarget(llm.NewClaude(reg, cfg.Temperature), target)
+			engine = "Claude 自主"
+		default:
+			chosen = scriptLLM(reg, target)
+		}
+	}
+
+	s.broker.Emit(core.Event{Kind: "engine", Data: map[string]any{"engine": engine, "target": target}})
+
 	goal := "对目标 " + target + " 做红队侦察与漏洞验证: 端口扫描→HTTP指纹→漏扫→发现可利用点尝试利用(如 SQLi)。用真实证据坐实; 充分则停止。"
-	g, trace := core.RunAgent(goal, chosen, reg, s.gate.Approve, emit, 10)
+	budget := cfg.MaxBudget
+	if budget < 1 {
+		budget = 10
+	}
+	g, trace := core.RunAgentCtx(ctx, goal, chosen, reg, func(a core.Action, lvl int) bool {
+		return s.gate.ApproveCtx(ctx, a, lvl) // 取消时 HITL 等待立即解除
+	}, emit, budget)
 
 	services := map[string]bool{}
 	for _, n := range g.Nodes {
@@ -91,7 +134,7 @@ func (s *Server) RunCampaign(target string) {
 	_ = s.store.SaveSnapshot(cid, g)
 	_ = s.store.EndCampaign(cid, conf, hypo, viol)
 
-	reportFile := fmt.Sprintf("redcell-report-%d.md", cid)
+	reportFile := fmt.Sprintf("vero-report-%d.md", cid)
 	md := report.Markdown(target, g, viol, time.Now().Format("2006-01-02 15:04:05"))
 	_ = os.WriteFile(reportFile, []byte(md), 0o644)
 

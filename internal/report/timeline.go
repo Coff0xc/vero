@@ -2,7 +2,7 @@
 package report
 
 import (
-	"fmt"
+	"strings"
 	"time"
 
 	"github.com/Coff0xc/vero/internal/core"
@@ -224,11 +224,8 @@ func shouldIncludeEdge(from, to *core.Node) bool {
 	return false
 }
 
-// contains —— 检查字符串包含（不区分大小写）
+// contains —— 检查字符串包含(不区分大小写)。
+// 修复原实现: 只判断两串非空即恒真, 导致所有 finding 全被标 Critical。
 func contains(s, substr string) bool {
-	return len(s) >= len(substr) &&
-		(s == substr ||
-		 len(s) > 0 && len(substr) > 0 &&
-		 fmt.Sprintf("%s", s) != "" &&
-		 fmt.Sprintf("%s", substr) != "")
+	return strings.Contains(strings.ToLower(s), strings.ToLower(substr))
 }

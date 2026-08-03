@@ -23,7 +23,7 @@ type Report struct {
 type ReportMeta struct {
 	Target      string    `json:"target"`
 	GeneratedAt time.Time `json:"generated_at"`
-	Engine      string    `json:"engine"`       // "REDCELL v1.0"
+	Engine      string    `json:"engine"`       // "VERO v1.0"
 	CampaignID  string    `json:"campaign_id"`
 	Duration    int       `json:"duration_sec"` // 战役耗时（秒）
 }

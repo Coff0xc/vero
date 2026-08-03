@@ -125,8 +125,8 @@ func (r *Report) ToMarkdown() string {
 
 	// 附录
 	b.WriteString("## 📎 附录\n\n")
-	b.WriteString("### 关于 REDCELL\n\n")
-	b.WriteString("REDCELL 是一个 AI 驱动的自主红队渗透测试平台，采用证据驱动机制确保所有发现可溯源、可验证。\n\n")
+	b.WriteString("### 关于 VERO\n\n")
+	b.WriteString("VERO 是一个 AI 驱动的自主红队渗透测试平台，采用证据驱动机制确保所有发现可溯源、可验证。\n\n")
 	b.WriteString("**核心特性**:\n")
 	b.WriteString("- ✅ 证据逐字溯源（反幻觉机制）\n")
 	b.WriteString("- ✅ 智能安全门控（L0-L4 分级）\n")
@@ -323,7 +323,7 @@ const htmlTemplate = `<!DOCTYPE html>
         {{end}}
 
         <div class="footer">
-            <p><strong>关于 REDCELL</strong></p>
+            <p><strong>关于 VERO</strong></p>
             <p>AI 驱动的自主红队渗透测试平台 | 证据驱动 · 安全可控 · 生产就绪</p>
             <p style="margin-top: 10px; font-size: 12px;">
                 ⚠️ 免责声明：本报告仅供授权渗透测试使用。建议结合人工复核。

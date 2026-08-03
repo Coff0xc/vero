@@ -121,7 +121,7 @@ func ParseNuclei(out string, args map[string]any) []tools.Observation {
 // 一次绕开三个坑 —— Windows 命令行引号转义、localhost→IPv6 挂起、Go net/http 对该靶的请求挂起。
 func exploitSQLiLogin(args map[string]any) tools.ToolResult {
 	target := baseURL(tools.ArgStr(args, "target", ""))
-	f, err := os.CreateTemp("", "redcell-sqli-*.json")
+	f, err := os.CreateTemp("", "vero-sqli-*.json")
 	if err != nil {
 		return tools.ToolResult{Success: false, Stderr: err.Error(), RC: -1}
 	}

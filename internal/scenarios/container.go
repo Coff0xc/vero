@@ -122,7 +122,7 @@ func k8sServiceAccountEnum(args map[string]any) tools.ToolResult {
 	if apiResult.Success {
 		if strings.Contains(apiResult.Stdout, "\"kind\":\"NamespaceList\"") {
 			output.WriteString("  [!] API accessible - can list namespaces\n")
-			output.WriteString(apiResult.Stdout[:200] + "...\n")
+			output.WriteString(tools.Clip(apiResult.Stdout, 200) + "...\n")
 		} else if strings.Contains(apiResult.Stdout, "Forbidden") {
 			output.WriteString("  [+] API reachable but access forbidden\n")
 		} else {
@@ -152,7 +152,7 @@ func k8sNodeExploit(args map[string]any) tools.ToolResult {
 			chrootResult := tools.Sh([]string{"ls", "/host/etc/passwd"}, 5*time.Second)
 			if chrootResult.Success {
 				output.WriteString("  [!] Can access host /etc/passwd\n")
-				output.WriteString(chrootResult.Stdout[:200] + "\n")
+				output.WriteString(tools.Clip(chrootResult.Stdout, 200) + "\n")
 			}
 		}
 
@@ -165,7 +165,7 @@ func k8sNodeExploit(args map[string]any) tools.ToolResult {
 			dockerResult := tools.Sh([]string{"docker", "ps"}, 5*time.Second)
 			if dockerResult.Success {
 				output.WriteString("  [!] Docker command works:\n")
-				output.WriteString(dockerResult.Stdout[:300] + "\n")
+				output.WriteString(tools.Clip(dockerResult.Stdout, 300) + "\n")
 			}
 		}
 	}

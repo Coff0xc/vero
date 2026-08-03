@@ -50,7 +50,7 @@ func (s *Server) handleReportJSON(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=redcell-report-%s.json", campaignID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=vero-report-%s.json", campaignID))
 	w.Write(data)
 }
 
@@ -85,7 +85,7 @@ func (s *Server) handleReportMarkdown(w http.ResponseWriter, r *http.Request) {
 	md := rep.ToMarkdown()
 
 	w.Header().Set("Content-Type", "text/markdown; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=redcell-report-%s.md", campaignID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=vero-report-%s.md", campaignID))
 	w.Write([]byte(md))
 }
 
@@ -124,7 +124,7 @@ func (s *Server) handleReportHTML(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=redcell-report-%s.html", campaignID))
+	w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=vero-report-%s.html", campaignID))
 	w.Write([]byte(html))
 }
 
@@ -148,13 +148,9 @@ func (s *Server) handleReportsList(w http.ResponseWriter, r *http.Request) {
 
 	var items []reportItem
 	for _, c := range campaigns {
-		// 快速统计
-		findingCount := 0
-		for _, n := range c.Graph.Nodes {
-			if n.Type == "finding" && n.State == "confirmed" {
-				findingCount++
-			}
-		}
+		// 快速统计 (ListCampaigns 不加载攻击图, Graph 恒为 nil —— 走 SQL 轻量统计,
+		// 修原版对 nil 遍历 .Nodes 必然空指针崩溃)
+		findingCount := s.store.CountFindings(c.ID)
 
 		duration := 0
 		startTime := time.Unix(c.StartedAt, 0)
