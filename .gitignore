@@ -1,6 +1,13 @@
 # 二进制
-/redcell
-/redcell.exe
+/vero
+/vero.exe
+nuclei.exe
+*.exe
+
+# 环境变量 —— 真实 API Key 绝不能入库(修原版 .env 未忽略)
+.env
+.env.*
+!.env.example
 
 # 运行时数据
 *.db
@@ -8,14 +15,38 @@
 audit.jsonl
 rollback.jsonl
 *.log
+*.jsonl
+
+# 生成的报告
+vero-report.md
+vero-report-*.md
 
 # 前端依赖与产物
 web/node_modules/
 web/dist/
+web/*.tsbuildinfo
+web/vite.config.js
+web/vite.config.d.ts
 
 # embed 目标(由 npm run build 生成; 保留占位让 go build 可用)
 internal/webui/dist/*
 !internal/webui/dist/.gitkeep
 
+# 本地数据目录
+data/
+wordlists/
+audit/
+
 # 杂项
 .DS_Store
+
+# 运行时产物 —— 进程 PID / 本地配置(可能含密钥, 绝不上库)
+run-pid.txt
+vero.config.json
+
+# 编译产物备份
+vero.exe~
+*.exe~
+
+# 本地自动下载安装的工具二进制(不经 git 分发, 首次启动自动装)
+tools/bin/
