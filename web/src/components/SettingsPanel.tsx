@@ -1,4 +1,4 @@
-// 设置面板 —— 决策引擎 / API key / 模型 / 思考强度 / 决策预算。
+// 设置面板 —— 决策引擎 / API key / 模型 / 思考强度 / 决策预算 / 工具依赖。
 // 密钥不回显明文: 后端只给 has_anthropic/has_deepseek 布尔; 前端据此显示「已配置/未配置」徽标。
 // 清除语义: 空 key 字段 = 不改, 显式清空必须发 clear_anthropic/clear_deepseek:true。
 import { useEffect, useState, type FormEvent } from 'react'
@@ -6,6 +6,7 @@ import { useStore } from '../store'
 import type { ConfigPublic } from '../types'
 import { ENGINE_ZH, ENGINE_DESC } from '../lib/i18n'
 import { ProviderSection } from './ProviderSection'
+import { DependenciesPanel } from './DependenciesPanel'
 
 interface KeyState {
   value: string // 新输入的 key(空 = 未改)
@@ -29,6 +30,7 @@ const MODEL_OPTIONS: Record<string, { value: string; label: string }[]> = {
 export function SettingsPanel() {
   const applyConfig = useStore((s) => s.applyConfig)
 
+  const [activeTab, setActiveTab] = useState<'config' | 'dependencies'>('config')
   const [engine, setEngine] = useState('auto')
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.2)
@@ -159,7 +161,34 @@ export function SettingsPanel() {
   }
 
   return (
-    <form onSubmit={onSave} className="p-6 max-w-2xl space-y-6">
+    <div className="p-6 max-w-2xl">
+      {/* Tab 导航 */}
+      <div className="flex items-center gap-4 mb-6 border-b border-line pb-2">
+        <button
+          onClick={() => setActiveTab('config')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'config'
+              ? 'text-amber-600 border-b-2 border-amber-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          配置
+        </button>
+        <button
+          onClick={() => setActiveTab('dependencies')}
+          className={`px-3 py-1.5 text-sm font-medium transition-colors ${
+            activeTab === 'dependencies'
+              ? 'text-amber-600 border-b-2 border-amber-600'
+              : 'text-gray-500 hover:text-gray-700'
+          }`}
+        >
+          工具依赖
+        </button>
+      </div>
+
+      {/* 配置面板 */}
+      {activeTab === 'config' && (
+        <form onSubmit={onSave} className="space-y-6")
       <div className="flex items-center justify-between">
         <h2 className="text-[17px] font-semibold text-ink2">设置</h2>
         <div className="flex gap-2.5">
@@ -330,5 +359,10 @@ export function SettingsPanel() {
 
       <ProviderSection />
     </form>
+      )}
+
+      {/* 依赖面板 */}
+      {activeTab === 'dependencies' && <DependenciesPanel />}
+    </div>
   )
 }
