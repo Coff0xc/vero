@@ -221,8 +221,8 @@ func ShouldRetry(reason string) bool {
 		return true
 	}
 
-	// 参数错误且是自动生成的参数（非用户指定）
-	if mode == FailureArgument && !strings.Contains(reason, "Required") {
+	// 参数错误且不是必填参数缺失（格式错误可以retry）
+	if mode == FailureArgument && !strings.Contains(strings.ToLower(reason), "required") {
 		return true
 	}
 

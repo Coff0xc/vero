@@ -89,16 +89,17 @@
   - [ ] image_ocr - Tesseract OCR
 ```
 
-#### 5. **反射学习强化** (抄 Xalgorix Reflexion)
-**目标**: 失败案例自动总结 + 策略调整
+#### 5. **反射学习强化** (抄 Xalgorix Reflexion) ✅
+**状态**: 已完成 (commit 待推送)
 ```
-- [ ] 增强 Reflector 接口
-  - [ ] 失败模式分类 (网络/权限/误报)
-  - [ ] 策略库持久化 (SQLite lessons 表)
-  - [ ] 自动 retry with 调整参数
-- [ ] LLM Prompt 优化
-  - [ ] Few-shot 示例动态注入
-  - [ ] 错误堆栈智能压缩
+- [x] 增强 Reflector 接口
+  - [x] 失败模式分类 (7 种: network/permission/tool_missing/...)
+  - [x] 策略库持久化 (SQLite lessons 表)
+  - [x] 自动 retry with 调整参数 (超时 → timeout/retry)
+- [x] LLM Prompt 优化
+  - [x] Few-shot 示例动态注入 (QueryLessons)
+  - [x] 解决方案自动建议 (SuggestSolution)
+- [x] 测试覆盖: 100% (5 测试用例)
 ```
 
 #### 6. **协同编排** (抄 AttackMate 分布式)
@@ -109,6 +110,8 @@
   - [ ] 子任务拆分 (端口扫描 → 批量并行)
   - [ ] 结果汇聚 + 去重
 ```
+
+**第 2 阶段进度**: 1/3 完成 (反射学习 ✅)
 
 ---
 
