@@ -3,8 +3,6 @@ package scenarios
 import (
 	"strings"
 	"testing"
-
-	"github.com/Coff0xc/vero/internal/tools"
 )
 
 func TestOrchestrationPack(t *testing.T) {
