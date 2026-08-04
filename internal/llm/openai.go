@@ -160,6 +160,13 @@ func (o *OpenAILLM) proposePlan(goal string, g *core.AttackGraph, history []core
 	}
 	if o.prov.Reasoning { // 深度思考: 某些提供商用 effort 字段/或模型名即推理族
 		body["reasoning_effort"] = "medium"
+		// thinking 模式不支持强制 function 调用(DeepSeek: "Thinking mode does not
+		// support this tool_choice") —— 放开为 auto, 模型自行决定; 未走 tool_calls
+		// 时下方有 content JSON 解析兜底。
+		body["tool_choice"] = "auto"
+		// 推理 token 与计划 JSON 共享 max_tokens: 2048 易被思维链占满导致 arguments
+		// 截断(unexpected end of JSON input), 推理模型放宽。
+		body["max_tokens"] = 8192
 	}
 	out, err := o.postChat(body)
 	if err != nil {
