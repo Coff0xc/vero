@@ -437,6 +437,7 @@ export function AttackGraph() {
         nodeTypes={nodeTypes}
         fitView
         minZoom={0.3}
+        colorMode="light"
         onNodeClick={handleNodeClick}
         onPaneClick={handlePaneClick}
         nodesDraggable={false}
