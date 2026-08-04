@@ -32,7 +32,11 @@ func scriptLLM(reg *tools.Registry, target string) core.LLM {
 func buildLiveRegistry() (*tools.Registry, *scenarios.Manager) {
 	reg := tools.NewRegistry()
 	reg.Register(&tools.Tool{Name: "port_scan", Level: tools.LevelScan,
-		Desc: "TCP connect 端口扫描, 发现开放端口/服务(target 用 host)", Run: tools.PortScan, Parse: tools.ParseNmap})
+		Desc: "TCP connect 端口扫描, 发现开放端口/服务", Run: tools.PortScan, Parse: tools.ParseNmap,
+		Args: []tools.ArgSpec{
+			{Name: "target", Desc: "主机/IP(不带 scheme/端口), 如 10.0.0.5 或 localhost", Required: true},
+			{Name: "ports", Desc: "端口范围, 如 1-10000 或 80,443,8080, 默认常见端口"},
+		}})
 	sm := scenarios.NewManager()
 	scenarios.RegisterDefaults(sm, reg)
 	return reg, sm
@@ -104,7 +108,7 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 	goal := "对目标 " + target + " 做红队侦察与漏洞验证: 端口扫描→HTTP指纹→漏扫→发现可利用点尝试利用(如 SQLi)。用真实证据坐实; 充分则停止。"
 	budget := cfg.MaxBudget
 	if budget < 1 {
-		budget = 10
+		budget = 20
 	}
 	g, trace := core.RunAgentCtx(ctx, goal, chosen, reg, approve, emit, budget)
 

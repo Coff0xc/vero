@@ -254,10 +254,16 @@ func ReconPack() Pack {
 	return Pack{
 		Name: "recon",
 		Tools: []*tools.Tool{
-			{Name: "fetch_page", Level: tools.LevelScan, Desc: "抓取目标页面 HTML body(curl -sL), 供分析页面结构/表单/链接", Run: fetchPage},
-			{Name: "fetch_headers", Level: tools.LevelScan, Desc: "抓取目标响应头文本(curl -sI), 供分析技术栈/安全头/泄露头", Run: fetchHeaders},
-			{Name: "extract_endpoints", Level: tools.LevelScan, Desc: "抓取页面并提取端点/表单参数/JS 文件, 建立攻击面地图(target 用 URL)", Run: extractEndpoints, Parse: ParseEndpoints},
-			{Name: "probe_endpoint", Level: tools.LevelScan, Desc: "对目标端点发 GET 探测, 记录状态码/长度/敏感词(target+path 参数)", Run: probeEndpoint, Parse: ParseProbe},
+			{Name: "fetch_page", Level: tools.LevelScan, Desc: "抓取目标页面 HTML body(curl -sL), 供分析页面结构/表单/链接", Run: fetchPage,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标 URL(带 scheme), 如 http://host:port/login", Required: true}}},
+			{Name: "fetch_headers", Level: tools.LevelScan, Desc: "抓取目标响应头文本(curl -sI), 供分析技术栈/安全头/泄露头", Run: fetchHeaders,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标 URL(带 scheme)", Required: true}}},
+			{Name: "extract_endpoints", Level: tools.LevelScan, Desc: "抓取页面并提取端点/表单参数/JS 文件, 建立攻击面地图(target 用 URL)", Run: extractEndpoints, Parse: ParseEndpoints,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标 URL(带 scheme)", Required: true}}},
+			{Name: "probe_endpoint", Level: tools.LevelScan, Desc: "对目标端点发 GET 探测, 记录状态码/长度/敏感词", Run: probeEndpoint, Parse: ParseProbe,
+				Args: []tools.ArgSpec{
+					{Name: "target", Desc: "目标 URL(带 scheme)", Required: true},
+					{Name: "path", Desc: "探测路径, 如 /admin, 默认 /"},}},
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			return s["http"] || s["https"] || s["ssl/http"] || s["http-proxy"]

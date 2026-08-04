@@ -3,6 +3,8 @@ package scenarios
 import (
 	"strings"
 	"testing"
+
+	"github.com/Coff0xc/vero/internal/tools"
 )
 
 // TestParseMSFSearch —— 验证 exploit 搜索结果解析。
@@ -96,22 +98,41 @@ func TestExploitPack(t *testing.T) {
 		t.Errorf("包名应为 exploit, 实际 %s", pack.Name)
 	}
 
-	// 应有 3 个工具
-	if len(pack.Tools) != 3 {
-		t.Fatalf("应有 3 个工具, 实际 %d", len(pack.Tools))
+	// 应有 4 个工具(含后渗透 msf_session_cmd)
+	if len(pack.Tools) != 4 {
+		t.Fatalf("应有 4 个工具, 实际 %d", len(pack.Tools))
 	}
 
 	// 验证工具存在
 	toolNames := make(map[string]bool)
+	toolByName := make(map[string]*tools.Tool)
 	for _, tool := range pack.Tools {
 		toolNames[tool.Name] = true
+		toolByName[tool.Name] = tool
 	}
 
-	required := []string{"msf_search", "msf_execute", "msf_get_sessions"}
+	required := []string{"msf_search", "msf_execute", "msf_get_sessions", "msf_session_cmd"}
 	for _, name := range required {
 		if !toolNames[name] {
 			t.Errorf("缺失工具: %s", name)
 		}
+	}
+
+	// 后渗透闭环: msf_session_cmd 成功即真实 shell(攻击链终点), cmd 必填。
+	if sc := toolByName["msf_session_cmd"]; sc != nil {
+		if sc.Produces != "shell" {
+			t.Errorf("msf_session_cmd.Produces 应为 shell, 实际 %q", sc.Produces)
+		}
+		if msg := tools.ValidateArgs(sc, map[string]any{}); msg == "" {
+			t.Error("msf_session_cmd 缺 cmd 应校验失败")
+		}
+		if msg := tools.ValidateArgs(sc, map[string]any{"cmd": "whoami"}); msg != "" {
+			t.Errorf("msf_session_cmd 带 cmd 应通过, 实际 %s", msg)
+		}
+	}
+	// msf_get_sessions: 有活跃 session 才建 foothold(空列表判失败, 防证据造假)。
+	if gs := toolByName["msf_get_sessions"]; gs != nil && gs.Produces != "foothold" {
+		t.Errorf("msf_get_sessions.Produces 应为 foothold, 实际 %q", gs.Produces)
 	}
 
 	// 验证指纹函数

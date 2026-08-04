@@ -40,6 +40,15 @@ type Observation struct {
 	Tactic    string // MITRE ATT&CK tactic(如 initial-access); 未映射留空
 }
 
+// ArgSpec —— 工具参数规格(抄 PentAGI/Dark-Moon 的参数级工具描述):
+// 进 prompt 让 LLM 按规格填参(不再瞎猜字段名), 内核执行前校验必填项,
+// 校验失败的精确原因经 Reflector 回喂决策器, 下轮自纠。
+type ArgSpec struct {
+	Name     string // 参数名(args map 的 key)
+	Desc     string // 一句话说明(含格式/取值示例)
+	Required bool   // 缺失/空串时内核拒绝执行并回喂原因
+}
+
 // RunFunc 执行工具; ParseFunc 把 stdout 结构化。
 type RunFunc func(args map[string]any) ToolResult
 type ParseFunc func(stdout string, args map[string]any) []Observation
@@ -47,13 +56,30 @@ type ParseFunc func(stdout string, args map[string]any) []Observation
 // Tool —— 一个可执行工具(对应 Python Tool)。Parse 可为 nil(无结构化产出)。
 // Produces —— 工具成功后的默认攻击链产出类型(service/web_shell/cred/foothold/shell):
 // 内核在动作未显式标注 produces 时用它建节点+边, 使攻击链不依赖 LLM 自觉填字段。
+// Args —— 参数规格(可选): 声明后进 prompt + 执行前校验必填。
 type Tool struct {
 	Name     string
 	Level    int
 	Desc     string // 给 LLM 的能力描述(能做什么/边界), 让 LLM 不再盲选工具名
 	Run      RunFunc
 	Parse    ParseFunc
-	Produces string // 可选: 成功即推进的攻击链产出类型
+	Produces string    // 可选: 成功即推进的攻击链产出类型
+	Args     []ArgSpec // 可选: 参数规格(进 prompt + 执行前校验)
+}
+
+// ValidateArgs —— 按 Args 规格校验动作参数: 返回空串表示通过,
+// 否则返回精确原因(缺哪个必填参数/该参数的说明), 供内核回喂决策器自纠。
+// 未声明 Args 的工具不校验(向后兼容)。
+func ValidateArgs(t *Tool, args map[string]any) string {
+	for _, spec := range t.Args {
+		if !spec.Required {
+			continue
+		}
+		if ArgStr(args, spec.Name, "") == "" {
+			return "参数校验失败: 工具 " + t.Name + " 缺必填参数 " + spec.Name + "(" + spec.Desc + ")"
+		}
+	}
+	return ""
 }
 
 // Registry —— 工具注册表(显式实例, 取代 Python 的全局 REGISTRY dict)。
@@ -93,14 +119,15 @@ type ToolSpec struct {
 	Name  string
 	Level int
 	Desc  string
+	Args  []ArgSpec
 }
 
-// Specs —— 已注册工具的规格列表(排序稳定), 供 LLM 知道每个工具能做什么、边界在哪。
+// Specs —— 已注册工具的规格列表(排序稳定), 供 LLM 知道每个工具能做什么、边界在哪、参数怎么填。
 func (r *Registry) Specs() []ToolSpec {
 	specs := make([]ToolSpec, 0, len(r.tools))
 	for _, n := range r.Names() {
 		t := r.tools[n]
-		specs = append(specs, ToolSpec{Name: t.Name, Level: t.Level, Desc: t.Desc})
+		specs = append(specs, ToolSpec{Name: t.Name, Level: t.Level, Desc: t.Desc, Args: t.Args})
 	}
 	return specs
 }

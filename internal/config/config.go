@@ -81,7 +81,7 @@ func Default() *Config {
 	return &Config{
 		Engine:        EngineAuto,
 		Temperature:   0.2,
-		MaxBudget:     10,
+		MaxBudget:     20, // 连续引擎默认 20 步(抄 Dark-Moon 连续推进: 8~10 步只够侦察+一次利用)
 		Providers:     provs,
 		ActiveProvider: "deepseek",
 	}

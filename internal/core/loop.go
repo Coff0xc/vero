@@ -145,6 +145,16 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
 		return false
 	}
+	// 参数规格校验(抄 PentAGI: 执行前按 schema 拦): 缺必填参数不执行,
+	// 精确原因回喂决策器, 下轮按规格自纠 —— 不再瞎跑一个注定失败的命令。
+	if msg := tools.ValidateArgs(tool, action.Args); msg != "" {
+		emit(Event{Kind: "tool", Data: map[string]any{"tool": action.Tool, "success": false, "stdout": msg}})
+		if rf, ok := llm.(Reflector); ok {
+			rf.OnFailure(*action, msg)
+		}
+		*history = append(*history, HistoryItem{Outcome: "rejected", Action: *action})
+		return false
+	}
 	level := tool.Level
 	emit(Event{Kind: "step", Data: map[string]any{
 		"step": step, "tool": action.Tool, "args": action.Args, "level": level, "why": action.Rationale,

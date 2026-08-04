@@ -228,11 +228,20 @@ func WebPack() Pack {
 	return Pack{
 		Name: "web",
 		Tools: []*tools.Tool{
-			{Name: "http_probe", Level: tools.LevelScan, Desc: "HTTP HEAD 探测(curl -sI), 只取响应头做指纹, 不取页面 body", Run: httpProbe, Parse: ParseHTTP},
-			{Name: "web_vuln_scan", Level: tools.LevelScan, Desc: "nuclei 漏洞扫描, 发现 web 暴露面/技术栈/配置缺陷/敏感端点", Run: webVuln, Parse: ParseNuclei},
-			{Name: "ffuf_dir_brute", Level: tools.LevelScan, Desc: "ffuf 目录爆破, 发现隐藏路径/后台/备份文件, 需 wordlist 参数(可选)", Run: ffufDirBrute, Parse: ParseFFUF},
-			{Name: "ffuf_vhost_enum", Level: tools.LevelScan, Desc: "ffuf 虚拟主机枚举, 通过 Host 头爆破子域名, 需 domain 参数", Run: ffufVhostEnum, Parse: ParseFFUFVhost},
-			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 对 /rest/user/login 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi, Produces: "web_shell"},
+			{Name: "http_probe", Level: tools.LevelScan, Desc: "HTTP HEAD 探测(curl -sI), 只取响应头做指纹, 不取页面 body", Run: httpProbe, Parse: ParseHTTP,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标 URL(带 scheme), 如 http://host:port", Required: true}}},
+			{Name: "web_vuln_scan", Level: tools.LevelScan, Desc: "nuclei 漏洞扫描, 发现 web 暴露面/技术栈/配置缺陷/敏感端点", Run: webVuln, Parse: ParseNuclei,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标 URL(带 scheme)", Required: true}}},
+			{Name: "ffuf_dir_brute", Level: tools.LevelScan, Desc: "ffuf 目录爆破, 发现隐藏路径/后台/备份文件", Run: ffufDirBrute, Parse: ParseFFUF,
+				Args: []tools.ArgSpec{
+					{Name: "target", Desc: "目标 URL(带 scheme)", Required: true},
+					{Name: "wordlist", Desc: "字典路径, 可选(内置默认)"},}},
+			{Name: "ffuf_vhost_enum", Level: tools.LevelScan, Desc: "ffuf 虚拟主机枚举, 通过 Host 头爆破子域名", Run: ffufVhostEnum, Parse: ParseFFUFVhost,
+				Args: []tools.ArgSpec{
+					{Name: "target", Desc: "目标 URL(带 scheme)", Required: true},
+					{Name: "domain", Desc: "基础域, 如 example.com"},}},
+			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 对 /rest/user/login 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi, Produces: "web_shell",
+				Args: []tools.ArgSpec{{Name: "target", Desc: "站点根 URL(带 scheme), 内部自动拼 /rest/user/login", Required: true}}},
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			return s["http"] || s["https"] || s["ssl/http"] || s["http-proxy"]
@@ -275,8 +284,13 @@ func ADPack() Pack {
 	return Pack{
 		Name: "ad",
 		Tools: []*tools.Tool{
-			{Name: "smb_enum", Level: tools.LevelScan, Desc: "SMB 枚举(nxc), 需目标 445/SMB 开放(Windows/Samba)", Run: smbEnum, Parse: ParseSMB},
-			{Name: "kerberoast", Level: tools.LevelCred, Desc: "Kerberoasting(nxc), 需 AD 域凭证(user/pass)", Run: kerberoast},
+			{Name: "smb_enum", Level: tools.LevelScan, Desc: "SMB 枚举(nxc), 需目标 445/SMB 开放(Windows/Samba)", Run: smbEnum, Parse: ParseSMB,
+				Args: []tools.ArgSpec{{Name: "target", Desc: "目标主机/IP(不带 scheme)", Required: true}}},
+			{Name: "kerberoast", Level: tools.LevelCred, Desc: "Kerberoasting(nxc), 需 AD 域凭证", Run: kerberoast,
+				Args: []tools.ArgSpec{
+					{Name: "target", Desc: "域控主机/IP", Required: true},
+					{Name: "user", Desc: "域用户名", Required: true},
+					{Name: "pass", Desc: "域密码", Required: true},}},
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			return s["microsoft-ds"] || s["netbios-ssn"] || s["ldap"] || s["kerberos-sec"]

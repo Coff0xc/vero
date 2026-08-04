@@ -32,7 +32,7 @@ export function SettingsPanel() {
   const [engine, setEngine] = useState('auto')
   const [model, setModel] = useState('')
   const [temperature, setTemperature] = useState(0.2)
-  const [maxBudget, setMaxBudget] = useState(10)
+  const [maxBudget, setMaxBudget] = useState(20)
   const [hasAnthropic, setHasAnthropic] = useState(false)
   const [hasDeepSeek, setHasDeepSeek] = useState(false)
   const [anthropic, setAnthropic] = useState<KeyState>({ value: '', cleared: false })
@@ -50,7 +50,7 @@ export function SettingsPanel() {
         setEngine(body.engine ?? 'auto')
         setModel(body.model ?? '')
         setTemperature(body.temperature ?? 0.2)
-        setMaxBudget(body.max_budget ?? 10)
+        setMaxBudget(body.max_budget ?? 20)
         setHasAnthropic(!!body.has_anthropic)
         setHasDeepSeek(!!body.has_deepseek)
         setAnthropic({ value: '', cleared: false })
@@ -121,15 +121,15 @@ export function SettingsPanel() {
     submit(patch)
   }
 
-  // 恢复默认: engine=auto / temp=0.2 / max_budget=10 / model=''(本地重置 + 提交)。
+  // 恢复默认: engine=auto / temp=0.2 / max_budget=20 / model=''(本地重置 + 提交)。
   const onRestore = () => {
     setEngine('auto')
     setModel('')
     setTemperature(0.2)
-    setMaxBudget(10)
+    setMaxBudget(20)
     setAnthropic({ value: '', cleared: false })
     setDeepseek({ value: '', cleared: false })
-    submit({ engine: 'auto', temperature: 0.2, max_budget: 10 })
+    submit({ engine: 'auto', temperature: 0.2, max_budget: 20 })
   }
 
   // 引擎回退提示: 选了具体模型但 key 缺失 → 发起战役会回退脚本模式。
