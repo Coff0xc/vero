@@ -103,6 +103,7 @@ func (s *Server) Router() http.Handler {
 	r.Get("/api/config", s.handleConfigGet)
 	r.Post("/api/config", s.handleConfigSet)
 	r.Post("/api/providers/test", s.handleProviderTest) // 测试提供商连接 + 拉模型列表
+	r.Get("/api/dependencies", s.handleDependencies)    // 工具依赖检测(抄 Dark-Moon)
 
 	// 工作流模板 API
 	r.Get("/api/workflows", s.handleWorkflowList)
