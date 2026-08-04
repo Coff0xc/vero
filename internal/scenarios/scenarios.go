@@ -305,7 +305,8 @@ func RegisterDefaults(m *Manager, reg *tools.Registry) {
 	m.Register(reg, ADPackEnhanced())      // P0-2: NetExec 增强包
 	m.Register(reg, PostExploitPack())     // P0-4: 凭证提取包
 	m.Register(reg, ExploitPack())         // P1: Metasploit RPC
-	m.Register(reg, CloudPack())           // P2: 云环境侦察
+	m.Register(reg, CloudPack())           // P2: 云环境侦察 (原有)
+	m.Register(reg, CloudPackEnhanced())   // P2: 云渗透增强 (抄 Shannon + NOVA)
 	m.Register(reg, ContainerPack())       // P3: 容器逃逸
 	m.Register(reg, ReconPack())           // 智能渗透: 交互式侦察感知层
 	m.Register(reg, CodeAuditPack())       // 代码审计: SAST + 依赖扫描 (抄 DeepAudit)

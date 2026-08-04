@@ -87,6 +87,17 @@ var CoreDependencies = []Dependency{
 	{Binary: "dependency-check", DisplayName: "OWASP Dependency-Check",
 		CheckCmd: []string{"dependency-check", "--version"},
 		InstallHint: "https://github.com/jeremylong/DependencyCheck/releases"},
+
+	// 云渗透场景 (CloudPackEnhanced)
+	{Binary: "aws", DisplayName: "AWS CLI",
+		CheckCmd: []string{"aws", "--version"},
+		InstallHint: "pip install awscli 或 https://aws.amazon.com/cli/"},
+	{Binary: "az", DisplayName: "Azure CLI",
+		CheckCmd: []string{"az", "--version"},
+		InstallHint: "https://docs.microsoft.com/cli/azure/install-azure-cli"},
+	{Binary: "gcloud", DisplayName: "Google Cloud SDK",
+		CheckCmd: []string{"gcloud", "--version"},
+		InstallHint: "https://cloud.google.com/sdk/docs/install"},
 }
 
 // CheckDependencies —— 检测所有核心依赖, 返回缺失清单。
