@@ -6,12 +6,20 @@ interface Dependency {
   installed: boolean;
   version?: string;
   install_hint?: string;
+  platform?: string; // 新增: 工具平台标识
 }
 
 interface DependenciesResponse {
   dependencies: Dependency[];
   missing_count: number;
   all_ready: boolean;
+  platform?: string; // 新增: 当前运行平台
+  platform_tools?: {
+    windows: number;
+    linux: number;
+    darwin: number;
+    all: number;
+  };
 }
 
 export function DependenciesPanel() {
@@ -67,8 +75,49 @@ export function DependenciesPanel() {
   const installed = deps.dependencies.filter(d => d.installed);
   const missing = deps.dependencies.filter(d => !d.installed);
 
+  // 平台图标
+  const platformIcon = {
+    windows: '🪟',
+    linux: '🐧',
+    darwin: '🍎',
+  };
+
+  const platformName = {
+    windows: 'Windows',
+    linux: 'Linux',
+    darwin: 'macOS',
+  };
+
   return (
     <div className="p-6 space-y-6">
+      {/* 平台信息卡片 */}
+      {deps.platform && (
+        <div className="bg-gradient-to-r from-blue-50 to-indigo-50 border-2 border-blue-200 rounded-lg p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-3xl">{platformIcon[deps.platform as keyof typeof platformIcon] || '💻'}</span>
+              <div>
+                <h3 className="font-semibold text-lg text-blue-900">
+                  当前平台: {platformName[deps.platform as keyof typeof platformName] || deps.platform}
+                </h3>
+                {deps.platform_tools && (
+                  <p className="text-sm text-blue-700 mt-1">
+                    平台工具: {deps.platform === 'windows' ? deps.platform_tools.windows :
+                              deps.platform === 'linux' ? deps.platform_tools.linux :
+                              deps.platform_tools.darwin} 个专用 + {deps.platform_tools.all} 个通用
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="text-right">
+              <span className="text-xs text-blue-600 bg-blue-100 px-2 py-1 rounded">
+                自动过滤不兼容工具
+              </span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* 总览卡片 */}
       <div className={`rounded-lg border-2 p-4 transition-all duration-300 ${
         deps.all_ready
@@ -117,6 +166,11 @@ export function DependenciesPanel() {
                       <span className="text-xs text-gray-500">
                         {dep.display_name}
                       </span>
+                      {dep.platform && dep.platform !== 'all' && (
+                        <span className="text-xs bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded">
+                          {platformName[dep.platform as keyof typeof platformName] || dep.platform}
+                        </span>
+                      )}
                     </div>
                     {dep.install_hint && (
                       <div className="mt-2 bg-gray-50 border border-gray-200 rounded p-2">
@@ -158,6 +212,12 @@ export function DependenciesPanel() {
                     </div>
                     <p className="text-xs text-gray-500 mt-1 truncate">
                       {dep.display_name}
+                      {dep.platform && dep.platform !== 'all' && (
+                        <span className="ml-2 text-purple-600">
+                          · {platformIcon[dep.platform as keyof typeof platformIcon]}
+                          {platformName[dep.platform as keyof typeof platformName]}
+                        </span>
+                      )}
                     </p>
                     {dep.version && (
                       <p className="text-xs text-gray-400 mt-1 font-mono truncate">
@@ -178,6 +238,7 @@ export function DependenciesPanel() {
         <ul className="text-sm text-blue-800 space-y-1">
           <li>• 核心工具 (nuclei/nmap) 必须安装才能执行扫描</li>
           <li>• 场景工具 (aws/kubectl) 仅在相应场景激活时需要</li>
+          <li>• <strong>平台专用工具</strong>自动根据系统过滤 (Windows/Linux互不干扰)</li>
           <li>• 工具缺失时 Agent 会自动跳过该工具, 不会中断战役</li>
         </ul>
       </div>
