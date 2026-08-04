@@ -98,6 +98,17 @@ var CoreDependencies = []Dependency{
 	{Binary: "gcloud", DisplayName: "Google Cloud SDK",
 		CheckCmd: []string{"gcloud", "--version"},
 		InstallHint: "https://cloud.google.com/sdk/docs/install"},
+
+	// K8s/容器场景 (K8sPackEnhanced)
+	{Binary: "kubectl", DisplayName: "Kubernetes CLI",
+		CheckCmd: []string{"kubectl", "version", "--client"},
+		InstallHint: "https://kubernetes.io/docs/tasks/tools/"},
+	{Binary: "helm", DisplayName: "Helm 包管理器",
+		CheckCmd: []string{"helm", "version"},
+		InstallHint: "https://helm.sh/docs/intro/install/"},
+	{Binary: "docker", DisplayName: "Docker CLI",
+		CheckCmd: []string{"docker", "--version"},
+		InstallHint: "https://docs.docker.com/get-docker/"},
 }
 
 // CheckDependencies —— 检测所有核心依赖, 返回缺失清单。
