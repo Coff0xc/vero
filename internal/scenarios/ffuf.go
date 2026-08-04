@@ -3,6 +3,8 @@ package scenarios
 import (
 	"encoding/json"
 	"fmt"
+	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -27,35 +29,66 @@ func ffufDirBrute(args map[string]any) tools.ToolResult {
 	// 字典路径: 优先用 args 指定, 回退常见位置
 	wordlist := tools.ArgStr(args, "wordlist", "")
 	if wordlist == "" {
-		// 常见字典路径(按优先级)
-		candidates := []string{
-			"/usr/share/wordlists/dirb/common.txt",      // Kali Linux
-			"/usr/share/seclists/Discovery/Web-Content/common.txt", // SecLists
-			"wordlist.txt", // 当前目录
+		// 修复 T4: 跨平台字典路径
+		var candidates []string
+		if runtime.GOOS == "windows" {
+			candidates = []string{
+				"C:\\wordlists\\common.txt",
+				"C:\\Tools\\wordlists\\common.txt",
+				"wordlist.txt",
+			}
+		} else {
+			candidates = []string{
+				"/usr/share/wordlists/dirb/common.txt",                     // Kali Linux
+				"/usr/share/seclists/Discovery/Web-Content/common.txt",     // SecLists
+				"/usr/share/wordlists/seclists/Discovery/Web-Content/common.txt", // 备选
+				"wordlist.txt",
+			}
 		}
-		// 简化: 直接用第一个候选(实际应检查文件存在)
-		wordlist = candidates[0]
+
+		// 检查文件存在性，使用第一个存在的字典
+		for _, path := range candidates {
+			if _, err := os.Stat(path); err == nil {
+				wordlist = path
+				break
+			}
+		}
+
+		// 如果没有找到，返回错误
+		if wordlist == "" {
+			return tools.ToolResult{
+				Success: false,
+				Stderr:  fmt.Sprintf("ffuf: 未找到字典文件。请安装字典或通过 wordlist 参数指定路径"),
+				RC:      -1,
+			}
+		}
 	}
 
 	// ffuf 参数:
 	// -u: 目标 URL, FUZZ 占位符
 	// -w: 字典文件
 	// -mc: 匹配状态码(200/204/301/302/307/401/403 表明路径存在)
-	// -o: 输出文件(/dev/stdout 输出到标准输出)
+	// -o: 输出文件(stdout)
 	// -of: 输出格式(json)
 	// -t: 线程数(默认 40, 避免过载)
 	// -timeout: 请求超时(秒)
-	// -se: 静默模式, 不打印 banner
+	// 修复 T5: 移除 -se 参数(新版本ffuf不支持)
+
+	// 修复 T6: Windows下使用 - 代替 /dev/stdout
+	outputTarget := "-"
+	if runtime.GOOS != "windows" {
+		outputTarget = "/dev/stdout"
+	}
+
 	return tools.Sh([]string{
 		"ffuf",
 		"-u", target + "FUZZ",
 		"-w", wordlist,
 		"-mc", "200,204,301,302,307,401,403",
-		"-o", "/dev/stdout",
+		"-o", outputTarget,
 		"-of", "json",
 		"-t", "40",
 		"-timeout", "10",
-		"-se", // 静默, 避免 banner 干扰 JSON 解析
 	}, 600*time.Second)
 }
 
@@ -138,24 +171,47 @@ func ffufVhostEnum(args map[string]any) tools.ToolResult {
 		return tools.ToolResult{Success: false, Stderr: "ffuf vhost: 缺 target 或 domain", RC: -1}
 	}
 
-	wordlist := tools.ArgStr(args, "wordlist", "/usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt")
+	wordlist := tools.ArgStr(args, "wordlist", "")
+	if wordlist == "" {
+		// 修复 T4: 跨平台字典路径
+		if runtime.GOOS == "windows" {
+			wordlist = "C:\\wordlists\\subdomains.txt"
+		} else {
+			wordlist = "/usr/share/seclists/Discovery/DNS/subdomains-top1million-5000.txt"
+		}
+
+		// 检查文件存在性
+		if _, err := os.Stat(wordlist); err != nil {
+			return tools.ToolResult{
+				Success: false,
+				Stderr:  fmt.Sprintf("ffuf vhost: 字典文件不存在: %s", wordlist),
+				RC:      -1,
+			}
+		}
+	}
+
+	// 修复 T6: Windows下使用 - 代替 /dev/stdout
+	outputTarget := "-"
+	if runtime.GOOS != "windows" {
+		outputTarget = "/dev/stdout"
+	}
 
 	// -u: 目标 IP/URL
 	// -w: 子域名字典
 	// -H: 设置 Host 头为 FUZZ.domain
 	// -mc: 匹配状态码
 	// -fs: 过滤响应大小(排除默认页面, 需根据目标调整)
+	// 修复 T5: 移除 -se 参数
 	return tools.Sh([]string{
 		"ffuf",
 		"-u", target,
 		"-w", wordlist,
 		"-H", "Host: FUZZ." + domain,
 		"-mc", "200,204,301,302,307,401,403",
-		"-o", "/dev/stdout",
+		"-o", outputTarget,
 		"-of", "json",
 		"-t", "40",
 		"-timeout", "10",
-		"-se",
 	}, 600*time.Second)
 }
 

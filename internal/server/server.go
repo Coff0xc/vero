@@ -153,6 +153,32 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
+	// 修复 D23: 校验 target 参数
+	if body.Target == "" {
+		writeJSON(w, map[string]any{"ok": false, "err": "target 参数为空"})
+		return
+	}
+
+	// 校验 URL 格式
+	target := strings.TrimSpace(body.Target)
+	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
+		// 尝试解析为主机名或IP
+		if !strings.Contains(target, "://") {
+			// 如果没有协议，默认添加 http://
+			target = "http://" + target
+		} else {
+			writeJSON(w, map[string]any{"ok": false, "err": "target 必须以 http:// 或 https:// 开头，或提供主机名/IP"})
+			return
+		}
+	}
+
+	// 验证 URL 可解析
+	u, err := url.Parse(target)
+	if err != nil || u.Host == "" {
+		writeJSON(w, map[string]any{"ok": false, "err": "无效的 target URL: " + target})
+		return
+	}
+
 	s.mu.Lock()
 	if s.busy {
 		s.mu.Unlock()
@@ -171,7 +197,7 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 			s.stop = nil
 			s.mu.Unlock()
 		}()
-		s.RunCampaign(ctx, body.Target)
+		s.RunCampaign(ctx, target)
 	}()
 	writeJSON(w, map[string]any{"ok": true})
 }
