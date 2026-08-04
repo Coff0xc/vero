@@ -16,6 +16,7 @@ func (s *Server) handleDependencies(w http.ResponseWriter, r *http.Request) {
 		Installed   bool   `json:"installed"`
 		Version     string `json:"version,omitempty"`
 		InstallHint string `json:"install_hint,omitempty"`
+		Platform    string `json:"platform,omitempty"` // 新增: 工具平台
 	}
 	var deps []depItem
 	for _, d := range tools.CoreDependencies {
@@ -30,10 +31,34 @@ func (s *Server) handleDependencies(w http.ResponseWriter, r *http.Request) {
 		}
 		deps = append(deps, item)
 	}
+
+	// 统计平台工具数量
+	reg, _ := buildLiveRegistry()
+	platformTools := map[string]int{
+		"windows": 0,
+		"linux":   0,
+		"darwin":  0,
+		"all":     0,
+	}
+
+	for _, name := range reg.Names() {
+		tool, _ := reg.Get(name)
+		if tool == nil {
+			continue
+		}
+		platform := tool.Platform
+		if platform == "" {
+			platform = "all"
+		}
+		platformTools[platform]++
+	}
+
 	missing := tools.CheckDependencies()
 	writeJSON(w, map[string]any{
-		"dependencies":  deps,
-		"missing_count": len(missing),
-		"all_ready":     len(missing) == 0,
+		"dependencies":   deps,
+		"missing_count":  len(missing),
+		"all_ready":      len(missing) == 0,
+		"platform":       tools.GetPlatform(),
+		"platform_tools": platformTools,
 	})
 }
