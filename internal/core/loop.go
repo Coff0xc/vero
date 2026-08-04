@@ -3,8 +3,10 @@ package core
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
 	"strings"
 
 	"github.com/Coff0xc/vero/internal/tools"
@@ -179,6 +181,22 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		"tool": action.Tool, "level": level, "args": action.Args,
 		"success": res.Success, "stdout": truncate(res.Stdout, 400), "stderr": truncate(res.Stderr, 200),
 	}})
+	// 修复 L1/L2: 工具失败时检查是否可自动重试(网络超时等可恢复失败)
+	if !res.Success {
+		if rt, ok := llm.(Retrier); ok && rt.ShouldRetry(resultReason(res)) {
+			retryArgs := rt.AdjustArgsForRetry(*action, resultReason(res))
+			emit(Event{Kind: "tool", Data: map[string]any{
+				"tool": action.Tool, "args": retryArgs, "success": false,
+				"stdout": "自动重试中(调整参数)...", "stderr": resultReason(res),
+			}})
+			res = tool.Run(retryArgs)
+			*trace = append(*trace, res.Stdout)
+			emit(Event{Kind: "tool", Data: map[string]any{
+				"tool": action.Tool, "level": level, "args": retryArgs,
+				"success": res.Success, "stdout": truncate(res.Stdout, 400), "stderr": truncate(res.Stderr, 200),
+			}})
+		}
+	}
 	if !res.Success {
 		if r, ok := llm.(Rejecter); ok {
 			r.OnReject() // 失败 -> 让规划器换路
@@ -215,8 +233,13 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	}
 	// claim 即验证: 本动作 verifies 某 claim -> confirm
 	// 并补 rel="verifies" 的 confirmed 边(目标 host -> claim), 给 FindPath 提供真实边。
-	if action.Verifies != "" {
-		cid := "claim:" + action.Verifies
+	// 修复 C3 兼容: verifies 可能来自结构体字段(DeepSeek/Claude)或 Args(LLM 随意放置)
+	verifiesVal := action.Verifies
+	if verifiesVal == "" {
+		verifiesVal = tools.ArgStr(action.Args, "verifies", "")
+	}
+	if verifiesVal != "" {
+		cid := "claim:" + verifiesVal
 		if _, ok := g.Nodes[cid]; ok {
 			_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
 			if host := "host:" + tools.ArgStr(action.Args, "target", "?"); g.Nodes[host] != nil && !g.HasEdge(host, "verifies", cid) {
@@ -254,7 +277,8 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	*history = append(*history, HistoryItem{Outcome: "done", Action: *action, Result: &res})
 
 	// 停滞检测: 连续重复(tool+args)且攻击图无新增 -> 停止空转(防 LLM 分析瘫痪/无效循环)
-	sig := action.Tool + "|" + fmt.Sprint(action.Args)
+	// 修复 C4: 用稳定的 JSON 序列化替代 fmt.Sprint(map)（map 遍历无序导致 sig 不稳定）
+	sig := action.Tool + "|" + stableArgsSig(action.Args)
 	if sig == *lastSig && len(g.Nodes) == *prevNodeCount {
 		if *stall++; *stall >= 2 {
 			emit(Event{Kind: "done", Data: map[string]any{"reason": "检测到重复无进展动作, 停止空转"}})
@@ -376,38 +400,42 @@ var attackChainStages = []string{"service", "web_shell", "cred", "foothold", "sh
 // prevStageNode —— produces 产物类型 stageType 的上一阶段已 confirmed 节点。
 // 优先选 label 含 target 的节点(如产物 web_shell:http://host:3000 应挂在 service:host:3000 上,
 // 而非先扫到的 445), 回退按插入序取首个。
-// 用于把 produces 节点连成攻击链边(如 service -produces-> web_shell -produces-> cred -produces-> foothold)。
+// 修复 C8: 当紧邻的前一阶段无 confirmed 节点时, 向前递归搜索更早的阶段(支持跨级跳跃)。
+// 例如 service 直接产出 cred(跳过 web_shell), 应连 service→cred 而非因找不到 web_shell 而不建边。
 func prevStageNode(g *AttackGraph, stageType, target string) string {
-	prev := ""
+	prevStages := []string{}
 	for i, t := range attackChainStages {
 		if t == stageType {
-			if i > 0 {
-				prev = attackChainStages[i-1]
+			for j := i - 1; j >= 0; j-- {
+				prevStages = append(prevStages, attackChainStages[j])
 			}
 			break
 		}
 	}
-	if prev == "" {
+	if len(prevStages) == 0 {
 		return ""
 	}
-	// 第一轮: 前置阶段中 host:port 与产物 target 一致的(如产物 web_shell:http://host:3000
-	// 挂在 service:localhost:3000 上, 而非先扫到的 445)。host:port 规范化后比较。
-	if target != "" {
-		hp := hostPortOf(target)
-		if hp != "" {
-			for _, id := range g.Order {
-				n := g.Nodes[id]
-				if n.Type == prev && n.State == StateConfirmed && strings.Contains(n.Label, hp) {
-					return id
+	// 第一轮: 逐阶段找 host:port 匹配的 confirmed 节点(优先紧邻阶段)
+	for _, prev := range prevStages {
+		if target != "" {
+			hp := hostPortOf(target)
+			if hp != "" {
+				for _, id := range g.Order {
+					n := g.Nodes[id]
+					if n.Type == prev && n.State == StateConfirmed && strings.Contains(n.Label, hp) {
+						return id
+					}
 				}
 			}
 		}
 	}
-	// 回退: 任意前置阶段 confirmed 节点(插入序首个)。
-	for _, id := range g.Order {
-		n := g.Nodes[id]
-		if n.Type == prev && n.State == StateConfirmed {
-			return id
+	// 第二轮: 回退到任意 confirmed 的前置阶段节点(按阶段优先级)
+	for _, prev := range prevStages {
+		for _, id := range g.Order {
+			n := g.Nodes[id]
+			if n.Type == prev && n.State == StateConfirmed {
+				return id
+			}
 		}
 	}
 	return ""
@@ -445,4 +473,19 @@ func advancePhase(emit EmitFunc, phase *string, level int) {
 		*phase = target
 		emit(Event{Kind: "phase", Data: map[string]any{"phase": target}})
 	}
+}
+
+// stableArgsSig —— 生成稳定的参数签名（修复 C4: fmt.Sprint(map) 遍历无序导致 sig 不稳定）。
+// 按 key 排序后 JSON 序列化，保证同一组参数始终产生相同的 sig。
+func stableArgsSig(args map[string]any) string {
+	if len(args) == 0 {
+		return "{}"
+	}
+	keys := make([]string, 0, len(args))
+	for k := range args {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+	b, _ := json.Marshal(args)
+	return string(b)
 }

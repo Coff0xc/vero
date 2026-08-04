@@ -167,6 +167,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 			Rationale string         `json:"rationale"`
 			Claim     string         `json:"claim"`
 			Produces  string         `json:"produces"`
+			Verifies  string         `json:"verifies"`
 		} `json:"plan"`
 	}
 	if err := json.Unmarshal([]byte(out.Choices[0].Message.ToolCalls[0].Function.Arguments), &d2); err != nil {
@@ -178,7 +179,7 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		if a.Args == nil {
 			a.Args = map[string]any{}
 		}
-		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces})
+		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces, Verifies: a.Verifies})
 	}
 	return p
 }
@@ -265,6 +266,16 @@ func (d *DeepSeekLLM) Reflect(goal string, g *core.AttackGraph, history []core.H
 	}
 	d.lastReflection = tools.Clip(strings.TrimSpace(txt), 600)
 	return d.lastReflection
+}
+
+// ShouldRetry —— 实现 core.Retrier: 接入 ReflexionEnhanced 的可恢复失败判断。
+func (d *DeepSeekLLM) ShouldRetry(reason string) bool {
+	return ShouldRetry(reason)
+}
+
+// AdjustArgsForRetry —— 实现 core.Retrier: 接入 ReflexionEnhanced 的参数自动调整。
+func (d *DeepSeekLLM) AdjustArgsForRetry(action core.Action, reason string) map[string]any {
+	return AdjustArgsForRetry(action, reason)
 }
 
 // Chat —— 对话式问答(对话智能): 基于战役上下文 + 多轮历史回答用户问题。

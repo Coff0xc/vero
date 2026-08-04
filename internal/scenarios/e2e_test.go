@@ -202,15 +202,3 @@ func TestToolLevelHierarchy(t *testing.T) {
 	t.Logf("✓ 工具 Level 分级验证通过")
 }
 
-func contains(s, substr string) bool {
-	if len(substr) == 0 {
-		return true
-	}
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}
-

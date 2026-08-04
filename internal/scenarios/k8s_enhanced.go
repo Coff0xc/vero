@@ -350,9 +350,12 @@ func ParseK8sRBAC(out string, args map[string]any) []tools.Observation {
 }
 
 // ParseK8sNodeExploitEnhanced —— 解析 K8s 节点提权结果。
+// 同时兼容增强格式(特权模式/危险挂载点)和原有格式(Can access host/Kubelet API),
+// 因为 K8sPackEnhanced 在 RegisterDefaults 中覆盖了 ContainerPack 的同名工具注册。
 func ParseK8sNodeExploitEnhanced(out string, args map[string]any) []tools.Observation {
 	var obs []tools.Observation
 
+	// 增强格式: 特权模式
 	if strings.Contains(out, "特权模式") {
 		obs = append(obs, tools.Observation{
 			Kind:     "finding",
@@ -365,6 +368,7 @@ func ParseK8sNodeExploitEnhanced(out string, args map[string]any) []tools.Observ
 		})
 	}
 
+	// 增强格式: 危险挂载点
 	if strings.Contains(out, "危险挂载点") {
 		obs = append(obs, tools.Observation{
 			Kind:     "finding",
@@ -372,6 +376,26 @@ func ParseK8sNodeExploitEnhanced(out string, args map[string]any) []tools.Observ
 			Label:    "[critical] K8s 危险 hostPath 挂载",
 			Excerpt:  "hostPath 挂载: / 或 /var/run/docker.sock",
 			Severity: "critical",
+		})
+	}
+
+	// 原有格式兼容: ContainerPack 的 k8sNodeExploit 输出
+	if strings.Contains(out, "Can access host /etc/passwd") {
+		obs = append(obs, tools.Observation{
+			Kind:     "finding",
+			Key:      "k8s:host_access",
+			Label:    "[critical] Can access host filesystem from pod",
+			Excerpt:  "Can access host /etc/passwd",
+			Severity: "critical",
+		})
+	}
+	if strings.Contains(out, "Kubelet API accessible") {
+		obs = append(obs, tools.Observation{
+			Kind:     "finding",
+			Key:      "k8s:kubelet_unauth",
+			Label:    "[high] Kubelet API accessible without authentication",
+			Excerpt:  "Kubelet API accessible at :10250",
+			Severity: "high",
 		})
 	}
 

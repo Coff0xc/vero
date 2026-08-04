@@ -246,7 +246,7 @@ func ParseParallelScan(out string, args map[string]any) []tools.Observation {
 	// 提取每个工作者的结果
 	workers := strings.Split(out, "[Worker")
 	for _, w := range workers {
-		if !strings.Contains(w, "open") {
+		if !strings.Contains(strings.ToLower(w), "open") {
 			continue
 		}
 
@@ -260,8 +260,8 @@ func ParseParallelScan(out string, args map[string]any) []tools.Observation {
 			}
 		}
 
-		// 统计开放端口
-		openCount := strings.Count(w, "open")
+		// 统计开放端口(大小写不敏感, 兼容 "Open ports" / "open ports" 两种格式)
+		openCount := strings.Count(strings.ToLower(w), "open")
 		if openCount > 0 && target != "" {
 			obs = append(obs, tools.Observation{
 				Kind:  "host",
