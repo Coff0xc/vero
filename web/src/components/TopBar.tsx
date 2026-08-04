@@ -52,16 +52,16 @@ export function TopBar() {
         ))}
       </div>
 
-      {/* KPI 迷你计数 */}
+      {/* KPI 迷你计数 - 增强视觉对比 */}
       <div className="hidden lg:flex items-center gap-3.5 font-mono text-[11px]">
         <span className="text-muted">
-          服务 <span className="text-info font-medium">{kpi.services.length}</span>
+          服务 <span className="text-blue-600 font-semibold">{kpi.services.length}</span>
         </span>
         <span className="text-muted">
-          证实 <span className="text-live font-medium">{kpi.confirmed}</span>
+          证实 <span className="text-green-600 font-semibold">{kpi.confirmed}</span>
         </span>
         <span className="text-muted">
-          假设 <span className="text-ghost">{kpi.hypothesis}</span>
+          假设 <span className="text-gray-500">{kpi.hypothesis}</span>
         </span>
         {kpi.evidenceViolations > 0 && (
           <span className="text-alert font-medium" title="证据违规(疑似幻觉)">

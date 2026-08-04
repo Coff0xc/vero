@@ -70,10 +70,10 @@ export function DependenciesPanel() {
   return (
     <div className="p-6 space-y-6">
       {/* 总览卡片 */}
-      <div className={`rounded-lg border-2 p-4 ${
+      <div className={`rounded-lg border-2 p-4 transition-all duration-300 ${
         deps.all_ready
-          ? 'bg-green-50 border-green-200'
-          : 'bg-amber-50 border-amber-300'
+          ? 'bg-green-50 border-green-300 shadow-sm'
+          : 'bg-amber-50 border-amber-400 shadow-md'
       }`}>
         <div className="flex items-center justify-between">
           <div>
@@ -87,9 +87,10 @@ export function DependenciesPanel() {
           </div>
           <button
             onClick={fetchDependencies}
-            className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50"
+            disabled={loading}
+            className="px-3 py-1.5 text-sm bg-white border border-gray-300 rounded hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
           >
-            刷新
+            {loading ? '加载中...' : '刷新'}
           </button>
         </div>
       </div>
