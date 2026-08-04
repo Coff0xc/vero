@@ -104,7 +104,9 @@ func actSchema(names []string) (map[string]any, []string) {
 					"claim":     map[string]any{"type": "string"},
 					// produces: 该步成功后的攻击链推进(service→web_shell→cred→foothold→shell)。
 					// 内核据此建 produces 节点 + 与上阶段的 confirmed 边, 使攻击链指标(FindPath)真实可达。
-					"produces":  map[string]any{"type": "string"},
+					"produces": map[string]any{"type": "string"},
+					// 修复 C3: verifies 字段用于声明验证关系
+					"verifies": map[string]any{"type": "string", "description": "此动作验证的 claim ID (可选, 仅用于验证假设)"},
 				},
 				"required": []string{"tool", "args", "rationale"},
 			},

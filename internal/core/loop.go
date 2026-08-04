@@ -215,8 +215,8 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	}
 	// claim 即验证: 本动作 verifies 某 claim -> confirm
 	// 并补 rel="verifies" 的 confirmed 边(目标 host -> claim), 给 FindPath 提供真实边。
-	if v := tools.ArgStr(action.Args, "verifies", ""); v != "" {
-		cid := "claim:" + v
+	if action.Verifies != "" {
+		cid := "claim:" + action.Verifies
 		if _, ok := g.Nodes[cid]; ok {
 			_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
 			if host := "host:" + tools.ArgStr(action.Args, "target", "?"); g.Nodes[host] != nil && !g.HasEdge(host, "verifies", cid) {

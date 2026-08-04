@@ -69,7 +69,19 @@ func (g *AttackGraph) UpsertNode(n *Node) *Node {
 	now := time.Now().Unix()
 	if cur, ok := g.Nodes[n.ID]; ok {
 		if len(n.Evidence) > 0 {
-			cur.Evidence = append(cur.Evidence, n.Evidence...)
+			// 修复 C5: 证据去重 - 检查 Tool + Excerpt 指纹
+			for _, newEv := range n.Evidence {
+				isDup := false
+				for _, oldEv := range cur.Evidence {
+					if oldEv.Tool == newEv.Tool && oldEv.Excerpt == newEv.Excerpt {
+						isDup = true
+						break
+					}
+				}
+				if !isDup {
+					cur.Evidence = append(cur.Evidence, newEv)
+				}
+			}
 		}
 		cur.UpdatedAt = now
 		return cur
