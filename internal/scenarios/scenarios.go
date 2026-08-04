@@ -311,4 +311,8 @@ func RegisterDefaults(m *Manager, reg *tools.Registry) {
 	m.Register(reg, K8sPackEnhanced())     // P3: K8s 渗透增强 (抄 Reaper + ThreatCanvas)
 	m.Register(reg, ReconPack())           // 智能渗透: 交互式侦察感知层
 	m.Register(reg, CodeAuditPack())       // 代码审计: SAST + 依赖扫描 (抄 DeepAudit)
+
+	// 平台专用工具包
+	m.Register(reg, WindowsToolsPack())    // Windows 专用工具集
+	m.Register(reg, LinuxToolsPack())      // Linux 专用工具集
 }

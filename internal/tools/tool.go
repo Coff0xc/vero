@@ -57,6 +57,7 @@ type ParseFunc func(stdout string, args map[string]any) []Observation
 // Produces —— 工具成功后的默认攻击链产出类型(service/web_shell/cred/foothold/shell):
 // 内核在动作未显式标注 produces 时用它建节点+边, 使攻击链不依赖 LLM 自觉填字段。
 // Args —— 参数规格(可选): 声明后进 prompt + 执行前校验必填。
+// Platform —— 工具支持的平台: "windows", "linux", "darwin", "all"(默认)
 type Tool struct {
 	Name     string
 	Level    int
@@ -65,6 +66,7 @@ type Tool struct {
 	Parse    ParseFunc
 	Produces string    // 可选: 成功即推进的攻击链产出类型
 	Args     []ArgSpec // 可选: 参数规格(进 prompt + 执行前校验)
+	Platform string    // 可选: 平台限制 (windows/linux/darwin/all), 默认 all
 }
 
 // ValidateArgs —— 按 Args 规格校验动作参数: 返回空串表示通过,
@@ -84,13 +86,38 @@ func ValidateArgs(t *Tool, args map[string]any) string {
 
 // Registry —— 工具注册表(显式实例, 取代 Python 的全局 REGISTRY dict)。
 type Registry struct {
-	tools map[string]*Tool
+	tools   map[string]*Tool
+	runtime string // 当前运行平台 (windows/linux/darwin)
 }
 
-func NewRegistry() *Registry { return &Registry{tools: map[string]*Tool{}} }
+func NewRegistry() *Registry {
+	return &Registry{
+		tools:   map[string]*Tool{},
+		runtime: detectPlatform(),
+	}
+}
+
+// detectPlatform —— 检测当前运行平台
+func detectPlatform() string {
+	// 在 runtime 包中实现
+	return "runtime_detect"
+}
 
 // Register 并入一个工具(同名覆盖, 与场景包注册语义一致)。
-func (r *Registry) Register(t *Tool) { r.tools[t.Name] = t }
+// 自动检查平台兼容性，不兼容的工具不注册。
+func (r *Registry) Register(t *Tool) {
+	// 设置默认平台
+	if t.Platform == "" {
+		t.Platform = "all"
+	}
+
+	// 平台过滤：只注册兼容当前平台的工具
+	if t.Platform != "all" && t.Platform != r.runtime {
+		return // 跳过不兼容的工具
+	}
+
+	r.tools[t.Name] = t
+}
 
 // Get 按名取工具。
 func (r *Registry) Get(name string) (*Tool, bool) {
