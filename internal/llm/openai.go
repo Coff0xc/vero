@@ -164,6 +164,7 @@ func (o *OpenAILLM) proposePlan(goal string, g *core.AttackGraph, history []core
 	out, err := o.postChat(body)
 	if err != nil {
 		o.lastErr = "模型请求失败: " + err.Error()
+		fmt.Fprintf(os.Stderr, "[openai:%s] %s\n", o.prov.ID, o.lastErr) // headless 排障: 后端 stderr 可见
 		return nil
 	}
 	content, thinking, err := extractContentAndThinking(out)
@@ -196,6 +197,7 @@ func (o *OpenAILLM) proposePlan(goal string, g *core.AttackGraph, history []core
 	}
 	if err := json.Unmarshal([]byte(argsJSON), &d); err != nil {
 		o.lastErr = "返回的动作计划无法解析: " + err.Error()
+		fmt.Fprintf(os.Stderr, "[openai:%s] %s | 原始输出: %.200s\n", o.prov.ID, o.lastErr, argsJSON)
 		return nil
 	}
 	p := &core.Plan{Rationale: d.Rationale}
