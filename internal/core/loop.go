@@ -291,6 +291,35 @@ func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res too
 				emit(Event{Kind: "edge", Data: map[string]any{"src": hid, "dst": nid, "rel": "runs"}})
 			}
 		}
+		// 修复 C1: 为 finding 类型建立关联边
+		if o.Kind == "finding" {
+			// 查找此 finding 关联的 service 节点
+			var sourceService string
+			if strings.Contains(o.Key, ":") {
+				parts := strings.Split(o.Key, ":")
+				if len(parts) >= 2 {
+					host := parts[0]
+					port := parts[1]
+					// 查找对应的 service 节点
+					for sid, sn := range g.Nodes {
+						if sn.Type == "service" && strings.HasPrefix(sid, "service:") {
+							if strings.Contains(sid, host) && strings.Contains(sid, port) {
+								sourceService = sid
+								break
+							}
+						}
+					}
+				}
+			}
+			// 如果找到源服务，建立 service→exposes→finding 边
+			if sourceService != "" && !g.HasEdge(sourceService, "exposes", nid) {
+				g.Edges = append(g.Edges, &Edge{
+					Src: sourceService, Rel: "exposes", Dst: nid, State: StateConfirmed,
+					Evidence: []Evidence{{Tool: action.Tool, Excerpt: o.Excerpt}},
+				})
+				emit(Event{Kind: "edge", Data: map[string]any{"src": sourceService, "dst": nid, "rel": "exposes"}})
+			}
+		}
 		emitGraph(emit, g, nid, "confirm")
 	}
 	return len(parsed)
