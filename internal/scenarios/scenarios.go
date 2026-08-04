@@ -308,4 +308,5 @@ func RegisterDefaults(m *Manager, reg *tools.Registry) {
 	m.Register(reg, CloudPack())           // P2: 云环境侦察
 	m.Register(reg, ContainerPack())       // P3: 容器逃逸
 	m.Register(reg, ReconPack())           // 智能渗透: 交互式侦察感知层
+	m.Register(reg, CodeAuditPack())       // 代码审计: SAST + 依赖扫描 (抄 DeepAudit)
 }

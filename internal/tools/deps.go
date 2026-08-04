@@ -76,6 +76,17 @@ var CoreDependencies = []Dependency{
 	{Binary: "nmap", DisplayName: "Nmap 端口扫描器",
 		CheckCmd: []string{"nmap", "--version"},
 		InstallHint: "apt/yum/choco install nmap"},
+
+	// 代码审计场景 (CodeAuditPack)
+	{Binary: "semgrep", DisplayName: "Semgrep 代码扫描器",
+		CheckCmd: []string{"semgrep", "--version"},
+		InstallHint: "pip install semgrep 或 brew install semgrep"},
+	{Binary: "bandit", DisplayName: "Bandit Python 安全扫描",
+		CheckCmd: []string{"bandit", "--version"},
+		InstallHint: "pip install bandit"},
+	{Binary: "dependency-check", DisplayName: "OWASP Dependency-Check",
+		CheckCmd: []string{"dependency-check", "--version"},
+		InstallHint: "https://github.com/jeremylong/DependencyCheck/releases"},
 }
 
 // CheckDependencies —— 检测所有核心依赖, 返回缺失清单。
