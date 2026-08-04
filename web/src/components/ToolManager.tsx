@@ -121,20 +121,20 @@ export function ToolManager() {
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center flex-wrap gap-3">
-        <h2 className="text-lg font-disp font-semibold tracking-wider text-ink2 uppercase">工具管理</h2>
+        <h2 className="text-[17px] font-semibold text-ink2">工具管理</h2>
         <div className="flex gap-2.5">
           <button
             onClick={installAll}
             disabled={loading || installAllBusy || !canInstallAll}
             title={canInstallAll ? '批量安装全部缺失工具(二进制 + pip)' : '暂无缺失工具可自动安装'}
-            className="px-4 py-2 text-xs font-disp tracking-wider uppercase rounded-sm border border-signal text-signal hover:bg-signal hover:text-ink transition disabled:opacity-50"
+            className="px-3.5 py-1.5 text-[12px] font-medium rounded-md border border-signal text-signal hover:bg-signal hover:text-white transition-colors disabled:opacity-50"
           >
             {installAllBusy ? '安装中…' : '全部自动安装'}
           </button>
           <button
             onClick={runVerification}
             disabled={loading || installAllBusy}
-            className="px-4 py-2 text-xs font-disp tracking-wider uppercase rounded-sm border border-live text-live hover:bg-live hover:text-ink transition disabled:opacity-50"
+            className="px-3.5 py-1.5 text-[12px] font-medium rounded-md border border-live text-live hover:bg-live hover:text-white transition-colors disabled:opacity-50"
           >
             {loading ? '验证中…' : '验证工具'}
           </button>
@@ -143,7 +143,7 @@ export function ToolManager() {
 
       {error && <div className="text-xs text-alert">加载失败: {error}</div>}
       {notice && (
-        <div className="text-xs text-live border border-live/40 bg-live/5 rounded-sm px-3 py-2">{notice}</div>
+        <div className="text-xs text-live border border-live/40 bg-live/6 rounded px-3 py-2">{notice}</div>
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -154,10 +154,10 @@ export function ToolManager() {
           const installingPipKey = `${tool.Name}:pip`
           const busy = installing !== null || installAllBusy
           return (
-            <div key={tool.Name} className="border border-line rounded-lg p-4 space-y-2 bg-panel shadow-inner-line card-lift">
+            <div key={tool.Name} className="border border-line rounded-lg p-4 space-y-2 bg-white shadow-card card-lift">
               <div className="flex items-center justify-between gap-2">
                 <h3 className="font-mono text-sm text-ink2 break-all">{tool.Name}</h3>
-                <span className={`px-2 py-0.5 text-[10px] rounded-sm whitespace-nowrap ${LEVEL_STYLE[tool.Level] ?? LEVEL_STYLE[0]}`}>
+                <span className={`px-2 py-0.5 text-[10px] rounded whitespace-nowrap ${LEVEL_STYLE[tool.Level] ?? LEVEL_STYLE[0]}`}>
                   {LEVEL_NAMES[tool.Level] ?? `L${tool.Level}`}
                 </span>
               </div>
@@ -180,7 +180,7 @@ export function ToolManager() {
                           <button
                             onClick={() => install(status.installable!, 'binary', tool.Name)}
                             disabled={busy}
-                            className="text-[11px] font-disp tracking-wider uppercase rounded-sm border border-live text-live px-2.5 py-1 hover:bg-live hover:text-ink transition disabled:opacity-50"
+                            className="text-[11px] font-medium rounded border border-live text-live px-2.5 py-1 hover:bg-live hover:text-white transition-colors disabled:opacity-50"
                           >
                             {installing === installingBinKey ? '安装中…' : `自动安装(二进制) ${status.installable}`}
                           </button>
@@ -190,7 +190,7 @@ export function ToolManager() {
                             onClick={() => install(tool.Name, 'pip', tool.Name)}
                             disabled={busy}
                             title={status.pip_hint}
-                            className="text-[11px] font-disp tracking-wider uppercase rounded-sm border border-signal text-signal px-2.5 py-1 hover:bg-signal hover:text-ink transition disabled:opacity-50"
+                            className="text-[11px] font-medium rounded border border-signal text-signal px-2.5 py-1 hover:bg-signal hover:text-white transition-colors disabled:opacity-50"
                           >
                             {installing === installingPipKey ? '安装中…' : '一键安装(pip)'}
                           </button>
@@ -218,8 +218,8 @@ export function ToolManager() {
       </div>
 
       {verification && (
-        <div className="border border-line rounded-lg p-4 bg-panel shadow-inner-line">
-          <h3 className="font-disp text-xs tracking-wider uppercase text-ink2 mb-2">验证摘要</h3>
+        <div className="border border-line rounded-lg p-4 bg-white shadow-card">
+          <h3 className="text-[13px] font-semibold text-ink2 mb-2">验证摘要</h3>
           <div className="text-xs text-muted space-y-1">
             <p>总工具数: {verification.length}</p>
             <p className="text-live">可用: {verification.filter((v) => v.available).length}</p>

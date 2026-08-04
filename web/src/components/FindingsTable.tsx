@@ -1,11 +1,9 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { NODE_STATE_LABELS } from '../lib/i18n'
-import { IconChevron } from './Icon'
 import type { GraphNode, NodeState } from '../types'
 
 // 发现节点表 —— 从攻击图节点里筛 type==='finding', 可排序 / 按严重度过滤。
-// 颜色沿用全局色板: 严重度 alert 红 / 高 signal 黄 / 中 low live 青。
 
 // severity → 排序权重(未知 = 0)。
 const SEV_WEIGHT: Record<string, number> = { critical: 5, high: 4, medium: 3, low: 2, info: 1 }
@@ -13,7 +11,7 @@ const SEV_WEIGHT: Record<string, number> = { critical: 5, high: 4, medium: 3, lo
 // severity → 徽标 Tailwind 静态类(避免 JIT 漏扫动态类名)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#e8710a] border-[#e8710a]',
+  high: 'text-[#d06a1f] border-[#d06a1f]',
   medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
@@ -68,7 +66,7 @@ function StateBadge({ state }: { state: NodeState }) {
         ? 'text-alert border-alert'
         : 'text-ghost border-ghost'
   return (
-    <span className={`font-disp tracking-wider px-1.5 py-0.5 rounded-sm uppercase text-[10px] border whitespace-nowrap ${cls}`}>
+    <span className={`px-1.5 py-0.5 rounded text-[10px] border font-medium whitespace-nowrap ${cls}`}>
       {NODE_STATE_LABELS[state] ?? state}
     </span>
   )
@@ -148,23 +146,21 @@ export function FindingsTable() {
   }
 
   return (
-    <div className="shrink-0 border-t border-line bg-panel2">
+    <div className="shrink-0 border-t border-line bg-panel">
       <div className="flex items-center gap-3 px-4 py-2">
         <button
           onClick={() => setCollapsed((c) => !c)}
-          className="flex-1 flex items-center gap-2 font-disp text-[10px] tracking-[2.5px] uppercase text-muted hover:text-ink2 transition-colors text-left"
+          className="flex-1 flex items-center gap-2 text-[11px] font-medium text-muted hover:text-ink2 transition-colors text-left"
           title={collapsed ? '展开发现列表' : '折叠发现列表'}
         >
-          <span className={`inline-flex text-muted transition-transform ${collapsed ? '-rotate-90' : ''}`}>
-            <IconChevron size={12} className="rotate-90" />
-          </span>
+          <span className={`inline-flex text-ghost text-[9px] transition-transform ${collapsed ? '-rotate-90' : ''}`}>▼</span>
           发现 <span className="text-signal">({rows.length})</span>
         </button>
-        <label className="text-[10px] font-disp tracking-wider text-muted">严重度</label>
+        <label className="text-[11px] text-muted">严重度</label>
         <select
           value={sevFilter}
           onChange={(e) => setSevFilter(e.target.value)}
-          className="bg-panel border border-line text-ink2 text-[10.5px] px-2 py-1 rounded-sm outline-none focus:border-signal font-disp"
+          className="bg-white border border-line text-ink2 text-[11px] px-2 py-1 rounded outline-none focus:border-signal"
         >
           <option value="all">全部</option>
           {SEV_ORDER.map((s) => (
@@ -178,16 +174,16 @@ export function FindingsTable() {
       {!collapsed && (
         <div className="max-h-64 overflow-auto border-t border-line">
           <table className="w-full text-left text-[11.5px] border-collapse">
-            <thead className="sticky top-0 z-10 bg-panel">
+            <thead className="sticky top-0 z-10 bg-white">
               <tr>
                 {COLUMNS.map((c) => (
                   <th
                     key={c.key}
                     onClick={() => onSort(c.key)}
-                    className="px-3 py-1.5 font-disp text-[10px] tracking-wider uppercase text-muted hover:text-signal cursor-pointer select-none whitespace-nowrap"
+                    className="px-3 py-1.5 text-[10.5px] font-medium text-muted hover:text-signal cursor-pointer select-none whitespace-nowrap"
                   >
                     {c.label}
-                    {sortKey === c.key && <span className="ml-1 text-signal">{asc ? '▲' : '▼'}</span>}
+                    {sortKey === c.key && <span className="ml-1 text-signal">{asc ? '↑' : '↓'}</span>}
                   </th>
                 ))}
               </tr>
@@ -204,12 +200,12 @@ export function FindingsTable() {
                   <tr
                     key={r.id}
                     onClick={() => select(r.id)}
-                    className="border-t border-line/60 cursor-pointer hover:bg-white/[0.04] transition-colors"
+                    className="border-t border-line/60 cursor-pointer hover:bg-panel2 transition-colors"
                     title={`点击定位到攻击图: ${r.id}`}
                   >
                     <td className="px-3 py-1.5">
                       {r.sev ? (
-                        <span className={`font-disp text-[10px] uppercase border px-1.5 py-0.5 rounded-sm font-mono whitespace-nowrap ${SEV_BADGE[r.sev] ?? 'text-muted border-line'}`}>
+                        <span className={`text-[10px] border px-1.5 py-0.5 rounded font-mono whitespace-nowrap ${SEV_BADGE[r.sev] ?? 'text-muted border-line'}`}>
                           {SEV_ZH[r.sev] ?? r.sev}
                         </span>
                       ) : (

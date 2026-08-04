@@ -1,14 +1,13 @@
 import { useStore, type Tab } from '../store'
-import { IconChat, IconTools, IconWorkflow, IconReport, IconSettings, IconHistory, IconPlus, type IconComponent } from './Icon'
 
-// 左侧图标轨 —— 窄导航(52px): 历史抽屉 / 新会话 / 五个功能分区。
-// 宽 Sidebar 改为抽屉(HistoryDrawer), 把横向空间还给对话与攻击图。
-const NAV: { id: Tab; label: string; Icon: IconComponent; kbd?: string }[] = [
-  { id: 'campaign', label: '对话作战', Icon: IconChat, kbd: '1' },
-  { id: 'tools', label: '工具管理', Icon: IconTools, kbd: '2' },
-  { id: 'workflows', label: '工作流', Icon: IconWorkflow, kbd: '3' },
-  { id: 'reports', label: '报告', Icon: IconReport, kbd: '4' },
-  { id: 'settings', label: '设置', Icon: IconSettings, kbd: '5' },
+// 左侧导航轨 —— 纵向文字导航(84px): 历史 / 新建 + 五个功能分区。
+// 去图标化: 用简洁中文文字标签, 选中态为左侧琥珀刻度 + 文字加深。
+const NAV: { id: Tab; label: string; kbd?: string }[] = [
+  { id: 'campaign', label: '对话', kbd: '1' },
+  { id: 'tools', label: '工具', kbd: '2' },
+  { id: 'workflows', label: '工作流', kbd: '3' },
+  { id: 'reports', label: '报告', kbd: '4' },
+  { id: 'settings', label: '设置', kbd: '5' },
 ]
 
 export function IconRail() {
@@ -18,51 +17,51 @@ export function IconRail() {
   const reset = useStore((s) => s.reset)
   const status = useStore((s) => s.status)
 
+  const itemBase = 'relative w-full flex items-center justify-center py-2.5 text-[12.5px] rounded-md transition-colors duration-150'
+
   return (
-    <nav className="w-[52px] shrink-0 flex flex-col items-center py-3 gap-1 border-r border-line/80 bg-panel2/60">
-      {/* 历史抽屉开关 */}
+    <nav className="w-[84px] shrink-0 flex flex-col items-stretch px-2 py-3 gap-0.5 border-r border-line bg-panel">
+      {/* 历史 / 新建 */}
       <button
         onClick={() => toggleHistory()}
-        className="w-10 h-10 rounded-lg flex items-center justify-center text-muted hover:text-ink2 hover:bg-ink/60 border border-transparent hover:border-line/60 transition-all"
+        className={`${itemBase} text-muted hover:text-ink2 hover:bg-panel2`}
         title="历史战役 (Ctrl+H)"
       >
-        <IconHistory size={18} />
+        历史
       </button>
-      {/* 新会话 */}
       <button
         onClick={() => reset('')}
-        className="w-10 h-10 rounded-lg flex items-center justify-center text-signal hover:bg-signal/10 border border-transparent hover:border-signal/40 hover:shadow-glow-signal transition-all"
-        title="新会话"
+        className={`${itemBase} text-signal font-medium hover:bg-signal/8`}
+        title="新建会话"
       >
-        <IconPlus size={18} />
+        新建
       </button>
 
-      <div className="w-6 h-px bg-line/80 my-1.5" />
+      <div className="mx-2 my-2 h-px bg-line" />
 
-      {NAV.map(({ id, label, Icon, kbd }) => (
-        <button
-          key={id}
-          onClick={() => setTab(id)}
-          className={`relative w-10 h-10 rounded-lg flex items-center justify-center transition-all ${
-            activeTab === id
-              ? 'bg-signal/12 text-signal border border-signal/35 shadow-glow-signal'
-              : 'text-muted hover:text-ink2 hover:bg-ink/60 border border-transparent'
-          }`}
-          title={`${label} (Ctrl+${kbd})`}
-        >
-          <Icon size={18} />
-          {activeTab === id && <span className="absolute left-[-7px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r bg-signal" />}
-        </button>
-      ))}
+      {NAV.map((n) => {
+        const active = activeTab === n.id
+        return (
+          <button
+            key={n.id}
+            onClick={() => setTab(n.id)}
+            className={`${itemBase} ${active ? 'text-signal font-semibold bg-signal/8' : 'text-muted hover:text-ink2 hover:bg-panel2'}`}
+            title={`${n.label} (Ctrl+${n.kbd})`}
+          >
+            {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-4 rounded-r bg-signal" />}
+            {n.label}
+          </button>
+        )
+      })}
 
-      {/* 底部: 运行状态灯 */}
-      <div className="mt-auto pb-1">
+      {/* 底部: 运行状态 */}
+      <div className="mt-auto flex items-center justify-center gap-1.5 pb-1 text-[10px] text-ghost">
         <span
-          className={`inline-block w-2.5 h-2.5 rounded-full ${
-            status === 'running' ? 'bg-warn ring-pulse' : status === 'done' ? 'bg-live shadow-glow-live' : 'bg-ghost/60'
+          className={`inline-block w-2 h-2 rounded-full ${
+            status === 'running' ? 'bg-warn ring-pulse' : status === 'done' ? 'bg-live' : 'bg-ghost/50'
           }`}
-          title={status === 'running' ? '战役进行中' : status === 'done' ? '战役完成' : '待命'}
         />
+        {status === 'running' ? '运行' : status === 'done' ? '完成' : '待命'}
       </div>
     </nav>
   )

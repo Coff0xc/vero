@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { LEVEL_ZH } from '../lib/i18n'
-import { IconAlert } from './Icon'
 
 // 工具级别 → 中文口语化: L0=侦察级, L1=扫描级, L2=凭证级, L3=利用级, L4=破坏级。
 function levelZh(level: number): string {
@@ -69,17 +68,16 @@ export function HitlModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white border border-alert/40 border-t-[3px] rounded-lg px-6 py-5 max-w-md w-full shadow-card card-pop">
-        <div className="font-disp font-bold tracking-wider text-sm text-alert uppercase mb-1 flex items-center gap-2">
-          <IconAlert size={15} />
+    <div className="fixed inset-0 bg-black/45 flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-alert/50 border-t-[3px] rounded-lg px-6 py-5 max-w-md w-full shadow-pop card-pop">
+        <div className="font-semibold text-[14px] text-alert mb-1">
           需要授权
         </div>
-        <div className="text-[11px] text-muted mb-4">agent 请求执行高危动作, 等待操作员裁决</div>
+        <div className="text-[11px] text-muted mb-4">系统请求执行高危动作, 等待操作员裁决</div>
 
         <div className="text-sm leading-relaxed">
           <div className="flex items-center gap-2 flex-wrap">
-            <span className="px-2 py-0.5 text-[10px] rounded-sm border border-alert text-alert font-disp tracking-wider">
+            <span className="px-2 py-0.5 text-[10px] rounded border border-alert text-alert font-medium">
               {levelZh(hitl.level)}
             </span>
             <code className="text-signal font-mono">{hitl.tool}</code>
@@ -89,7 +87,7 @@ export function HitlModal() {
           <div className="mt-3">
             <div className="text-xs text-muted mb-1 flex items-center justify-between">
               <span>
-                调用参数 <span className="text-ghost normal-case tracking-normal">(可编辑 JSON)</span>
+                调用参数 <span className="text-ghost">(可编辑 JSON)</span>
               </span>
             </div>
             <textarea
@@ -98,7 +96,7 @@ export function HitlModal() {
               spellCheck={false}
               rows={Math.max(4, Math.min(10, text.split('\n').length + 1))}
               aria-label="可编辑的调用参数 JSON"
-              className="w-full bg-panel2 border border-line rounded-sm px-3 py-2 font-mono text-[11.5px] text-ink2 outline-none focus:border-signal resize-y whitespace-pre break-all"
+              className="w-full bg-panel2 border border-line rounded px-3 py-2 font-mono text-[11.5px] text-ink2 outline-none focus:border-signal resize-y whitespace-pre break-all"
             />
             {dirty ? (
               <div className="mt-1.5 text-[11px] text-signal leading-relaxed">
@@ -124,13 +122,13 @@ export function HitlModal() {
           <div className="flex gap-2.5">
             <button
               onClick={() => decide(true)}
-              className="btn-accent flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase"
+              className="btn-accent flex-1 font-semibold text-sm py-2.5 rounded-md"
             >
               批准执行
             </button>
             <button
               onClick={() => decide(false)}
-              className="btn-danger flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase border border-muted/60 text-muted hover:border-alert hover:text-alert"
+              className="btn-danger flex-1 font-semibold text-sm py-2.5 rounded-md border border-muted/50 text-muted hover:border-alert hover:text-alert"
             >
               拒绝
             </button>
@@ -140,10 +138,10 @@ export function HitlModal() {
               onClick={decideEdited}
               disabled={parsed === undefined}
               title={parsed === undefined ? '参数 JSON 非法, 修正后才能放行' : '仍以原参数执行(编辑为预览)'}
-              className={`w-full font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase border transition-all ${
+              className={`w-full font-semibold text-sm py-2.5 rounded-md border transition-all ${
                 parsed === undefined
                   ? 'border-line text-ghost cursor-not-allowed'
-                  : 'border-signal text-signal hover:bg-signal hover:text-ink hover:shadow-glow-signal'
+                  : 'border-signal text-signal hover:bg-signal hover:text-white'
               }`}
             >
               以修改参数放行

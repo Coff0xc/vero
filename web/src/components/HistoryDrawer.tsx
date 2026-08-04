@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useStore, parseEvent } from '../store'
-import { IconClose } from './Icon'
 
 interface Campaign {
   id: number
@@ -11,8 +10,8 @@ interface Campaign {
   status: string
 }
 
-// 历史战役抽屉 —— 从图标轨滑出; 点击进入只读回放, 删除移除记录。
-// 回放期间置顶"返回实时"条, 避免与进行中战役状态混杂(回放时实时 SSE 不灌入)。
+// 历史战役抽屉 —— 从左侧导航滑出; 点击进入只读回放, 删除移除记录。
+// 回放期间与实时战役隔离(回放时实时 SSE 不灌入)。纯文字, 无图标。
 export function HistoryDrawer() {
   const open = useStore((s) => s.historyOpen)
   const toggle = useStore((s) => s.toggleHistory)
@@ -64,46 +63,45 @@ export function HistoryDrawer() {
   return (
     <>
       {/* 遮罩: 点击关闭 */}
-      <div className="fixed inset-0 bg-black/50 z-30" onClick={() => toggle(false)} />
-      <aside className="fixed left-[52px] top-11 bottom-0 w-[280px] z-40 glass border-r border-line/80 drawer-in flex flex-col">
-        <div className="flex items-center justify-between px-3.5 py-3 border-b border-line/60">
-          <span className="section-title font-disp text-[10px] uppercase text-muted">历史战役</span>
+      <div className="fixed inset-0 bg-black/40 z-30" onClick={() => toggle(false)} />
+      <aside className="fixed left-[84px] top-12 bottom-0 w-[300px] z-40 bg-white border-r border-line drawer-in flex flex-col shadow-pop">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-line">
+          <span className="section-title text-[12px] font-medium text-muted">历史战役</span>
           <button
             onClick={() => toggle(false)}
-            className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center transition-colors"
-            aria-label="关闭"
+            className="text-muted hover:text-alert hover:bg-alert/8 rounded px-1.5 py-0.5 text-[11px] transition-colors"
           >
-            <IconClose size={14} />
+            关闭
           </button>
         </div>
         {status === 'running' && (
-          <div className="mx-3 mt-2.5 text-[10.5px] text-warn/90 border border-warn/25 bg-warn/5 rounded-md px-2.5 py-1.5 leading-relaxed">
+          <div className="mx-3 mt-2.5 text-[11px] text-warn border border-warn/30 bg-warn/6 rounded-md px-2.5 py-1.5 leading-relaxed">
             战役进行中, 结束后才能回放历史
           </div>
         )}
-        <div className="flex-1 min-h-0 overflow-y-auto p-2.5">
-          {campaigns.length === 0 && <div className="text-[11px] text-ghost px-1.5 py-2">暂无历史战役</div>}
+        <div className="flex-1 min-h-0 overflow-y-auto p-2">
+          {campaigns.length === 0 && <div className="text-[12px] text-ghost px-2 py-3">暂无历史战役</div>}
           {campaigns.map((c) => (
             <div
               key={c.id}
-              className="group w-full text-left px-2.5 py-2 rounded-lg hover:bg-ink/60 transition-all duration-150 mb-1 flex items-center gap-1 border border-transparent hover:border-line/60"
+              className="group w-full text-left px-2.5 py-2 rounded-md hover:bg-panel2 transition-colors duration-150 mb-0.5 flex items-center gap-1"
             >
               <button
-                className={`flex-1 min-w-0 ${status === 'running' ? 'opacity-40 cursor-not-allowed' : ''}`}
+                className={`flex-1 min-w-0 text-left ${status === 'running' ? 'opacity-40 cursor-not-allowed' : ''}`}
                 onClick={() => void openCampaign(c.id)}
                 disabled={status === 'running'}
               >
-                <div className="text-[12px] text-muted group-hover:text-ink2 truncate transition-colors">{c.goal}</div>
-                <div className="text-[10px] text-ghost font-mono mt-0.5">
-                  #{c.id} · <span className="text-live/90">证实 {c.confirmed}</span> · <span>假设 {c.hypothesis}</span> · {c.status}
+                <div className="text-[12.5px] text-muted group-hover:text-ink2 truncate transition-colors">{c.goal}</div>
+                <div className="text-[10.5px] text-ghost mt-0.5">
+                  #{c.id} · 证实 <span className="text-live">{c.confirmed}</span> · 假设 {c.hypothesis} · {c.status}
                 </div>
               </button>
               <button
                 onClick={() => void del(c.id)}
                 title="删除此会话"
-                className="shrink-0 flex items-center justify-center w-6 h-6 text-ghost hover:text-alert opacity-0 group-hover:opacity-100 transition-all rounded hover:bg-alert/10"
+                className="shrink-0 text-[10.5px] text-ghost hover:text-alert opacity-0 group-hover:opacity-100 transition-opacity px-1.5 py-1 rounded hover:bg-alert/8"
               >
-                <IconClose size={12} />
+                删除
               </button>
             </div>
           ))}

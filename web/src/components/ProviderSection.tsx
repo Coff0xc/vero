@@ -104,9 +104,9 @@ export function ProviderSection() {
     setProviders((ps) => ps.map((p) => (p.id === id ? fn(p) : p)))
 
   return (
-    <section className="border border-line rounded-sm bg-panel p-4 space-y-3">
+    <section className="border border-line rounded-lg bg-white p-4 space-y-3 shadow-card">
       <div className="flex items-center justify-between">
-        <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">模型提供商 (OpenAI 兼容)</div>
+        <div className="text-[11px] font-medium text-muted">模型提供商 (OpenAI 兼容)</div>
         <div className="flex gap-3 text-[11px]">
           <label className="flex items-center gap-1.5 text-muted cursor-pointer">
             <input type="checkbox" checked={yolo} onChange={(e) => setYolo(e.target.checked)} className="accent-[#1a73e8]" />
@@ -160,7 +160,7 @@ export function ProviderSection() {
                 <input
                   value={p.base_url}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, base_url: e.target.value }))}
-                  className="w-full bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-sm font-mono outline-none focus:border-signal"
+                  className="w-full bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-md font-mono outline-none focus:border-signal"
                   placeholder="https://api.example.com/v1"
                 />
               </label>
@@ -171,13 +171,13 @@ export function ProviderSection() {
                     type="password"
                     value={p.api_key}
                     onChange={(e) => patch(p.id, (x) => ({ ...x, api_key: e.target.value }))}
-                    className="flex-1 bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-sm font-mono outline-none focus:border-signal"
+                    className="flex-1 bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-md font-mono outline-none focus:border-signal"
                     placeholder={p.id.includes('ollama') ? '(本地无需 key)' : 'sk-... (留空 = 保留原值)'}
                   />
                   <button
                     onClick={() => void testConn(p)}
                     disabled={testing === p.id}
-                    className="px-2.5 py-1 text-[10px] font-disp uppercase tracking-wider rounded border border-signal text-signal hover:bg-signal/10 disabled:opacity-40 shrink-0"
+                    className="px-2.5 py-1 text-[10.5px] font-medium rounded border border-signal text-signal hover:bg-signal/8 disabled:opacity-40 shrink-0"
                   >
                     {testing === p.id ? '…' : '测试连接'}
                   </button>
@@ -191,7 +191,7 @@ export function ProviderSection() {
                   list={`models-${p.id}`}
                   value={p.model}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, model: e.target.value }))}
-                  className="w-full bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-sm font-mono outline-none focus:border-signal"
+                  className="w-full bg-panel2 border border-line text-ink2 text-[11px] px-2 py-1.5 rounded-md font-mono outline-none focus:border-signal"
                   placeholder="测试连接后自动拉取, 或手动输入"
                 />
                 <datalist id={`models-${p.id}`}>
@@ -233,7 +233,7 @@ export function ProviderSection() {
         <button
           onClick={() => void save()}
           disabled={saving}
-          className="px-4 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-live text-live hover:bg-live hover:text-ink transition disabled:opacity-50"
+          className="px-4 py-1.5 text-[11.5px] font-medium rounded-md border border-live text-live hover:bg-live hover:text-white transition-colors disabled:opacity-50"
         >
           {saving ? '保存中…' : '保存提供商配置'}
         </button>

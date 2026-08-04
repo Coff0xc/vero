@@ -32,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
             <span>组件渲染失败, 数据流未受影响</span>
             <button
               onClick={this.retry}
-              className="font-disp tracking-wider text-signal border border-signal px-4 py-1.5 rounded-sm uppercase hover:bg-signal hover:text-ink transition"
+              className="text-signal font-medium border border-signal px-4 py-1.5 rounded-md hover:bg-signal hover:text-white transition-colors"
             >
               重新加载
             </button>

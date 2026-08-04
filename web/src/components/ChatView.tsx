@@ -2,7 +2,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { LEVEL_ZH, EVENT_LABELS } from '../lib/i18n'
 import { TARGET_RE, STOP_RE, startCampaign, cancelCampaign } from '../lib/actions'
-import { IconShield, IconChevron, IconAlert, IconStop, IconSend, IconSparkle } from './Icon'
 import type { ChatMessage } from '../types'
 
 // 阶段 → 中文 + 颜色。
@@ -15,18 +14,18 @@ const PHASE_ZH: Record<string, string> = {
   done: '完成',
 }
 const PHASE_COLOR: Record<string, string> = {
-  idle: 'text-ghost border-ghost',
-  init: 'text-ghost border-ghost',
-  recon: 'text-signal border-signal',
-  scan: 'text-live border-live',
-  exploit: 'text-alert border-alert',
-  done: 'text-live border-live',
+  idle: 'text-ghost border-line',
+  init: 'text-ghost border-line',
+  recon: 'text-info border-info/50',
+  scan: 'text-warn border-warn/50',
+  exploit: 'text-alert border-alert/50',
+  done: 'text-live border-live/50',
 }
 
-// severity → 徽章样式(Google 亮色: 红/橙/琥珀/绿/灰)。
+// severity → 徽章样式(珍珠白亮色: 朱红/橙/琥珀/绿/灰)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'bg-alert/10 text-alert border-alert/40',
-  high: 'bg-[#e8710a]/10 text-[#e8710a] border-[#e8710a]/40',
+  high: 'bg-[#d06a1f]/10 text-[#d06a1f] border-[#d06a1f]/40',
   medium: 'bg-warn/10 text-warn border-warn/40',
   low: 'bg-live/10 text-live border-live/40',
   info: 'bg-ghost/10 text-muted border-ghost/40',
@@ -43,33 +42,24 @@ function ToolCard({ m }: { m: ChatMessage }) {
   const ok = m.meta?.success
   const stdout = m.meta?.stdout ?? ''
   return (
-    <div
-      className={`relative rounded-lg border pl-3.5 pr-3 py-2 mb-1 msg-in overflow-hidden ${
-        ok ? 'border-live/25 bg-live/5' : 'border-alert/30 bg-alert/5'
-      }`}
-    >
-      {/* 左侧状态色条 */}
-      <span className={`absolute left-0 top-0 bottom-0 w-[3px] ${ok ? 'bg-gradient-to-b from-live to-live/30' : 'bg-gradient-to-b from-alert to-alert/30'}`} />
+    <div className={`rounded-md border px-3 py-2 mb-1.5 msg-in bg-white ${ok ? 'border-line' : 'border-alert/40'}`}>
       <div className="flex items-center gap-2">
-        <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${ok ? 'bg-live shadow-glow-live' : 'bg-alert'} ${ok ? 'animate-pulse' : ''}`} />
-        <span className="font-mono text-[13px] text-ink2 font-medium">{m.meta?.tool ?? 'tool'}</span>
+        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${ok ? 'bg-live' : 'bg-alert'}`} />
+        <span className="font-mono text-[12.5px] text-ink2 font-medium">{m.meta?.tool ?? 'tool'}</span>
         {m.meta?.level !== undefined && (
-          <span className="text-[10px] text-ghost border border-line/80 bg-panel2/60 px-1.5 py-px rounded font-mono">
+          <span className="text-[10px] text-ghost border border-line bg-panel2 px-1.5 py-px rounded font-mono">
             L{m.meta.level} {LEVEL_ZH[m.meta.level] ?? ''}
           </span>
         )}
         <span className={`text-[11px] font-medium ${ok ? 'text-live' : 'text-alert'}`}>{ok ? '成功' : '失败'}</span>
         {stdout && (
-          <button onClick={() => setOpen((v) => !v)} className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted hover:text-signal transition-colors font-mono">
-            <span className={`inline-flex transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>
-              <IconChevron size={10} />
-            </span>
-            {open ? '收起输出' : '查看输出'}
+          <button onClick={() => setOpen((v) => !v)} className="ml-auto text-[11px] text-muted hover:text-signal transition-colors">
+            {open ? '收起' : '输出'}
           </button>
         )}
       </div>
       {open && stdout && (
-        <pre className="mt-2 text-[11px] font-mono text-muted whitespace-pre-wrap max-h-40 overflow-auto bg-ink/70 rounded-md p-2.5 border border-line/50 leading-relaxed">
+        <pre className="mt-2 text-[11px] font-mono text-muted whitespace-pre-wrap max-h-40 overflow-auto bg-panel2 rounded p-2.5 border border-line leading-relaxed">
           {stdout}
         </pre>
       )}
@@ -92,21 +82,21 @@ function FindingCard({ m }: { m: ChatMessage }) {
   return (
     <button
       onClick={() => select(id || null)}
-      className="block w-full text-left rounded-lg border px-3 py-2 mb-1 msg-in card-pop card-lift border-line/60 bg-panel2 hover:border-signal/60"
+      className="block w-full text-left rounded-md border px-3 py-2 mb-1.5 msg-in border-line bg-white hover:border-signal/60 transition-colors"
     >
       <div className="flex items-center gap-2">
-        <span className={`inline-block w-2 h-2 rounded-full shrink-0 ${confirmed ? 'bg-live animate-pulse shadow-glow-live' : 'bg-ghost'}`} />
-        <span className={`text-[10px] uppercase font-disp tracking-wider ${SEV_BADGE[sev] ?? SEV_BADGE.info} border px-1.5 py-0.5 rounded`}>
+        <span className={`inline-block w-1.5 h-1.5 rounded-full shrink-0 ${confirmed ? 'bg-live' : 'bg-ghost/70'}`} />
+        <span className={`text-[10px] ${SEV_BADGE[sev] ?? SEV_BADGE.info} border px-1.5 py-0.5 rounded font-medium`}>
           {sev}
         </span>
         <span className="font-mono text-[12px] text-ink2 truncate">{clip(id, 60)}</span>
-        <span className="ml-auto text-[10px] text-muted shrink-0">{confirmed ? '已证实 · 点我检视' : '假设 · 待验证'}</span>
+        <span className="ml-auto text-[10px] text-muted shrink-0">{confirmed ? '已证实 · 点击检视' : '假设 · 待验证'}</span>
       </div>
       {n?.technique && (
         <div className="mt-1 text-[10px] text-signal font-mono">MITRE: {n.technique} {n.tactic ? `· ${n.tactic}` : ''}</div>
       )}
       {n && n.evidence.length > 0 && (
-        <div className="mt-1.5 text-[11px] text-muted font-mono bg-ink/60 rounded-md px-2.5 py-1.5 border-l-2 border-live/40 leading-relaxed">
+        <div className="mt-1.5 text-[11px] text-muted font-mono bg-panel2 rounded px-2.5 py-1.5 border-l-2 border-live/50 leading-relaxed">
           证据[{n.evidence[0].tool}]: {clip(n.evidence[0].excerpt, 90)}
         </div>
       )}
@@ -117,10 +107,8 @@ function FindingCard({ m }: { m: ChatMessage }) {
 function ReflectCard({ m }: { m: ChatMessage }) {
   const text = m.meta?.rationale ?? m.text.replace(/^反思:\s*/, '')
   return (
-    <div className="rounded-lg border border-violet/30 bg-violet/8 px-3 py-2.5 mb-1 msg-in">
-      <div className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet uppercase mb-1">
-        <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet animate-pulse" /> 战役反思
-      </div>
+    <div className="rounded-md border border-violet/30 bg-violet/6 px-3 py-2.5 mb-1.5 msg-in">
+      <div className="text-[10px] font-medium text-violet mb-1">战役反思</div>
       <div className="text-[12.5px] leading-relaxed text-ink2 whitespace-pre-wrap">{text}</div>
     </div>
   )
@@ -130,15 +118,9 @@ function ThinkingCard({ m }: { m: ChatMessage }) {
   const text = m.meta?.rationale ?? m.text.replace(/^思考:\s*/, '')
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-lg border border-violet/20 bg-violet/5 px-3 py-1.5 mb-1 msg-in">
-      <button
-        onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet/80 uppercase"
-      >
-        <span className={`inline-flex transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>
-          <IconChevron size={11} />
-        </span>
-        决策推理{open ? ' · 收起' : ' · 点击展开'}
+    <div className="rounded-md border border-violet/20 bg-violet/5 px-3 py-1.5 mb-1.5 msg-in">
+      <button onClick={() => setOpen((v) => !v)} className="text-[10px] font-medium text-violet/90">
+        决策推理{open ? ' − 收起' : ' + 展开'}
       </button>
       {open && (
         <div className="mt-1.5 text-[12px] leading-relaxed text-muted whitespace-pre-wrap border-t border-violet/15 pt-1.5">
@@ -152,9 +134,9 @@ function ThinkingCard({ m }: { m: ChatMessage }) {
 function PhaseChip({ m }: { m: ChatMessage }) {
   const ph = m.meta?.stage ?? ''
   return (
-    <div className="flex justify-center my-1.5">
-      <span className={`text-[10px] font-disp tracking-[2px] uppercase border px-3 py-1 rounded-full msg-in ${PHASE_COLOR[ph] ?? 'text-ghost border-line'}`}>
-        ◈ {PHASE_ZH[ph] ?? ph}
+    <div className="flex justify-center my-2">
+      <span className={`text-[10.5px] border px-3 py-1 rounded-full msg-in bg-white ${PHASE_COLOR[ph] ?? 'text-ghost border-line'}`}>
+        {PHASE_ZH[ph] ?? ph}
       </span>
     </div>
   )
@@ -164,10 +146,8 @@ function PlanCard({ m }: { m: ChatMessage }) {
   const count = m.meta?.count
   const why = m.meta?.rationale
   return (
-    <div className="rounded-lg border border-signal/25 bg-signal/5 px-3 py-2 mb-1 msg-in">
-      <div className="flex items-center gap-1 text-[10px] text-signal font-disp tracking-wider uppercase mb-1">
-        <IconChevron size={11} /> 行动计划
-      </div>
+    <div className="rounded-md border border-signal/30 bg-signal/6 px-3 py-2 mb-1.5 msg-in">
+      <div className="text-[10px] text-signal font-medium mb-0.5">行动计划</div>
       <div className="text-[12px] text-ink2">
         {count !== undefined ? `下一步计划 ${count} 步` : '计划'} {why ? `· ${clip(why, 120)}` : ''}
       </div>
@@ -196,10 +176,8 @@ function HitlCard({ m }: { m: ChatMessage }) {
   const tool = m.meta?.tool ?? hitl?.tool ?? 'tool'
   const why = m.meta?.why ?? hitl?.why ?? ''
   return (
-    <div className="rounded-lg border border-alert/50 bg-alert/10 px-3.5 py-3 mb-1 msg-in shadow-glow-alert">
-      <div className="flex items-center gap-2 text-[11px] text-alert font-disp tracking-wider uppercase mb-1.5">
-        <IconAlert size={13} className="animate-pulse" /> 需要人工授权
-      </div>
+    <div className="rounded-md border border-alert/50 bg-alert/8 px-3.5 py-3 mb-1.5 msg-in">
+      <div className="text-[11px] text-alert font-medium mb-1.5">需要人工授权</div>
       <div className="font-mono text-[13px] text-ink2 font-medium">{tool}</div>
       {why && <div className="text-[12px] text-muted mt-1 leading-relaxed">{why}</div>}
       <div className="flex gap-2 mt-2.5">
@@ -213,7 +191,7 @@ function HitlCard({ m }: { m: ChatMessage }) {
         <button
           onClick={() => decide(false)}
           disabled={busy}
-          className="btn-danger px-3.5 py-1.5 text-[12px] rounded-md border border-alert/60 text-alert hover:bg-alert/15 disabled:opacity-40"
+          className="btn-danger px-3.5 py-1.5 text-[12px] rounded-md border border-alert/50 text-alert disabled:opacity-40"
         >
           拒绝
         </button>
@@ -227,7 +205,7 @@ function StatusLine({ m }: { m: ChatMessage }) {
   if (kind === 'engine') {
     return (
       <div className="text-[12px] text-muted mb-1 msg-in">
-        <span className="text-live font-disp tracking-wider uppercase text-[10px] mr-2">▶ 战役启动</span>
+        <span className="text-live font-medium mr-2">战役启动</span>
         {m.text}
       </div>
     )
@@ -245,7 +223,7 @@ function Message({ m }: { m: ChatMessage }) {
   if (m.role === 'user') {
     return (
       <div className="flex justify-end mb-3 msg-in">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-signal/20 to-signal/5 border border-signal/30 px-4 py-2.5 text-[13px] text-ink2 whitespace-pre-wrap shadow-card">
+        <div className="max-w-[85%] rounded-lg bg-signal/10 border border-signal/30 px-3.5 py-2 text-[13px] text-ink2 whitespace-pre-wrap">
           {m.text}
         </div>
       </div>
@@ -255,9 +233,9 @@ function Message({ m }: { m: ChatMessage }) {
     // 问答回复: 普通文本气泡(打字机逐字填充中也会显示)。
     return (
       <div className="flex mb-3 msg-in">
-        <div className="max-w-[92%] rounded-2xl rounded-tl-sm bg-panel2 border border-line/60 shadow-inner-line px-4 py-3 text-[13px] leading-relaxed text-ink2 whitespace-pre-wrap">
+        <div className="max-w-[92%] rounded-lg bg-white border border-line px-3.5 py-2.5 text-[13px] leading-relaxed text-ink2 whitespace-pre-wrap">
           {m.text || '…'}
-          {m.text === '' && <span className="inline-block w-1.5 h-4 bg-signal/80 align-middle caret-blink ml-0.5 rounded-[1px]" />}
+          {m.text === '' && <span className="inline-block w-1.5 h-4 bg-signal/70 align-middle caret-blink ml-0.5 rounded-[1px]" />}
         </div>
       </div>
     )
@@ -266,8 +244,7 @@ function Message({ m }: { m: ChatMessage }) {
     case 'step':
       return (
         <div className="text-[12px] text-muted mb-0.5 msg-in">
-          <span className="text-ghost mr-1.5">🧠</span>
-          <span className="font-mono">{m.meta?.tool}</span>
+          <span className="font-mono text-ink2/80">{m.meta?.tool}</span>
           <span className="text-ghost mx-1.5">·</span>
           {m.meta?.why ?? m.text}
         </div>
@@ -356,7 +333,7 @@ export function ChatView() {
       const ans = (body.answer ?? '(无回答)').trim()
       // 深度思考: 思维链折叠在回答上方。
       const th = body.thinking && String(body.thinking).trim() ? String(body.thinking).trim() : ''
-      typewrite(id, (th ? '\n\n[深度思考] ' + th + '\n\n' : '') + ans)
+      typewrite(id, (th ? '\n\n[决策推理] ' + th + '\n\n' : '') + ans)
     } catch (err) {
       patchMsg(id, '对话请求失败: ' + String(err))
     } finally {
@@ -377,7 +354,7 @@ export function ChatView() {
       void start(t)
       return
     }
-    // 一般问题/指令 -> AI 问答。
+    // 一般问题/指令 -> 问答。
     pushMsg('user', 'user', t)
     setInput('')
     void ask(t)
@@ -398,41 +375,36 @@ export function ChatView() {
       {/* 消息流 */}
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6">
         {empty ? (
-          <div className="h-full flex flex-col items-center justify-center text-center gap-5 msg-in px-4">
-            <div className="w-[64px] h-[64px] rounded-2xl border border-line bg-white flex items-center justify-center text-signal shadow-card">
-              <IconShield size={30} />
-            </div>
+          <div className="h-full flex flex-col items-center justify-center text-center gap-4 msg-in px-4">
             <div>
-              <div className="font-disp text-[22px] font-semibold tracking-wide text-ink2">
+              <div className="text-[24px] font-semibold tracking-tight text-ink2">
                 Vero 渗透测试助手
               </div>
               <div className="text-[13px] text-muted mt-2">
-                粘贴目标开始自主渗透 · 或直接提问
+                粘贴目标开始自主渗透, 或直接提问
               </div>
-              <div className="text-[11px] text-ghost mt-1.5 font-mono">
+              <div className="text-[11.5px] text-ghost mt-1.5">
                 例: 「http://localhost:3000」跑战役 · 「这个 SQLi 严重吗」问答 · 「停止」取消
               </div>
             </div>
-            <div className="flex flex-wrap gap-2.5 justify-center mt-3 max-w-lg">
+            <div className="flex flex-wrap gap-2 justify-center mt-2 max-w-lg">
               {['http://localhost:3000', 'http://localhost:8080'].map((t) => (
                 <button
                   key={t}
                   onClick={() => void start(t)}
-                  className="group inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-mono rounded-full border border-line bg-white text-muted hover:text-signal hover:border-signal/50 hover:shadow-glow-signal transition-all duration-200 card-lift"
+                  className="px-3.5 py-1.5 text-[12px] font-mono rounded-md border border-line bg-white text-muted hover:text-signal hover:border-signal/60 transition-colors card-lift"
                 >
-                  <IconChevron size={12} className="text-signal/60 group-hover:text-signal" />
                   {t}
                 </button>
               ))}
               <button
                 onClick={() => void ask('渗透测试中 SQL 注入的原理、危害与防御是什么？')}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] rounded-full border border-line bg-white text-muted hover:text-violet hover:border-violet/50 hover:shadow-glow-violet transition-all duration-200 card-lift"
+                className="px-3.5 py-1.5 text-[12px] rounded-md border border-line bg-white text-muted hover:text-violet hover:border-violet/50 transition-colors card-lift"
               >
-                <IconSparkle size={12} className="text-violet/70" />
                 试试问我: SQLi 是什么
               </button>
             </div>
-            <div className="flex items-center gap-3 mt-1 text-[10px] text-ghost/80 font-mono">
+            <div className="flex items-center gap-4 mt-2 text-[11px] text-ghost">
               <span><span className="kbd">Ctrl K</span> 命令面板</span>
               <span><span className="kbd">Ctrl H</span> 历史战役</span>
               <span><span className="kbd">G</span> 攻击图全屏</span>
@@ -445,37 +417,37 @@ export function ChatView() {
       </div>
 
       {/* 输入区 */}
-      <div className="border-t border-line/80 glass px-4 md:px-8 py-3.5">
+      <div className="border-t border-line bg-white px-4 md:px-8 py-3.5">
         <div className="max-w-3xl mx-auto">
           {engineChip && status !== 'idle' && (
-            <div className="text-[10px] text-muted mb-1.5 font-mono flex items-center gap-1.5">
+            <div className="text-[11px] text-muted mb-1.5 flex items-center gap-1.5">
               <span className={`inline-block w-1.5 h-1.5 rounded-full ${status === 'running' ? 'bg-warn ring-pulse' : 'bg-live'}`} />
               {engineChip} · {EVENT_LABELS[status] ?? status}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-xl border border-line bg-ink/60 shadow-inner-line focus-within:border-signal/60 focus-within:shadow-glow-signal transition-all duration-200 px-3 py-2">
+          <div className="flex items-end gap-2 rounded-lg border border-line bg-panel focus-within:border-signal/60 transition-colors px-3 py-2">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={onKey}
               rows={1}
-              placeholder="发目标跑战役, 或问我任何问题…"
-              className="flex-1 bg-transparent outline-none resize-none text-[13.5px] text-ink2 placeholder:text-ghost/80 font-mono leading-relaxed"
+              placeholder="粘贴目标跑战役, 或提问…"
+              className="flex-1 bg-transparent outline-none resize-none text-[13.5px] text-ink2 placeholder:text-ghost/90 leading-relaxed"
               style={{ maxHeight: 120 }}
             />
             {status === 'running' ? (
               <button
                 onClick={() => void cancelCampaign()}
-                className="btn-danger inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] rounded-lg border border-alert/60 text-alert hover:bg-alert/15 shrink-0 font-medium"
+                className="btn-danger px-3.5 py-2 text-[12px] rounded-md border border-alert/50 text-alert shrink-0 font-medium"
                 title="停止当前战役"
               >
-                <IconStop size={12} /> 停止
+                停止
               </button>
             ) : (
               <button
                 onClick={() => submit(input)}
                 disabled={thinking}
-                className="btn-accent inline-flex items-center gap-1.5 px-4 py-2 text-[12px] rounded-lg shrink-0"
+                className="btn-accent px-4 py-2 text-[12px] rounded-md shrink-0"
               >
                 {thinking ? (
                   <span className="flex gap-0.5 px-1">
@@ -484,16 +456,14 @@ export function ChatView() {
                     <span className="dot-pulse">●</span>
                   </span>
                 ) : (
-                  <>
-                    <IconSend size={12} /> 发送
-                  </>
+                  '发送'
                 )}
               </button>
             )}
           </div>
-          <div className="text-[10px] text-ghost/90 mt-2 font-mono flex items-center gap-1.5 flex-wrap">
+          <div className="text-[10.5px] text-ghost mt-2 flex items-center gap-1.5 flex-wrap">
             <span className="kbd">Enter</span>
-            <span>发送 · 目标=URL/IP · 其他内容 = 问我 · 攻击动作 L3+ 会请求你授权</span>
+            <span>发送 · 目标 = URL/IP · 其他内容 = 提问 · L3+ 攻击动作会请求授权</span>
           </div>
         </div>
       </div>

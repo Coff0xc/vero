@@ -12,36 +12,28 @@ body,
 }
 body {
   margin: 0;
-  background: #f8f7f4;
-  color: #202124;
+  background: #fbfaf6;
+  color: #26241d;
   font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
-  /* 珠光白: 顶部极淡暖光 + 右下淡蓝微光, 干净明亮 */
-  background-image:
-    radial-gradient(1100px 460px at 70% -10%, rgba(26, 115, 232, 0.045), transparent 62%),
-    radial-gradient(860px 400px at 96% 108%, rgba(118, 39, 187, 0.03), transparent 60%);
-  background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 /* 等宽字体: 全系统栈, 内网/离线环境不依赖 Google Fonts */
 .font-mono {
   font-family: ui-monospace, 'Cascadia Mono', 'JetBrains Mono', Consolas, 'Courier New', monospace;
 }
-.font-disp {
-  font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
-  letter-spacing: 0.05em;
-}
 
-/* 选中文本: 蓝呼应主强调色 */
+/* 选中文本: 琥珀淡底 */
 ::selection {
-  background: rgba(26, 115, 232, 0.18);
-  color: #0b2947;
+  background: rgba(168, 120, 28, 0.16);
+  color: #26241d;
 }
 
 /* 亮色滚动条: 细、透明轨道、hover 加深 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #d2d0ca transparent;
+  scrollbar-color: #d9d5c9 transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -51,19 +43,19 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #d2d0ca;
+  background: #d9d5c9;
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #b3b1ab;
+  background: #bdb9ac;
   background-clip: content-box;
 }
 
-/* 键盘聚焦可见性(可访问性): 蓝细环 */
+/* 键盘聚焦可见性(可访问性): 琥珀细环 */
 :focus-visible {
-  outline: 1.5px solid rgba(26, 115, 232, 0.55);
+  outline: 1.5px solid rgba(168, 120, 28, 0.6);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -71,19 +63,17 @@ body {
 /* KPI 数字变化的动画提示 */
 @keyframes kpi-flash {
   0% {
-    background-color: rgba(24, 128, 56, 0.16);
-    transform: scale(1.12);
+    background-color: rgba(26, 127, 75, 0.14);
   }
   100% {
     background-color: transparent;
-    transform: scale(1);
   }
 }
 .kpi-flash {
   display: inline-block;
   padding: 0 6px;
   border-radius: 4px;
-  animation: kpi-flash 0.7s ease-out;
+  animation: kpi-flash 0.6s ease-out;
 }
 
 /* React Flow 适配 */
@@ -100,11 +90,11 @@ body {
   z-index: 10;
 }
 
-/* ---- 对话式 UI 动画 ---- */
+/* ---- 克制的进入动画(去掉夸张特效) ---- */
 @keyframes msg-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(4px);
   }
   to {
     opacity: 1;
@@ -112,13 +102,13 @@ body {
   }
 }
 .msg-in {
-  animation: msg-in 0.28s ease-out;
+  animation: msg-in 0.22s ease-out;
 }
 
 @keyframes card-pop {
   from {
     opacity: 0;
-    transform: scale(0.97);
+    transform: scale(0.99);
   }
   to {
     opacity: 1;
@@ -126,29 +116,29 @@ body {
   }
 }
 .card-pop {
-  animation: card-pop 0.22s ease-out;
+  animation: card-pop 0.18s ease-out;
 }
 
-/* 命令面板/抽屉: 自上而下淡入 */
+/* 命令面板: 自上而下淡入 */
 @keyframes panel-in {
   from {
     opacity: 0;
-    transform: translateY(-10px) scale(0.98);
+    transform: translateY(-6px);
   }
   to {
     opacity: 1;
-    transform: translateY(0) scale(1);
+    transform: translateY(0);
   }
 }
 .panel-in {
-  animation: panel-in 0.18s ease-out;
+  animation: panel-in 0.16s ease-out;
 }
 
 /* 抽屉: 从左滑入 */
 @keyframes drawer-in {
   from {
     opacity: 0;
-    transform: translateX(-14px);
+    transform: translateX(-10px);
   }
   to {
     opacity: 1;
@@ -156,40 +146,37 @@ body {
   }
 }
 .drawer-in {
-  animation: drawer-in 0.2s ease-out;
+  animation: drawer-in 0.18s ease-out;
 }
 
-/* ---- 精致化工具类 ---- */
+/* ---- 工具类 ---- */
 
-/* 玻璃面板: 亮白半透明 + 背景模糊, 用于浮层/输入区 */
+/* 浮层面板(命令面板/抽屉): 白底(玻璃拟态已弃, 保留类名兼容) */
 .glass {
-  background: rgba(255, 255, 255, 0.86);
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
+  background: #ffffff;
 }
 
-/* 卡片悬浮: hover 微浮起 + 投影(配合 transition) */
+/* 卡片悬浮: 仅阴影加深(去掉上浮位移, 更克制) */
 .card-lift {
-  transition: transform 0.18s ease, border-color 0.18s ease, box-shadow 0.18s ease;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
 }
 .card-lift:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.18), 0 6px 16px rgba(60, 64, 67, 0.12);
+  box-shadow: 0 2px 4px rgba(45, 41, 32, 0.08), 0 8px 20px rgba(45, 41, 32, 0.10);
 }
 
-/* 主行动按钮: 实心 Google 蓝 + 白字(Material Filled Button) */
+/* 主行动按钮: 实心琥珀 + 白字 */
 .btn-accent {
-  background: #1a73e8;
+  background: #a8781c;
   color: #ffffff;
   font-weight: 600;
-  transition: box-shadow 0.18s ease, filter 0.18s ease, transform 0.12s ease;
+  transition: background-color 0.15s ease, box-shadow 0.15s ease;
 }
 .btn-accent:hover:not(:disabled) {
-  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.28), 0 4px 10px rgba(26, 115, 232, 0.24);
-  filter: brightness(1.05);
+  background: #8f6616;
+  box-shadow: 0 2px 8px rgba(168, 120, 28, 0.28);
 }
 .btn-accent:active:not(:disabled) {
-  transform: scale(0.97);
+  background: #7d5813;
 }
 .btn-accent:disabled {
   opacity: 0.5;
@@ -198,13 +185,14 @@ body {
 
 /* 危险行动按钮 */
 .btn-danger {
-  transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 .btn-danger:hover:not(:disabled) {
-  box-shadow: 0 1px 3px rgba(217, 48, 37, 0.24);
+  background: rgba(207, 56, 37, 0.08);
 }
-.btn-danger:active:not(:disabled) {
-  transform: scale(0.97);
+.btn-danger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* 打字光标(对话等待/流式输出) */
@@ -226,7 +214,7 @@ body {
   0%,
   80%,
   100% {
-    opacity: 0.25;
+    opacity: 0.3;
     transform: translateY(0);
   }
   40% {
@@ -245,16 +233,16 @@ body {
   animation-delay: 0.3s;
 }
 
-/* 状态点光环(运行中): 琥珀 */
+/* 状态点光环(运行中) */
 @keyframes ring-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(176, 96, 0, 0.4);
+    box-shadow: 0 0 0 0 rgba(168, 120, 28, 0.4);
   }
   70% {
-    box-shadow: 0 0 0 6px rgba(176, 96, 0, 0);
+    box-shadow: 0 0 0 5px rgba(168, 120, 28, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(176, 96, 0, 0);
+    box-shadow: 0 0 0 0 rgba(168, 120, 28, 0);
   }
 }
 .ring-pulse {
@@ -271,17 +259,16 @@ body {
   }
 }
 .shimmer {
-  background: linear-gradient(90deg, rgba(60, 64, 67, 0.05) 25%, rgba(60, 64, 67, 0.12) 50%, rgba(60, 64, 67, 0.05) 75%);
+  background: linear-gradient(90deg, rgba(45, 41, 32, 0.04) 25%, rgba(45, 41, 32, 0.10) 50%, rgba(45, 41, 32, 0.04) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s linear infinite;
 }
 
-/* 分区标题: 字母拉开 + 左侧蓝色刻度 */
+/* 分区标题: 左侧琥珀刻度(去掉大写拉开, 更现代) */
 .section-title {
   display: flex;
   align-items: center;
   gap: 6px;
-  letter-spacing: 2.5px;
 }
 .section-title::before {
   content: '';
@@ -289,7 +276,7 @@ body {
   width: 3px;
   height: 10px;
   border-radius: 2px;
-  background: #1a73e8;
+  background: #a8781c;
 }
 
 /* 键帽(快捷键提示) */
@@ -298,10 +285,10 @@ body {
   align-items: center;
   padding: 1px 5px;
   border-radius: 4px;
-  border: 1px solid #e3e1db;
-  background: #f5f4f0;
+  border: 1px solid #e6e3d9;
+  background: #f4f2ec;
   font-size: 9.5px;
-  color: #5f6368;
+  color: #6f6d62;
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   line-height: 1.5;
 }

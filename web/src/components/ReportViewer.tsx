@@ -61,11 +61,11 @@ export function ReportViewer() {
   return (
     <div className="p-6 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-disp font-semibold tracking-wider text-ink2 uppercase">报告</h2>
+        <h2 className="text-[17px] font-semibold text-ink2">报告</h2>
         <button
           onClick={load}
           disabled={busy}
-          className="px-3 py-1.5 text-[11px] font-disp tracking-wider uppercase rounded-sm border border-live text-live hover:bg-live hover:text-ink transition disabled:opacity-50"
+          className="px-3.5 py-1.5 text-[12px] font-medium rounded-md border border-live text-live hover:bg-live hover:text-white transition-colors disabled:opacity-50"
         >
           {busy ? '刷新中…' : '刷新'}
         </button>
@@ -75,14 +75,14 @@ export function ReportViewer() {
       {notice && <div className="text-xs text-live">{notice}</div>}
 
       {reports.length === 0 && !error && (
-        <div className="border border-dashed border-line rounded-sm p-8 text-center text-muted text-xs">
+        <div className="border border-dashed border-line rounded-lg p-8 text-center text-muted text-xs bg-white">
           暂无报告 — 完成一次战役后, JSON / Markdown / HTML 报告会出现在这里
         </div>
       )}
 
       <ul className="space-y-2">
         {reports.map((r) => (
-          <li key={r.campaign_id} className="border border-line rounded-lg bg-panel px-4 py-3 shadow-inner-line card-lift flex items-center justify-between gap-4">
+          <li key={r.campaign_id} className="border border-line rounded-lg bg-white px-4 py-3 shadow-card card-lift flex items-center justify-between gap-4">
             <div className="min-w-0">
               <div className="font-mono text-xs text-ink2 truncate" title={r.campaign_id}>
                 战役 #{r.campaign_id}

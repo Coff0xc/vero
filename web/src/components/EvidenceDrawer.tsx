@@ -1,6 +1,5 @@
 import { useStore } from '../store'
 import { NODE_STATE_LABELS } from '../lib/i18n'
-import { IconClose } from './Icon'
 import type { NodeState } from '../types'
 
 // 节点 type → 中文(仅展示层, type 标识本身保持英文)。
@@ -17,7 +16,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
 // severity → Tailwind 静态类(徽标用)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#e8710a] border-[#e8710a]',
+  high: 'text-[#d06a1f] border-[#d06a1f]',
   medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
@@ -39,13 +38,13 @@ function StateBadge({ state }: { state: NodeState }) {
         ? 'text-alert border-alert'
         : 'text-ghost border-ghost'
   return (
-    <b className={`font-disp tracking-wider px-2 py-0.5 rounded-sm uppercase text-[10px] border ${cls}`}>
+    <b className={`px-2 py-0.5 rounded text-[10px] border font-medium ${cls}`}>
       {NODE_STATE_LABELS[state] ?? state}
     </b>
   )
 }
 
-// 证据抽屉: 作为右栏的兄弟列展开(flex 布局让位), 不再绝对定位盖住攻击图。
+// 证据抽屉: 作为右栏的兄弟列展开(flex 布局让位), 不绝对定位盖住攻击图。
 export function EvidenceDrawer() {
   const selected = useStore((s) => s.selected)
   const nodes = useStore((s) => s.nodes)
@@ -57,19 +56,18 @@ export function EvidenceDrawer() {
 
   return (
     <aside
-      className={`shrink-0 border-l border-line bg-gradient-to-b from-panel to-panel2 flex flex-col overflow-hidden transition-[width] duration-200 ${
+      className={`shrink-0 border-l border-line bg-panel flex flex-col overflow-hidden transition-[width] duration-200 ${
         open ? 'w-[min(400px,80vw)]' : 'w-0 border-l-0'
       }`}
       aria-hidden={!open}
     >
       <div className="flex items-center justify-between p-4 pb-0 whitespace-nowrap">
-        <span className="section-title font-disp text-[10px] uppercase text-muted">证据检视</span>
+        <span className="section-title text-[11px] font-medium text-muted">证据检视</span>
         <button
           onClick={() => select(null)}
-          className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center transition-colors"
-          aria-label="关闭"
+          className="text-muted hover:text-alert hover:bg-alert/8 rounded px-1.5 py-0.5 text-[11px] transition-colors"
         >
-          <IconClose size={14} />
+          关闭
         </button>
       </div>
       <div className="text-[12.5px] font-mono text-signal my-2.5 px-4 break-all leading-relaxed">{selected ?? '—'}</div>
@@ -80,22 +78,22 @@ export function EvidenceDrawer() {
           {(node.severity || node.technique || node.tactic) && (
             <div className="flex flex-wrap gap-1.5 mt-2">
               {node.severity && (
-                <span className={`text-[10px] uppercase border px-1.5 py-0.5 rounded-sm font-mono ${SEV_BADGE[node.severity] ?? 'text-muted border-line'}`}>
+                <span className={`text-[10px] border px-1.5 py-0.5 rounded font-mono ${SEV_BADGE[node.severity] ?? 'text-muted border-line'}`}>
                   {node.severity}
                 </span>
               )}
               {node.technique && (
-                <span className="text-[10px] uppercase border border-signal/60 text-signal px-1.5 py-0.5 rounded-sm font-mono">
+                <span className="text-[10px] border border-signal/60 text-signal px-1.5 py-0.5 rounded font-mono">
                   TTP {node.technique}
                 </span>
               )}
               {node.tactic && (
-                <span className="text-[10px] border border-ghost/60 text-ghost px-1.5 py-0.5 rounded-sm font-mono">{node.tactic}</span>
+                <span className="text-[10px] border border-ghost/60 text-ghost px-1.5 py-0.5 rounded font-mono">{node.tactic}</span>
               )}
             </div>
           )}
           {refuted && (
-            <div className="mt-2.5 border border-alert/40 bg-alert/5 text-alert text-[11px] px-2.5 py-2 rounded-sm leading-relaxed">
+            <div className="mt-2.5 border border-alert/40 bg-alert/6 text-alert text-[11px] px-2.5 py-2 rounded leading-relaxed">
               该节点已被证伪 — 下列证据构成反驳链。
             </div>
           )}
@@ -105,12 +103,12 @@ export function EvidenceDrawer() {
         {node && node.evidence.length > 0 ? (
           // 完整证据链: 不做条数截断, 每条展示 tool + excerpt + 捕获时间 + 置信度。
           node.evidence.map((ev, i) => (
-            <div key={i} className={`my-2 border-l-2 rounded-r-sm ${refuted ? 'border-l-alert bg-alert/5' : 'border-l-live bg-live/5'}`}>
-              <span className={`block font-disp text-[10px] tracking-wider uppercase px-2.5 pt-1.5 pb-0.5 ${refuted ? 'text-alert' : 'text-live'}`}>
+            <div key={i} className={`my-2 border-l-2 rounded-r ${refuted ? 'border-l-alert bg-alert/6' : 'border-l-live bg-live/6'}`}>
+              <span className={`block text-[10px] font-medium px-2.5 pt-1.5 pb-0.5 ${refuted ? 'text-alert' : 'text-live'}`}>
                 {ev.tool}
-                {fmtTime(ev.at) && <span className="ml-2 normal-case tracking-normal text-muted">{fmtTime(ev.at)}</span>}
+                {fmtTime(ev.at) && <span className="ml-2 font-normal text-muted">{fmtTime(ev.at)}</span>}
                 {typeof ev.confidence === 'number' && (
-                  <span className="ml-2 normal-case tracking-normal text-muted">置信 {Math.round(ev.confidence * 100)}%</span>
+                  <span className="ml-2 font-normal text-muted">置信 {Math.round(ev.confidence * 100)}%</span>
                 )}
               </span>
               <pre className="m-0 px-2.5 pb-2 font-mono text-[11.5px] text-ink2 whitespace-pre-wrap break-all">{ev.excerpt}</pre>
@@ -132,10 +130,10 @@ export function EvidenceDrawer() {
         <div className="px-4 pb-4 shrink-0">
           <button
             onClick={() => markRefuted(node.id)}
-            className={`w-full text-[10px] font-disp tracking-wider uppercase border rounded-sm px-2.5 py-1.5 transition-colors ${
+            className={`w-full text-[11px] font-medium border rounded px-2.5 py-1.5 transition-colors ${
               refuted
                 ? 'border-alert/40 text-alert/70 cursor-not-allowed'
-                : 'border-alert/50 text-alert hover:bg-alert/10'
+                : 'border-alert/50 text-alert hover:bg-alert/8'
             }`}
             disabled={refuted}
             title={refuted ? '该节点已是证伪状态' : '标记该节点为已证伪'}
