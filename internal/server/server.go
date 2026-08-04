@@ -259,21 +259,50 @@ func writeJSON(w http.ResponseWriter, v any) {
 	_ = json.NewEncoder(w).Encode(v)
 }
 
+// devAllowedPorts —— 本地回环(loopback)开发前端的允许端口(vite dev 默认 5173)。
+// 仅当 Origin 与本服务同为回环地址、仅端口不同(反代开发模式)时放行;
+// 对外网/局域网来源仍按完整 host:port 严格比较, 防护不削弱。
+var devAllowedPorts = map[string]bool{"5173": true}
+
+// isLoopback —— host(可含端口)是否为回环地址(localhost / 127.x / ::1)。
+func isLoopback(hostport string) bool {
+	h := hostnameOf(hostport)
+	if strings.EqualFold(h, "localhost") {
+		return true
+	}
+	ip := net.ParseIP(h)
+	return ip != nil && ip.IsLoopback()
+}
+
 // originGuard —— 跨站防护中间件: 浏览器发出的请求必带 Origin。
 // Origin 与本服务不同源的请求直接 403(阻止任意网页: 偷听 SSE / 触发战役 / 冒名审批)。
+// 例外: 回环 dev 前端(vite :5173 反代)在"双端均回环"前提下放行, 仅端口不同。
 // 非浏览器客户端(curl/健康检查)不带 Origin, 不受影响。
 func originGuard(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 		if origin != "" {
 			u, err := url.Parse(origin)
-			if err != nil || u.Host != r.Host { // 完整 host:port 比较(修: 原只比 hostname, 异端口页面可操控本服务)
+			if err != nil || !originAllowed(u, r.Host) {
 				http.Error(w, "forbidden: cross-origin request rejected", http.StatusForbidden)
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// originAllowed —— Origin 是否可信: 完整 host:port 相同, 或同为回环的 dev 端口白名单。
+func originAllowed(u *url.URL, reqHost string) bool {
+	if u.Host == reqHost { // 同源(生产: 前端 embed 进同一端口)
+		return true
+	}
+	// dev 模式: 双端都是回环, 且前端端口在白名单(vite), 后端任意回环端口。
+	_, oport, oerr := net.SplitHostPort(u.Host)
+	if oerr == nil && devAllowedPorts[oport] && isLoopback(u.Host) && isLoopback(reqHost) {
+		return true
+	}
+	return false
 }
 
 // hostnameOf —— 从 "host:port" 里剥离端口取 hostname。
