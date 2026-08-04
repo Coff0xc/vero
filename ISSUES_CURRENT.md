@@ -1,9 +1,98 @@
 # Vero 问题清单 (当前状态)
 
 > 更新日期: 2026-08-04
-> 分支: fix/critical-bugs (基于 main)
-> 测试状态: go test ./... 全部通过
-> 审计方法: 全代码库逐文件审查 + 实战测试(file.nciyuan.net)交叉验证
+> 分支: fix/graph-reflexion-integration (基于 fix/critical-bugs)
+> 测试状态: go test ./... 全部通过 + 真实 agent 测试 (file.nciyuan.net)
+> 审计方法: 全代码库逐文件审查 + 实战测试交叉验证
+
+---
+
+## 真实测试反馈 (file.nciyuan.net + DeepSeek)
+
+测试模式: tooltest / probe / scan / agent(LLM 决策)
+结果: 30+ 节点 · 9 finding · 证据回查 0 违规 · 8 轮工具调用
+
+### ✅ 修复生效部分
+
+| # | 验证项 | 真实结果 |
+|---|--------|----------|
+| 1 | 工具不再返回假数据 (T1-T3) | `exploit_sqli`/`ffuf_dir_brute` 返回 `success=false`, 不再伪造"✅ 利用成功" |
+| 2 | 攻击图节点正确创建 | 30+ 节点: 1 host + 5 service + 9 finding + 15 endpoint + 4 claim |
+| 3 | 证据回查 0 违规 | 抗幻觉机制工作正常, 所有证据可溯回 curl/nuclei 真实输出 |
+| 4 | LLM 决策正常 | DeepSeek 驱动 8 轮工具调用 (port_scan→http_probe→fetch_page→web_vuln_scan→extract_endpoints→exploit_sqli) |
+| 5 | scan 模式边建边正常 | 4 条 `host→runs→service` 边正确建立 |
+| 6 | C5 证据去重 | 证据块未重复 (修复前会重复 8 次) |
+| 7 | 编译和单元测试 | `go build ./...` + `go test ./...` 全绿 |
+
+### ❌ 修复未生效部分 (真实测试发现)
+
+#### U1. claim 节点全部停留 hypothesis 状态 (C3 修复失效)
+
+**现象**: 攻击图 4 个 claim 全部 hypothesis, 无一被 confirmed:
+```
+claim:确定 file.nciyuan.net 开放的端口与服务 (finding,hypothesis)
+claim:获取 HTTP 服务响应头指纹 (finding,hypothesis)
+claim:获取首页内容与攻击面 (finding,hypothesis)
+claim:发现 web 漏洞与敏感端点 (finding,hypothesis)
+```
+
+**根因**: schema 里有 `verifies` 字段, 但 LLM 根本不填它。LLM 把 claim 当作"计划描述"而非"待验证假设", 没有机制告诉 LLM "这个 action 验证了之前的哪个 claim"。这是设计层面的结构性问题, 不是简单的 schema 字段缺失。
+
+**影响**: 攻击图无法区分"假设"和"已验证事实", FindPath 找不到完整攻击链。
+
+#### U2. finding/endpoint 节点仍然孤立 (C1 修复失效)
+
+**现象**: EDGES 只有 4 条 `host→runs→service` 边, 所有 finding/endpoint 节点无关联边:
+```
+finding:http://file.nciyuan.net:tech:Via: 0.0 Caddy  ← 孤立
+endpoint:http://file.nciyuan.net/index.php?user/view/manifest  ← 孤立
+```
+
+**根因**: C1 修复的 finding 建边逻辑期望 Key 格式为 `host:port`, 但实际 Key 是 `http://file.nciyuan.net:tech:Via`。`strings.Split(o.Key, ":")` 切错位置:
+- 期望: `["file.nciyuan.net", "80", ...]`
+- 实际: `["http", "//file.nciyuan.net", "tech", "Via"]`
+
+同时 probe 模式下没有 service 节点, finding 找不到可关联的 service。
+
+**影响**: 攻击图有节点无拓扑, FindPath 永远找不到通向 finding 的路径。
+
+#### U3. Reflexion 重试未触发 (L1/L2 修复失效)
+
+**现象**: `http_probe` 对 8080 端口连续失败 4 次, 但没看到 "自动重试中(调整参数)..." 日志:
+```
+· [L1] http_probe → ... 先做 HTTP 指纹探测确认其技术栈
+  ⤷ http_probe success=false
+· [L1] http_probe → ... 先做 HTTP 指纹探测确认其技术栈与是否独立应用
+  ⤷ http_probe success=false
+· [L1] http_probe → ... 先做 HTTP HEAD 探测获取响应头
+  ⤷ http_probe success=false
+· [L1] http_probe → ... 先做 HTTP 指纹探测以判断其应用类型
+  ⤷ http_probe success=false
+```
+
+**根因**: `curl -sI` 静默模式失败时 stdout/stderr 都为空, `resultReason` 返回 `"工具失败(无输出)"`, `ClassifyFailure` 判断为 `FailureUnknown`, `ShouldRetry` 返回 false。重试逻辑只处理网络超时/参数错误, 无法处理静默失败。
+
+**影响**: 工具失败后不重试, LLM 反复尝试相同动作, 浪费决策轮次。
+
+#### U4. 停滞检测未触发 (C4 修复部分失效)
+
+**现象**: 同一个 `http_probe` 对 8080 端口连续失败 4 次, 循环没有停止。
+
+**根因**: `stableArgsSig` 让相同 args 产生相同 sig, 但 LLM 每次传的 args 可能略有不同 (target 格式 `http://file.nciyuan.net:8080` vs `file.nciyuan.net:8080`), sig 不同。同时停滞检测要求 `sig 相同 AND 节点数不变`, 但前序成功工具增加了节点数, 条件不满足。
+
+**影响**: LLM 在失败动作上空转, 浪费 budget。
+
+#### U5. probe 模式 EDGES 仍然为空
+
+**现象**:
+```
+EDGES:
+  (空)
+```
+
+**根因**: probe 只产出 finding 类型, 没有 service 节点。finding 建边逻辑找不到匹配的 service 节点 (U2 的另一个表现)。
+
+**影响**: probe 模式的攻击图完全无拓扑, 前端可视化无意义。
 
 ---
 
@@ -15,7 +104,19 @@
 | 批次 1 (commit 0eb9cf0) | T1/T2/T3 移除 searchsploit/poc_manager 假数据 | exploit_library.go |
 | 批次 1 (commit fec7b70) | C3 verifies 字段 / C5 证据去重 | deepseek.go / graph.go |
 | 批次 1 (commit 16c7b16) | T4/T5/T6 ffuf Windows 兼容 + 字典路径 + -se 参数 | ffuf.go |
-| 批次 2 (本次) | C3 兼容 Args 提取 verifies / C4 稳定 sig / C8 跨级建边 / L1+L2 Retrier 接入 / T7 ParseSearchsploit Key / ParseParallelScan 大小写 / k8s_node_exploit 双注册兼容 | loop.go / llm.go / deepseek.go / exploit_library.go / orchestration.go / k8s_enhanced.go |
+| 批次 2 (commit 8e74eb2) | C3 兼容 Args 提取 verifies / C4 稳定 sig / C8 跨级建边 / L1+L2 Retrier 接入 / T7 ParseSearchsploit Key / ParseParallelScan 大小写 / k8s_node_exploit 双注册兼容 | loop.go / llm.go / deepseek.go / exploit_library.go / orchestration.go / k8s_enhanced.go |
+
+### 批次 2 修复的真实测试验证
+
+| # | 修复项 | 单元测试 | 真实测试 |
+|---|--------|----------|----------|
+| C3 | claim 验证兼容 Args 提取 verifies | ✅ | ❌ LLM 不填 verifies 字段 |
+| C4 | 停滞检测稳定 sig | ✅ | ⚠️ LLM 每次 args 不同, sig 不同 |
+| C8 | produces 跨级建边 | ✅ | ⚠️ 没有产生 produces 的工具调用 |
+| L1+L2 | Retrier 接入 | ✅ | ❌ ShouldRetry 无法处理静默失败 |
+| T7 | ParseSearchsploit Key | ✅ | ✅ |
+| NEW-1 | ParseParallelScan 大小写 | ✅ | ✅ |
+| NEW-2 | k8s_node_exploit 双注册兼容 | ✅ | ✅ |
 
 ---
 
@@ -37,7 +138,19 @@
 
 ---
 
-## 仍然存在的问题
+## 真实测试新发现的问题 (需后续修复)
+
+| # | 问题 | 详情 | 根因 | 严重度 |
+|---|------|------|------|--------|
+| U1 | **claim 验证机制完全失效** | 4 个 claim 全部停留 hypothesis, 无一 confirmed | LLM 不填 verifies 字段, 设计层面问题 | 高 |
+| U2 | **finding/endpoint 节点孤立** | EDGES 只有 4 条 host→service 边, finding/endpoint 无关联 | Key 格式 `http://host:tech:X` 与建边逻辑 `host:port` 不匹配 | 高 |
+| U3 | **Reflexion 重试未触发** | http_probe 连续失败 4 次未触发重试 | curl -sI 静默失败时 stdout/stderr 为空, ClassifyFailure 判断为 Unknown | 高 |
+| U4 | **停滞检测未触发** | 同一动作连续失败 4 次未停止 | LLM 每次 args 略有不同 (target 格式变化), sig 不同 | 中 |
+| U5 | **probe 模式 EDGES 为空** | probe 产出的 finding 全部孤立 | probe 没有 service 节点, finding 找不到可关联的 service | 高 |
+
+---
+
+## 仍然存在的问题 (代码层)
 
 ### 高严重度
 
@@ -90,8 +203,8 @@
 
 | # | 缺陷 | 状态 |
 |---|------|------|
-| A1 | "证据驱动"理念与实际实现脱节 — finding 节点建边已修复, 但 endpoint/claim 节点仍部分孤立 | 部分修复 |
-| A2 | "LLM 自主决策"依赖 LLM 自觉填隐藏字段 — verifies 已修复, 但 produces/claim 仍依赖 LLM 自觉 | 部分修复 |
+| A1 | "证据驱动"理念与实际实现脱节 — finding 节点建边已修复但 Key 格式不匹配, 真实测试仍孤立 | 修复失败 |
+| A2 | "LLM 自主决策"依赖 LLM 自觉填隐藏字段 — verifies 字段添加了但 LLM 不填, 真实测试全部 hypothesis | 修复失败 |
 | A3 | "抗幻觉"只防 LLM 编造, 不防工具模拟 — exploit_cve/searchsploit/poc_manager 假数据已移除 | 已修复 |
 | A4 | "跨平台"与"安全工具链"矛盾 — ffuf 已修 Windows 兼容, 但 nxc/metasploit 仍需 Linux | 部分修复 |
 | A5 | "多步规划"中断后无回退机制 — 某步失败即中断, 副作用不回滚 | 未修复 |
@@ -109,6 +222,10 @@
 | TestParseParallelScan | ✅ 通过 (大小写不敏感修复) |
 | TestK8sPackEnhanced | ✅ 通过 |
 | TestExploitLibraryPack | ✅ 通过 (测试预期改为失败) |
+| 真实 tooltest (file.nciyuan.net) | ✅ 2/44 工具可用 (4.5%) — 与修复前一致 |
+| 真实 probe (file.nciyuan.net) | ⚠️ 4 finding + 0 edges (U5: probe 无 service 节点) |
+| 真实 scan (file.nciyuan.net) | ✅ 4 端口 + 4 edges 正常 |
+| 真实 agent (file.nciyuan.net) | ⚠️ 30+ 节点 + 9 finding, 但 4 claim 全 hypothesis + finding 孤立 + 重试未触发 |
 
 ---
 
@@ -116,6 +233,7 @@
 
 | 状态 | 高 | 中 | 低 | 合计 |
 |------|----|----|----|------|
-| 已修复 (本批 + 批次 1) | 8 | 5 | 1 | 14 |
+| 已修复 (单元测试通过) | 8 | 5 | 1 | 14 |
+| 真实测试发现失效 | 5 (U1-U5) | 0 | 0 | 5 |
 | 仍然存在 | 4 | 25 | 3 | 32 |
-| **合计** | **12** | **30** | **4** | **46** |
+| **合计** | **17** | **30** | **4** | **51** |
