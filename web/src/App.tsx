@@ -15,6 +15,7 @@ import { ReportViewer } from './components/ReportViewer'
 import { SettingsPanel } from './components/SettingsPanel'
 import { FindingsTable } from './components/FindingsTable'
 import { ErrorBoundary } from './components/ErrorBoundary'
+import { IconFullscreen, IconClose } from './components/Icon'
 
 const TABS: Tab[] = ['campaign', 'tools', 'workflows', 'reports', 'settings']
 
@@ -77,10 +78,10 @@ export default function App() {
                 </ErrorBoundary>
                 <button
                   onClick={() => toggleGraphFull(false)}
-                  className="absolute right-4 top-3 z-20 text-[11px] text-muted hover:text-ink2 border border-line bg-ink/80 rounded-md px-2.5 py-1.5 transition-colors"
+                  className="absolute right-4 top-3 z-20 inline-flex items-center gap-1.5 text-[11px] text-muted hover:text-ink2 border border-line bg-ink/80 rounded-md px-2.5 py-1.5 transition-colors"
                   title="退出全屏 (Esc / G)"
                 >
-                  ✕ 退出全屏
+                  <IconClose size={12} /> 退出全屏
                 </button>
                 <ErrorBoundary>
                   <EvidenceDrawer />
@@ -98,10 +99,10 @@ export default function App() {
                     <span className="section-title">攻击图 · 实时</span>
                     <button
                       onClick={() => toggleGraphFull(true)}
-                      className="text-ghost hover:text-signal transition-colors font-mono text-[10px]"
+                      className="inline-flex items-center gap-1 text-ghost hover:text-signal transition-colors font-mono text-[10px]"
                       title="全屏 (G)"
                     >
-                      ⛶ 全屏
+                      <IconFullscreen size={11} /> 全屏
                     </button>
                   </div>
                   <div className="relative flex-1 min-h-0 flex">

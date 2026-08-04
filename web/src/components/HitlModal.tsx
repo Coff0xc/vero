@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { LEVEL_ZH } from '../lib/i18n'
+import { IconAlert } from './Icon'
 
 // 工具级别 → 中文口语化: L0=侦察级, L1=扫描级, L2=凭证级, L3=利用级, L4=破坏级。
 function levelZh(level: number): string {
@@ -68,10 +69,10 @@ export function HitlModal() {
   }
 
   return (
-    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-panel border border-alert/70 border-t-[3px] rounded-lg px-6 py-5 max-w-md w-full shadow-[0_0_50px_rgba(255,92,77,.22)] card-pop">
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-white border border-alert/40 border-t-[3px] rounded-lg px-6 py-5 max-w-md w-full shadow-card card-pop">
         <div className="font-disp font-bold tracking-wider text-sm text-alert uppercase mb-1 flex items-center gap-2">
-          <span className="inline-block w-2 h-2 rounded-full bg-alert animate-pulse" />
+          <IconAlert size={15} />
           需要授权
         </div>
         <div className="text-[11px] text-muted mb-4">agent 请求执行高危动作, 等待操作员裁决</div>
@@ -125,13 +126,13 @@ export function HitlModal() {
               onClick={() => decide(true)}
               className="btn-accent flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase"
             >
-              ✓ 批准执行
+              批准执行
             </button>
             <button
               onClick={() => decide(false)}
               className="btn-danger flex-1 font-disp font-semibold tracking-wider text-sm py-2.5 rounded-md uppercase border border-muted/60 text-muted hover:border-alert hover:text-alert"
             >
-              ✗ 拒绝
+              拒绝
             </button>
           </div>
           {dirty && (

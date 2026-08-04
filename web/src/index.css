@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 html,
 body,
@@ -12,15 +12,13 @@ body,
 }
 body {
   margin: 0;
-  background: #05070c;
-  color: #d7e1ec;
+  background: #f8f7f4;
+  color: #202124;
   font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, -apple-system, sans-serif;
-  /* 冷色作战台氛围: 顶部青色微光 + 右下紫色微光 + 极淡网格点阵 */
+  /* 珠光白: 顶部极淡暖光 + 右下淡蓝微光, 干净明亮 */
   background-image:
-    radial-gradient(1100px 460px at 70% -10%, rgba(34, 211, 238, 0.05), transparent 62%),
-    radial-gradient(860px 400px at 96% 108%, rgba(167, 139, 250, 0.04), transparent 60%),
-    radial-gradient(rgba(120, 150, 190, 0.05) 1px, transparent 1px);
-  background-size: auto, auto, 26px 26px;
+    radial-gradient(1100px 460px at 70% -10%, rgba(26, 115, 232, 0.045), transparent 62%),
+    radial-gradient(860px 400px at 96% 108%, rgba(118, 39, 187, 0.03), transparent 60%);
   background-attachment: fixed;
   -webkit-font-smoothing: antialiased;
 }
@@ -34,16 +32,16 @@ body {
   letter-spacing: 0.05em;
 }
 
-/* 选中文本: 青色呼应主强调色 */
+/* 选中文本: 蓝呼应主强调色 */
 ::selection {
-  background: rgba(34, 211, 238, 0.26);
-  color: #eef6fb;
+  background: rgba(26, 115, 232, 0.18);
+  color: #0b2947;
 }
 
-/* 暗色滚动条: 细、透明轨道、hover 亮起 */
+/* 亮色滚动条: 细、透明轨道、hover 加深 */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #233042 transparent;
+  scrollbar-color: #d2d0ca transparent;
 }
 *::-webkit-scrollbar {
   width: 8px;
@@ -53,19 +51,19 @@ body {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: #233042;
+  background: #d2d0ca;
   border-radius: 8px;
   border: 2px solid transparent;
   background-clip: content-box;
 }
 *::-webkit-scrollbar-thumb:hover {
-  background: #3a4e68;
+  background: #b3b1ab;
   background-clip: content-box;
 }
 
-/* 键盘聚焦可见性(可访问性): 青色细环 */
+/* 键盘聚焦可见性(可访问性): 蓝细环 */
 :focus-visible {
-  outline: 1.5px solid rgba(34, 211, 238, 0.55);
+  outline: 1.5px solid rgba(26, 115, 232, 0.55);
   outline-offset: 2px;
   border-radius: 4px;
 }
@@ -73,7 +71,7 @@ body {
 /* KPI 数字变化的动画提示 */
 @keyframes kpi-flash {
   0% {
-    background-color: rgba(52, 211, 153, 0.35);
+    background-color: rgba(24, 128, 56, 0.16);
     transform: scale(1.12);
   }
   100% {
@@ -88,7 +86,7 @@ body {
   animation: kpi-flash 0.7s ease-out;
 }
 
-/* React Flow 暗色适配 */
+/* React Flow 适配 */
 .react-flow__attribution {
   display: none;
 }
@@ -96,7 +94,7 @@ body {
   background: transparent;
 }
 .react-flow__edge-path {
-  stroke-width: 1.2;
+  stroke-width: 1.4;
 }
 .react-flow__node.selected {
   z-index: 10;
@@ -161,25 +159,11 @@ body {
   animation: drawer-in 0.2s ease-out;
 }
 
-/* 已证实节点呼吸发光(仅 box-shadow, 不动 transform —— ReactFlow 节点定位依赖 transform) */
-@keyframes node-glow {
-  0%,
-  100% {
-    box-shadow: 0 0 4px rgba(52, 211, 153, 0.15);
-  }
-  50% {
-    box-shadow: 0 0 14px rgba(52, 211, 153, 0.45);
-  }
-}
-.rf-node-glow {
-  animation: node-glow 2.4s ease-in-out infinite;
-}
-
 /* ---- 精致化工具类 ---- */
 
-/* 玻璃面板: 半透明 + 背景模糊, 用于浮层/输入区 */
+/* 玻璃面板: 亮白半透明 + 背景模糊, 用于浮层/输入区 */
 .glass {
-  background: rgba(8, 11, 17, 0.82);
+  background: rgba(255, 255, 255, 0.86);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
 }
@@ -190,25 +174,25 @@ body {
 }
 .card-lift:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 2px rgba(60, 64, 67, 0.18), 0 6px 16px rgba(60, 64, 67, 0.12);
 }
 
-/* 主行动按钮: 青色渐变 + 深色文字 + hover 发光 */
+/* 主行动按钮: 实心 Google 蓝 + 白字(Material Filled Button) */
 .btn-accent {
-  background: linear-gradient(135deg, #22d3ee 0%, #0ea5c4 100%);
-  color: #032530;
+  background: #1a73e8;
+  color: #ffffff;
   font-weight: 600;
   transition: box-shadow 0.18s ease, filter 0.18s ease, transform 0.12s ease;
 }
 .btn-accent:hover:not(:disabled) {
-  box-shadow: 0 0 16px rgba(34, 211, 238, 0.4);
-  filter: brightness(1.07);
+  box-shadow: 0 1px 3px rgba(60, 64, 67, 0.28), 0 4px 10px rgba(26, 115, 232, 0.24);
+  filter: brightness(1.05);
 }
 .btn-accent:active:not(:disabled) {
   transform: scale(0.97);
 }
 .btn-accent:disabled {
-  opacity: 0.45;
+  opacity: 0.5;
   cursor: not-allowed;
 }
 
@@ -217,7 +201,7 @@ body {
   transition: background-color 0.18s ease, box-shadow 0.18s ease, transform 0.12s ease;
 }
 .btn-danger:hover:not(:disabled) {
-  box-shadow: 0 0 14px rgba(251, 113, 133, 0.3);
+  box-shadow: 0 1px 3px rgba(217, 48, 37, 0.24);
 }
 .btn-danger:active:not(:disabled) {
   transform: scale(0.97);
@@ -264,40 +248,17 @@ body {
 /* 状态点光环(运行中): 琥珀 */
 @keyframes ring-pulse {
   0% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0.45);
+    box-shadow: 0 0 0 0 rgba(176, 96, 0, 0.4);
   }
   70% {
-    box-shadow: 0 0 0 6px rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 6px rgba(176, 96, 0, 0);
   }
   100% {
-    box-shadow: 0 0 0 0 rgba(251, 191, 36, 0);
+    box-shadow: 0 0 0 0 rgba(176, 96, 0, 0);
   }
 }
 .ring-pulse {
   animation: ring-pulse 1.6s ease-out infinite;
-}
-
-/* Hero 徽标漂浮 + 光晕呼吸 */
-@keyframes hero-float {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-  50% {
-    transform: translateY(-4px);
-  }
-}
-@keyframes hero-halo {
-  0%,
-  100% {
-    box-shadow: 0 0 18px rgba(34, 211, 238, 0.16), 0 0 42px rgba(34, 211, 238, 0.05);
-  }
-  50% {
-    box-shadow: 0 0 26px rgba(34, 211, 238, 0.3), 0 0 60px rgba(34, 211, 238, 0.09);
-  }
-}
-.hero-badge {
-  animation: hero-float 3.2s ease-in-out infinite, hero-halo 3.2s ease-in-out infinite;
 }
 
 /* 骨架微光(通用 loading) */
@@ -310,12 +271,12 @@ body {
   }
 }
 .shimmer {
-  background: linear-gradient(90deg, rgba(120, 150, 190, 0.06) 25%, rgba(120, 150, 190, 0.14) 50%, rgba(120, 150, 190, 0.06) 75%);
+  background: linear-gradient(90deg, rgba(60, 64, 67, 0.05) 25%, rgba(60, 64, 67, 0.12) 50%, rgba(60, 64, 67, 0.05) 75%);
   background-size: 400px 100%;
   animation: shimmer 1.4s linear infinite;
 }
 
-/* 分区标题: 字母拉开 + 左侧青色刻度 */
+/* 分区标题: 字母拉开 + 左侧蓝色刻度 */
 .section-title {
   display: flex;
   align-items: center;
@@ -328,7 +289,7 @@ body {
   width: 3px;
   height: 10px;
   border-radius: 2px;
-  background: linear-gradient(180deg, #22d3ee, rgba(34, 211, 238, 0.25));
+  background: #1a73e8;
 }
 
 /* 键帽(快捷键提示) */
@@ -337,10 +298,10 @@ body {
   align-items: center;
   padding: 1px 5px;
   border-radius: 4px;
-  border: 1px solid #1b2432;
-  background: rgba(12, 16, 23, 0.8);
+  border: 1px solid #e3e1db;
+  background: #f5f4f0;
   font-size: 9.5px;
-  color: #7d8ea3;
+  color: #5f6368;
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   line-height: 1.5;
 }

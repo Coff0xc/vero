@@ -25,10 +25,10 @@ function fmt(e: SSEEvent): string {
   switch (e.kind) {
     case 'engine': return `引擎: ${e.data.engine} · 目标: ${e.data.target}`
     case 'step': return `思考 L${e.data.level} ${e.data.tool}: ${e.data.why ?? ''}`
-    case 'tool': return `${e.data.tool} ${e.data.success ? '✓ 成功' : '✗ 失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
-    case 'graph': return `${e.data.confirm ? '✓ 已证实' : '○ 待验证'} ${e.data.confirm ?? e.data.hypothesis ?? ''}`
+    case 'tool': return `${e.data.tool} ${e.data.success ? '成功' : '失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
+    case 'graph': return `${e.data.confirm ? '已证实' : '待验证'} ${e.data.confirm ?? e.data.hypothesis ?? ''}`
     case 'edge': return `${e.data.src} —${e.data.rel}→ ${e.data.dst}`
-    case 'hitl_request': return `⚠ 需授权 L${e.data.level} ${e.data.tool}`
+    case 'hitl_request': return `需授权 L${e.data.level} ${e.data.tool}`
     case 'route': return `服务 ${e.data.services.join(' · ') || '—'} → 激活 ${e.data.activated.join(' · ') || '无'}`
     case 'summary': return `已证实 ${e.data.confirmed} · 待验证 ${e.data.hypothesis} · 证据违规 ${e.data.evidence_violations}`
     case 'done': return `战役结束: ${e.data.reason ?? ''}`
@@ -37,15 +37,15 @@ function fmt(e: SSEEvent): string {
     case 'workflow_stage': return `阶段: ${e.data.stage}${e.data.desc ? ` — ${e.data.desc}` : ''}`
     case 'workflow_complete': return `工作流完成: ${e.data.workflow}`
     case 'workflow_cancelled': return `工作流已取消: ${e.data.workflow}`
-    case 'tool_result': return `${e.data.tool} ${e.data.success ? '✓ 成功' : '✗ 失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
-    case 'tool_error': return `${e.data.tool} ✗ ${e.data.error}`
+    case 'tool_result': return `${e.data.tool} ${e.data.success ? '成功' : '失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
+    case 'tool_error': return `${e.data.tool} 失败: ${e.data.error}`
     case 'path': return `主路径: ${e.data.nodes.length ? e.data.nodes.join(' → ') : '—'}`
     case 'phase': return `阶段: ${e.data.phase}`
-    case 'error': return `⚠ ${e.data.msg}`
+    case 'error': return `错误: ${e.data.msg}`
     case 'reflect': return `反思: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'thinking': return `思考: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'hitl':
-      return `${e.data.approved ? '✓ 已放行' : '✗ 已拒绝'} ${e.data.action}`
+      return `${e.data.approved ? '已放行' : '已拒绝'} ${e.data.action}`
   }
 }
 

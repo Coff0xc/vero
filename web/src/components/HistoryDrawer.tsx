@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore, parseEvent } from '../store'
+import { IconClose } from './Icon'
 
 interface Campaign {
   id: number
@@ -69,10 +70,10 @@ export function HistoryDrawer() {
           <span className="section-title font-disp text-[10px] uppercase text-muted">历史战役</span>
           <button
             onClick={() => toggle(false)}
-            className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center text-sm transition-colors"
+            className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center transition-colors"
             aria-label="关闭"
           >
-            ✕
+            <IconClose size={14} />
           </button>
         </div>
         {status === 'running' && (
@@ -94,15 +95,15 @@ export function HistoryDrawer() {
               >
                 <div className="text-[12px] text-muted group-hover:text-ink2 truncate transition-colors">{c.goal}</div>
                 <div className="text-[10px] text-ghost font-mono mt-0.5">
-                  #{c.id} · <span className="text-live/80">✓{c.confirmed}</span> · <span className="text-ghost">○{c.hypothesis}</span> · {c.status}
+                  #{c.id} · <span className="text-live/90">证实 {c.confirmed}</span> · <span>假设 {c.hypothesis}</span> · {c.status}
                 </div>
               </button>
               <button
                 onClick={() => void del(c.id)}
                 title="删除此会话"
-                className="shrink-0 text-[11px] text-ghost hover:text-alert opacity-0 group-hover:opacity-100 transition-all px-1.5 py-0.5 rounded hover:bg-alert/10"
+                className="shrink-0 flex items-center justify-center w-6 h-6 text-ghost hover:text-alert opacity-0 group-hover:opacity-100 transition-all rounded hover:bg-alert/10"
               >
-                ✕
+                <IconClose size={12} />
               </button>
             </div>
           ))}

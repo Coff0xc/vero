@@ -1,5 +1,6 @@
 import { useStore } from '../store'
 import { STAGES, ENGINE_ZH } from '../lib/i18n'
+import { IconShield, IconAlert, IconCommand } from './Icon'
 
 // 顶部状态栏 —— 指挥台式布局的全局状态中枢:
 // 左: Logo + 目标 | 中: 阶段进度条 | 右: KPI 计数 + 引擎 chip + 状态灯 + ⌘K。
@@ -27,8 +28,8 @@ export function TopBar() {
     <header className="h-11 shrink-0 flex items-center gap-4 px-3.5 border-b border-line/80 glass relative z-20">
       {/* Logo + 目标 */}
       <div className="flex items-center gap-2.5 min-w-0">
-        <span className="w-[26px] h-[26px] rounded-md bg-gradient-to-br from-signal/30 to-violet/20 border border-signal/40 flex items-center justify-center text-[13px] shadow-glow-signal">
-          🦅
+        <span className="w-[26px] h-[26px] rounded-md bg-signal/10 border border-signal/30 flex items-center justify-center text-signal">
+          <IconShield size={15} />
         </span>
         <span className="font-disp text-[13px] font-semibold text-ink2 tracking-wide hidden sm:inline">Vero</span>
         <span className="text-ghost text-[11px] hidden md:inline">·</span>
@@ -67,8 +68,8 @@ export function TopBar() {
           假设 <span className="text-ghost">{kpi.hypothesis}</span>
         </span>
         {kpi.evidenceViolations > 0 && (
-          <span className="text-alert" title="证据违规(疑似幻觉)">
-            ⚠ {kpi.evidenceViolations}
+          <span className="inline-flex items-center gap-1 text-alert" title="证据违规(疑似幻觉)">
+            <IconAlert size={11} /> {kpi.evidenceViolations}
           </span>
         )}
       </div>
@@ -89,7 +90,7 @@ export function TopBar() {
           className="flex items-center gap-1.5 text-[10.5px] text-muted hover:text-ink2 border border-line/80 bg-panel2/70 hover:border-signal/40 rounded-md px-2 py-1 transition-colors"
           title="命令面板 (Ctrl+K)"
         >
-          <span className="text-[11px]">⌘</span>
+          <IconCommand size={11} />
           <span className="kbd">Ctrl K</span>
         </button>
       </div>

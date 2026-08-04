@@ -1,5 +1,6 @@
 import { useStore } from '../store'
 import { NODE_STATE_LABELS } from '../lib/i18n'
+import { IconClose } from './Icon'
 import type { NodeState } from '../types'
 
 // 节点 type → 中文(仅展示层, type 标识本身保持英文)。
@@ -16,7 +17,7 @@ const NODE_TYPE_LABELS: Record<string, string> = {
 // severity → Tailwind 静态类(徽标用)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#fb923c] border-[#fb923c]',
+  high: 'text-[#e8710a] border-[#e8710a]',
   medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
@@ -65,10 +66,10 @@ export function EvidenceDrawer() {
         <span className="section-title font-disp text-[10px] uppercase text-muted">证据检视</span>
         <button
           onClick={() => select(null)}
-          className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center text-sm transition-colors"
+          className="text-muted hover:text-alert hover:bg-alert/10 rounded-md w-6 h-6 flex items-center justify-center transition-colors"
           aria-label="关闭"
         >
-          ✕
+          <IconClose size={14} />
         </button>
       </div>
       <div className="text-[12.5px] font-mono text-signal my-2.5 px-4 break-all leading-relaxed">{selected ?? '—'}</div>

@@ -165,10 +165,10 @@ export function ToolManager() {
               {status && (
                 <div className="pt-2 border-t border-line">
                   {status.available ? (
-                    <span className="text-live text-xs">✓ 可用</span>
+                    <span className="text-live text-xs">可用</span>
                   ) : (
                     <div>
-                      <span className="text-alert text-xs">✗ 不可用</span>
+                      <span className="text-alert text-xs">不可用</span>
                       {status.error && (
                         <p className="text-[11px] text-muted mt-1 truncate" title={status.error}>
                           {status.error}
@@ -205,7 +205,7 @@ export function ToolManager() {
                   )}
                   {feedback && (
                     <p className={`text-[11px] mt-1.5 ${feedback.ok ? 'text-live' : 'text-alert'}`}>
-                      {feedback.ok ? '✓ ' : '✗ '}
+                      
                       {feedback.msg}
                     </p>
                   )}

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { LEVEL_ZH, EVENT_LABELS } from '../lib/i18n'
 import { TARGET_RE, STOP_RE, startCampaign, cancelCampaign } from '../lib/actions'
+import { IconShield, IconChevron, IconAlert, IconStop, IconSend, IconSparkle } from './Icon'
 import type { ChatMessage } from '../types'
 
 // 阶段 → 中文 + 颜色。
@@ -22,13 +23,13 @@ const PHASE_COLOR: Record<string, string> = {
   done: 'text-live border-live',
 }
 
-// severity → 徽章样式(新色板: 玫红/橙/琥珀/翡翠/灰)。
+// severity → 徽章样式(Google 亮色: 红/橙/琥珀/绿/灰)。
 const SEV_BADGE: Record<string, string> = {
-  critical: 'bg-alert/15 text-alert border-alert/40',
-  high: 'bg-[#fb923c]/15 text-[#fb923c] border-[#fb923c]/40',
-  medium: 'bg-warn/15 text-warn border-warn/40',
-  low: 'bg-live/15 text-live border-live/40',
-  info: 'bg-ghost/15 text-muted border-ghost/40',
+  critical: 'bg-alert/10 text-alert border-alert/40',
+  high: 'bg-[#e8710a]/10 text-[#e8710a] border-[#e8710a]/40',
+  medium: 'bg-warn/10 text-warn border-warn/40',
+  low: 'bg-live/10 text-live border-live/40',
+  info: 'bg-ghost/10 text-muted border-ghost/40',
 }
 
 function clip(s: string, n: number): string {
@@ -57,10 +58,13 @@ function ToolCard({ m }: { m: ChatMessage }) {
             L{m.meta.level} {LEVEL_ZH[m.meta.level] ?? ''}
           </span>
         )}
-        <span className={`text-[11px] font-medium ${ok ? 'text-live' : 'text-alert'}`}>{ok ? '✓ 成功' : '✗ 失败'}</span>
+        <span className={`text-[11px] font-medium ${ok ? 'text-live' : 'text-alert'}`}>{ok ? '成功' : '失败'}</span>
         {stdout && (
-          <button onClick={() => setOpen((v) => !v)} className="ml-auto text-[10px] text-muted hover:text-signal transition-colors font-mono">
-            {open ? '▾ 收起输出' : '▸ 查看输出'}
+          <button onClick={() => setOpen((v) => !v)} className="ml-auto inline-flex items-center gap-1 text-[10px] text-muted hover:text-signal transition-colors font-mono">
+            <span className={`inline-flex transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>
+              <IconChevron size={10} />
+            </span>
+            {open ? '收起输出' : '查看输出'}
           </button>
         )}
       </div>
@@ -76,7 +80,7 @@ function ToolCard({ m }: { m: ChatMessage }) {
 function FindingCard({ m }: { m: ChatMessage }) {
   const nodes = useStore((s) => s.nodes)
   const select = useStore((s) => s.select)
-  // text 形如 "✓ 已证实 finding:xxx" / "○ 待验证 claim:xxx" —— 取节点 id。
+  // text 形如 "已证实 finding:xxx" / "待验证 claim:xxx" —— 取节点 id(冒号后部分)。
   const id = useMemo(() => {
     const t = m.text
     const i = t.indexOf(':')
@@ -84,7 +88,7 @@ function FindingCard({ m }: { m: ChatMessage }) {
   }, [m.text])
   const n = nodes[id]
   const sev = n?.severity ?? 'info'
-  const confirmed = m.kind === 'graph' && m.text.startsWith('✓')
+  const confirmed = m.kind === 'graph' && m.text.startsWith('已证实')
   return (
     <button
       onClick={() => select(id || null)}
@@ -115,7 +119,7 @@ function ReflectCard({ m }: { m: ChatMessage }) {
   return (
     <div className="rounded-lg border border-violet/30 bg-violet/8 px-3 py-2.5 mb-1 msg-in">
       <div className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet uppercase mb-1">
-        <span className="animate-pulse">◉</span> AI 战略反思
+        <span className="inline-block w-1.5 h-1.5 rounded-full bg-violet animate-pulse" /> 战役反思
       </div>
       <div className="text-[12.5px] leading-relaxed text-ink2 whitespace-pre-wrap">{text}</div>
     </div>
@@ -131,8 +135,10 @@ function ThinkingCard({ m }: { m: ChatMessage }) {
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet/80 uppercase"
       >
-        <span className="inline-block w-1.5 h-3 bg-violet/60 animate-pulse" />
-        深度思考{open ? ' ▾' : ' ▸'} · 点击展开/收起
+        <span className={`inline-flex transition-transform duration-150 ${open ? 'rotate-90' : ''}`}>
+          <IconChevron size={11} />
+        </span>
+        决策推理{open ? ' · 收起' : ' · 点击展开'}
       </button>
       {open && (
         <div className="mt-1.5 text-[12px] leading-relaxed text-muted whitespace-pre-wrap border-t border-violet/15 pt-1.5">
@@ -159,7 +165,9 @@ function PlanCard({ m }: { m: ChatMessage }) {
   const why = m.meta?.rationale
   return (
     <div className="rounded-lg border border-signal/25 bg-signal/5 px-3 py-2 mb-1 msg-in">
-      <div className="text-[10px] text-signal font-disp tracking-wider uppercase mb-1">▸ 行动计划</div>
+      <div className="flex items-center gap-1 text-[10px] text-signal font-disp tracking-wider uppercase mb-1">
+        <IconChevron size={11} /> 行动计划
+      </div>
       <div className="text-[12px] text-ink2">
         {count !== undefined ? `下一步计划 ${count} 步` : '计划'} {why ? `· ${clip(why, 120)}` : ''}
       </div>
@@ -190,7 +198,7 @@ function HitlCard({ m }: { m: ChatMessage }) {
   return (
     <div className="rounded-lg border border-alert/50 bg-alert/10 px-3.5 py-3 mb-1 msg-in shadow-glow-alert">
       <div className="flex items-center gap-2 text-[11px] text-alert font-disp tracking-wider uppercase mb-1.5">
-        <span className="animate-pulse text-[13px]">⚠</span> 需要人工授权
+        <IconAlert size={13} className="animate-pulse" /> 需要人工授权
       </div>
       <div className="font-mono text-[13px] text-ink2 font-medium">{tool}</div>
       {why && <div className="text-[12px] text-muted mt-1 leading-relaxed">{why}</div>}
@@ -200,14 +208,14 @@ function HitlCard({ m }: { m: ChatMessage }) {
           disabled={busy}
           className="btn-accent px-3.5 py-1.5 text-[12px] rounded-md disabled:opacity-40"
         >
-          ✓ 放行
+          放行
         </button>
         <button
           onClick={() => decide(false)}
           disabled={busy}
           className="btn-danger px-3.5 py-1.5 text-[12px] rounded-md border border-alert/60 text-alert hover:bg-alert/15 disabled:opacity-40"
         >
-          ✗ 拒绝
+          拒绝
         </button>
       </div>
     </div>
@@ -391,15 +399,15 @@ export function ChatView() {
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6">
         {empty ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-5 msg-in px-4">
-            <div className="hero-badge w-[72px] h-[72px] rounded-2xl border border-signal/40 bg-gradient-to-br from-signal/20 to-violet/10 flex items-center justify-center text-[34px] shadow-glow-signal">
-              🦅
+            <div className="w-[64px] h-[64px] rounded-2xl border border-line bg-white flex items-center justify-center text-signal shadow-card">
+              <IconShield size={30} />
             </div>
             <div>
-              <div className="font-disp text-[22px] font-semibold tracking-wide bg-gradient-to-r from-signal via-ink2 to-violet bg-clip-text text-transparent">
-                Vero 自主渗透助手
+              <div className="font-disp text-[22px] font-semibold tracking-wide text-ink2">
+                Vero 渗透测试助手
               </div>
               <div className="text-[13px] text-muted mt-2">
-                发目标让我自主渗透 · 或直接问我任何问题
+                粘贴目标开始自主渗透 · 或直接提问
               </div>
               <div className="text-[11px] text-ghost mt-1.5 font-mono">
                 例: 「http://localhost:3000」跑战役 · 「这个 SQLi 严重吗」问答 · 「停止」取消
@@ -410,17 +418,17 @@ export function ChatView() {
                 <button
                   key={t}
                   onClick={() => void start(t)}
-                  className="group px-4 py-2 text-[12px] font-mono rounded-full border border-line bg-panel2/60 text-muted hover:text-signal hover:border-signal/50 hover:shadow-glow-signal transition-all duration-200 card-lift"
+                  className="group inline-flex items-center gap-1.5 px-4 py-2 text-[12px] font-mono rounded-full border border-line bg-white text-muted hover:text-signal hover:border-signal/50 hover:shadow-glow-signal transition-all duration-200 card-lift"
                 >
-                  <span className="text-signal/60 group-hover:text-signal mr-1.5">▸</span>
+                  <IconChevron size={12} className="text-signal/60 group-hover:text-signal" />
                   {t}
                 </button>
               ))}
               <button
                 onClick={() => void ask('渗透测试中 SQL 注入的原理、危害与防御是什么？')}
-                className="px-4 py-2 text-[12px] rounded-full border border-line bg-panel2/60 text-muted hover:text-violet hover:border-violet/50 hover:shadow-glow-violet transition-all duration-200 card-lift"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-[12px] rounded-full border border-line bg-white text-muted hover:text-violet hover:border-violet/50 hover:shadow-glow-violet transition-all duration-200 card-lift"
               >
-                <span className="text-violet/70 mr-1.5">✦</span>
+                <IconSparkle size={12} className="text-violet/70" />
                 试试问我: SQLi 是什么
               </button>
             </div>
@@ -458,16 +466,16 @@ export function ChatView() {
             {status === 'running' ? (
               <button
                 onClick={() => void cancelCampaign()}
-                className="btn-danger px-3.5 py-2 text-[12px] rounded-lg border border-alert/60 text-alert hover:bg-alert/15 shrink-0 font-medium"
+                className="btn-danger inline-flex items-center gap-1.5 px-3.5 py-2 text-[12px] rounded-lg border border-alert/60 text-alert hover:bg-alert/15 shrink-0 font-medium"
                 title="停止当前战役"
               >
-                ■ 停止
+                <IconStop size={12} /> 停止
               </button>
             ) : (
               <button
                 onClick={() => submit(input)}
                 disabled={thinking}
-                className="btn-accent px-4 py-2 text-[12px] rounded-lg shrink-0"
+                className="btn-accent inline-flex items-center gap-1.5 px-4 py-2 text-[12px] rounded-lg shrink-0"
               >
                 {thinking ? (
                   <span className="flex gap-0.5 px-1">
@@ -476,7 +484,9 @@ export function ChatView() {
                     <span className="dot-pulse">●</span>
                   </span>
                 ) : (
-                  '⟶ 发送'
+                  <>
+                    <IconSend size={12} /> 发送
+                  </>
                 )}
               </button>
             )}

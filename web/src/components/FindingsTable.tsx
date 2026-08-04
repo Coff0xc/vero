@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { NODE_STATE_LABELS } from '../lib/i18n'
+import { IconChevron } from './Icon'
 import type { GraphNode, NodeState } from '../types'
 
 // 发现节点表 —— 从攻击图节点里筛 type==='finding', 可排序 / 按严重度过滤。
@@ -12,7 +13,7 @@ const SEV_WEIGHT: Record<string, number> = { critical: 5, high: 4, medium: 3, lo
 // severity → 徽标 Tailwind 静态类(避免 JIT 漏扫动态类名)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#fb923c] border-[#fb923c]',
+  high: 'text-[#e8710a] border-[#e8710a]',
   medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
@@ -154,7 +155,9 @@ export function FindingsTable() {
           className="flex-1 flex items-center gap-2 font-disp text-[10px] tracking-[2.5px] uppercase text-muted hover:text-ink2 transition-colors text-left"
           title={collapsed ? '展开发现列表' : '折叠发现列表'}
         >
-          <span className={`inline-block transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+          <span className={`inline-flex text-muted transition-transform ${collapsed ? '-rotate-90' : ''}`}>
+            <IconChevron size={12} className="rotate-90" />
+          </span>
           发现 <span className="text-signal">({rows.length})</span>
         </button>
         <label className="text-[10px] font-disp tracking-wider text-muted">严重度</label>

@@ -109,11 +109,11 @@ export function ProviderSection() {
         <div className="font-disp text-[10px] tracking-[2.5px] uppercase text-muted">模型提供商 (OpenAI 兼容)</div>
         <div className="flex gap-3 text-[11px]">
           <label className="flex items-center gap-1.5 text-muted cursor-pointer">
-            <input type="checkbox" checked={yolo} onChange={(e) => setYolo(e.target.checked)} className="accent-[#22d3ee]" />
+            <input type="checkbox" checked={yolo} onChange={(e) => setYolo(e.target.checked)} className="accent-[#1a73e8]" />
             <span className={yolo ? 'text-alert font-semibold' : ''}>YOLO 免审批</span>
           </label>
           <label className="flex items-center gap-1.5 text-muted cursor-pointer">
-            <input type="checkbox" checked={deepThinking} onChange={(e) => setDeepThinking(e.target.checked)} className="accent-[#22d3ee]" />
+            <input type="checkbox" checked={deepThinking} onChange={(e) => setDeepThinking(e.target.checked)} className="accent-[#1a73e8]" />
             <span className={deepThinking ? 'text-live font-semibold' : ''}>深度思考</span>
           </label>
         </div>
@@ -121,7 +121,7 @@ export function ProviderSection() {
 
       {yolo && (
         <div className="text-[11px] text-alert border border-alert/40 bg-alert/8 rounded px-2.5 py-1.5">
-          ⚠ YOLO 模式已开启: 所有攻击动作(L3/L4)自动放行, 不再请求人工审批 — 仅用于授权靶场/自动化。
+          YOLO 模式已开启: 所有攻击动作(L3/L4)自动放行, 不再请求人工审批 — 仅用于授权靶场/自动化。
         </div>
       )}
 
@@ -150,7 +150,7 @@ export function ProviderSection() {
                   activeId === p.id ? 'border-live text-live bg-live/10' : 'border-line text-muted hover:text-ink2'
                 }`}
               >
-                {activeId === p.id ? '● 生效中' : '○ 设为生效'}
+                {activeId === p.id ? '生效中' : '设为生效'}
               </button>
               <span className="text-[12px] text-ink2 font-mono">{p.name}</span>
             </div>
@@ -205,7 +205,7 @@ export function ProviderSection() {
                   type="checkbox"
                   checked={p.supports_reasoning}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, supports_reasoning: e.target.checked }))}
-                  className="accent-[#22d3ee]"
+                  className="accent-[#1a73e8]"
                 />
                 深度思考
               </label>
@@ -214,7 +214,7 @@ export function ProviderSection() {
                   type="checkbox"
                   checked={p.web_search}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, web_search: e.target.checked }))}
-                  className="accent-[#22d3ee]"
+                  className="accent-[#1a73e8]"
                 />
                 联网搜索
               </label>

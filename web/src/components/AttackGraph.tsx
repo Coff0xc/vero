@@ -4,28 +4,29 @@ import { ReactFlow, Background, MiniMap, type Node, type NodeProps, type Edge } 
 import '@xyflow/react/dist/style.css'
 import { useStore } from '../store'
 import type { GraphEdge, NodeState } from '../types'
+import { IconSearch, IconClose } from './Icon'
 
 // 杀伤链阶段: 节点按 type 映射到列, 从左到右 = 攻击推进方向。
 const STAGE: Record<string, number> = {
   host: 0, service: 0, finding: 1, web_shell: 2, cred: 3, claim: 3, foothold: 4,
 }
 
-// 主题色(与 tailwind token 同步): 青=主路径/聚焦, 翡翠=已证实, 玫瑰=证伪/严重。
+// 主题色(与 tailwind token 同步, 亮色): 蓝=主路径/聚焦, 绿=已证实, 红=证伪/严重。
 const C = {
-  signal: '#22d3ee',
-  live: '#34d399',
-  alert: '#fb7185',
-  warn: '#fbbf24',
-  high: '#fb923c',
-  ghost: '#54637a',
-  edgeDim: '#233042',
-  ink: '#05070c',
-  text: '#d7e1ec',
-  refutedText: '#e3bcba',
-  bgRefuted: '#241217',
-  bgMain: '#0a2129',
-  bgConfirmed: '#0b2920',
-  bgHypo: '#131c29',
+  signal: '#1a73e8',
+  live: '#188038',
+  alert: '#d93025',
+  warn: '#b06000',
+  high: '#e8710a',
+  ghost: '#9aa0a6',
+  edgeDim: '#d2d0ca',
+  ink: '#ffffff',
+  text: '#202124',
+  refutedText: '#a50e0e',
+  bgRefuted: '#fce8e6',
+  bgMain: '#e8f0fe',
+  bgConfirmed: '#e6f4ea',
+  bgHypo: '#f1f3f4',
 }
 
 // severity → 十六进制(画布导出用)。
@@ -36,10 +37,10 @@ const SEV_HEX: Record<string, string> = {
   low: C.live,
   info: C.ghost,
 }
-// severity → Tailwind 静态类(徽标用)。
+// severity → Tailwind 静态类(徽标用)。high 用橙(C.high 同步, 无独立 token)。
 const SEV_STYLE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#fb923c] border-[#fb923c]',
+  high: 'text-[#e8710a] border-[#e8710a]',
   medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
@@ -82,13 +83,13 @@ function AttackGraphNodeView({ data, selected }: NodeProps) {
   const border = refuted ? C.alert : d.matched ? C.signal : d.onMainPath ? C.signal : d.state === 'confirmed' ? C.live : C.ghost
   const bg = refuted ? C.bgRefuted : d.onMainPath ? C.bgMain : d.state === 'confirmed' ? C.bgConfirmed : C.bgHypo
   const glow = d.matched
-    ? '0 0 16px rgba(34,211,238,.55)'
+    ? '0 0 0 2px rgba(26, 115, 232, 0.45)'
     : refuted
-      ? '0 0 10px rgba(251,113,133,.35)'
+      ? '0 0 0 1.5px rgba(217, 48, 37, 0.35)'
       : d.onMainPath
-        ? '0 0 14px rgba(34,211,238,.4)'
+        ? '0 0 0 1.5px rgba(26, 115, 232, 0.4)'
         : d.state === 'confirmed'
-          ? '0 0 10px rgba(52,211,153,.3)'
+          ? '0 0 0 1px rgba(24, 128, 56, 0.25)'
           : 'none'
   return (
     <div
@@ -97,7 +98,7 @@ function AttackGraphNodeView({ data, selected }: NodeProps) {
         background: bg,
         border: `${selected ? 2.5 : refuted || d.matched || d.onMainPath ? 2 : 1.5}px solid ${border}`,
         color: refuted ? C.refutedText : C.text,
-        boxShadow: selected ? '0 0 16px rgba(34,211,238,.55)' : glow,
+        boxShadow: selected ? '0 0 0 3px rgba(26, 115, 232, 0.3)' : glow,
         width: '100%',
         transition: 'box-shadow .15s, border-color .15s',
       }}
@@ -266,7 +267,7 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
         ctx.fillText(text, bx + 4, by + 2)
         bx += tw + 4
       }
-      if (d.severity) badge(d.severity.toUpperCase(), SEV_HEX[d.severity] ?? '#7d8ea3')
+      if (d.severity) badge(d.severity.toUpperCase(), SEV_HEX[d.severity] ?? '#9aa0a6')
       if (d.technique) badge(d.technique, C.signal)
     }
   }
@@ -403,7 +404,7 @@ export function AttackGraph() {
       {/* 搜索框: 命中高亮, 未命中淡化; 计数提示 */}
       <div className="absolute left-4 top-3 z-10 flex items-center gap-2">
         <div className="flex items-center gap-1.5 bg-ink/80 border border-line/80 focus-within:border-signal/50 rounded-md px-2.5 py-1.5 transition-colors">
-          <span className="text-ghost text-[11px]">🔍</span>
+          <span className="text-ghost"><IconSearch size={12} /></span>
           <input
             value={nodeQuery}
             onChange={(e) => setNodeQuery(e.target.value)}
@@ -411,8 +412,8 @@ export function AttackGraph() {
             className="w-32 bg-transparent outline-none text-[11px] font-mono text-ink2 placeholder:text-ghost/70"
           />
           {nodeQuery && (
-            <button onClick={() => setNodeQuery('')} className="text-ghost hover:text-alert text-[10px]" aria-label="清空搜索">
-              ✕
+            <button onClick={() => setNodeQuery('')} className="text-ghost hover:text-alert flex items-center" aria-label="清空搜索">
+              <IconClose size={11} />
             </button>
           )}
         </div>
@@ -444,13 +445,13 @@ export function AttackGraph() {
         nodesConnectable={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#141d2b" gap={22} />
+        <Background color="#e8e6e1" gap={22} />
         <MiniMap
           position="bottom-left"
           pannable
           zoomable
-          bgColor="#05070c"
-          maskColor="rgba(5,7,12,0.72)"
+          bgColor="#f5f4f0"
+          maskColor="rgba(60, 64, 67, 0.12)"
           nodeColor={(n) => nodeColorFor((n.data as Partial<RFNodeData>) ?? {})}
         />
       </ReactFlow>
@@ -467,7 +468,7 @@ function Legend() {
         假设, 未坐实
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-live" style={{ boxShadow: '0 0 6px #34d399' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-live" style={{ boxShadow: '0 0 4px #188038' }} />
         已证实
       </div>
       <div>
@@ -475,11 +476,11 @@ function Legend() {
         已证伪
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-signal" style={{ boxShadow: '0 0 6px #22d3ee' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-signal" style={{ boxShadow: '0 0 4px #1a73e8' }} />
         主攻击路径
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ border: '2px solid #22d3ee' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ border: '2px solid #1a73e8' }} />
         当前选中
       </div>
     </div>
