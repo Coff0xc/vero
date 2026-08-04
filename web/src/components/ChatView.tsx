@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { LEVEL_ZH, EVENT_LABELS } from '../lib/i18n'
+import { TARGET_RE, STOP_RE, startCampaign, cancelCampaign } from '../lib/actions'
 import type { ChatMessage } from '../types'
 
 // 阶段 → 中文 + 颜色。
@@ -21,13 +22,13 @@ const PHASE_COLOR: Record<string, string> = {
   done: 'text-live border-live',
 }
 
-// severity → 徽章样式。
+// severity → 徽章样式(新色板: 玫红/橙/琥珀/翡翠/灰)。
 const SEV_BADGE: Record<string, string> = {
-  critical: 'bg-[#ff5c4d]/15 text-[#ff5c4d] border-[#ff5c4d]/40',
-  high: 'bg-[#ff9d5c]/15 text-[#ff9d5c] border-[#ff9d5c]/40',
-  medium: 'bg-[#e8b23a]/15 text-[#e8b23a] border-[#e8b23a]/40',
-  low: 'bg-[#4ec9b0]/15 text-[#4ec9b0] border-[#4ec9b0]/40',
-  info: 'bg-[#5b6b7a]/15 text-[#728496] border-[#5b6b7a]/40',
+  critical: 'bg-alert/15 text-alert border-alert/40',
+  high: 'bg-[#fb923c]/15 text-[#fb923c] border-[#fb923c]/40',
+  medium: 'bg-warn/15 text-warn border-warn/40',
+  low: 'bg-live/15 text-live border-live/40',
+  info: 'bg-ghost/15 text-muted border-ghost/40',
 }
 
 function clip(s: string, n: number): string {
@@ -112,8 +113,8 @@ function FindingCard({ m }: { m: ChatMessage }) {
 function ReflectCard({ m }: { m: ChatMessage }) {
   const text = m.meta?.rationale ?? m.text.replace(/^反思:\s*/, '')
   return (
-    <div className="rounded-lg border border-[#a78bfa]/30 bg-[#a78bfa]/8 px-3 py-2.5 mb-1 msg-in">
-      <div className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-[#a78bfa] uppercase mb-1">
+    <div className="rounded-lg border border-violet/30 bg-violet/8 px-3 py-2.5 mb-1 msg-in">
+      <div className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet uppercase mb-1">
         <span className="animate-pulse">◉</span> AI 战略反思
       </div>
       <div className="text-[12.5px] leading-relaxed text-ink2 whitespace-pre-wrap">{text}</div>
@@ -125,16 +126,16 @@ function ThinkingCard({ m }: { m: ChatMessage }) {
   const text = m.meta?.rationale ?? m.text.replace(/^思考:\s*/, '')
   const [open, setOpen] = useState(false)
   return (
-    <div className="rounded-lg border border-[#5b6b7a]/25 bg-[#0d1117]/60 px-3 py-1.5 mb-1 msg-in">
+    <div className="rounded-lg border border-violet/20 bg-violet/5 px-3 py-1.5 mb-1 msg-in">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-ghost uppercase"
+        className="flex items-center gap-2 text-[10px] font-disp tracking-wider text-violet/80 uppercase"
       >
-        <span className="inline-block w-1.5 h-3 bg-ghost/60 animate-pulse" />
+        <span className="inline-block w-1.5 h-3 bg-violet/60 animate-pulse" />
         深度思考{open ? ' ▾' : ' ▸'} · 点击展开/收起
       </button>
       {open && (
-        <div className="mt-1.5 text-[12px] leading-relaxed text-[#8fa3b8] whitespace-pre-wrap border-t border-line/40 pt-1.5">
+        <div className="mt-1.5 text-[12px] leading-relaxed text-muted whitespace-pre-wrap border-t border-violet/15 pt-1.5">
           {text}
         </div>
       )}
@@ -179,7 +180,7 @@ function HitlCard({ m }: { m: ChatMessage }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ key: hitl.key, approved }),
       })
-      clearHitl() // 裁决后同步清除全局弹窗(修: 双审批 UI 状态不同步)
+      clearHitl() // 裁决后同步清除全局弹窗(双审批 UI 状态一致)
     } finally {
       setBusy(false)
     }
@@ -236,7 +237,7 @@ function Message({ m }: { m: ChatMessage }) {
   if (m.role === 'user') {
     return (
       <div className="flex justify-end mb-3 msg-in">
-        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-live/20 to-live/8 border border-live/30 px-4 py-2.5 text-[13px] text-ink2 whitespace-pre-wrap shadow-card">
+        <div className="max-w-[85%] rounded-2xl rounded-tr-sm bg-gradient-to-br from-signal/20 to-signal/5 border border-signal/30 px-4 py-2.5 text-[13px] text-ink2 whitespace-pre-wrap shadow-card">
           {m.text}
         </div>
       </div>
@@ -248,7 +249,7 @@ function Message({ m }: { m: ChatMessage }) {
       <div className="flex mb-3 msg-in">
         <div className="max-w-[92%] rounded-2xl rounded-tl-sm bg-panel2 border border-line/60 shadow-inner-line px-4 py-3 text-[13px] leading-relaxed text-ink2 whitespace-pre-wrap">
           {m.text || '…'}
-          {m.text === '' && <span className="inline-block w-1.5 h-4 bg-live/80 align-middle caret-blink ml-0.5 rounded-[1px]" />}
+          {m.text === '' && <span className="inline-block w-1.5 h-4 bg-signal/80 align-middle caret-blink ml-0.5 rounded-[1px]" />}
         </div>
       </div>
     )
@@ -288,7 +289,6 @@ function Message({ m }: { m: ChatMessage }) {
 export function ChatView() {
   const messages = useStore((s) => s.messages)
   const status = useStore((s) => s.status)
-  const reset = useStore((s) => s.reset)
   const pushMsg = useStore((s) => s.pushMsg)
   const patchMsg = useStore((s) => s.patchMsg)
   const engineLabel = useStore((s) => s.engineLabel)
@@ -304,31 +304,13 @@ export function ChatView() {
   const start = async (target: string) => {
     const t = target.trim()
     if (!t) return
-    try {
-      const r = await fetch('/start', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target: t }),
-      })
-      const body = (await r.json().catch(() => ({}))) as { ok?: boolean; err?: string }
-      if (!r.ok || !body.ok) {
-        // 拒绝时保留当前窗口并提示(修: 原实现先清空消息再静默发请求, busy 拒绝时无反馈)。
-        pushMsg('assistant', 'chat', '无法启动战役: ' + (body.err ?? `HTTP ${r.status}`))
-        return
-      }
-      reset(t)
-      setInput(t)
-    } catch (err) {
-      pushMsg('assistant', 'chat', '启动战役失败: ' + String(err))
+    const r = await startCampaign(t)
+    if (!r.ok) {
+      // 拒绝时保留当前窗口并提示(busy 拒绝/网络错误可见)。
+      pushMsg('assistant', 'chat', '无法启动战役: ' + (r.err ?? '未知错误'))
+      return
     }
-  }
-
-  const cancel = async () => {
-    try {
-      await fetch('/cancel', { method: 'POST' })
-    } catch (err) {
-      console.error('取消防败:', err)
-    }
+    setInput(t)
   }
 
   // 打字机效果: 逐字填充回答(每帧 2 字符)。
@@ -374,17 +356,17 @@ export function ChatView() {
     }
   }
 
-  // 意图分流: 目标(URL/主机) -> 跑战役; 停止类命令 -> 取消; 其余 -> 问答。
+  // 意图分流: 停止类指令优先(避免裸词被目标正则吞掉) -> 目标跑战役 -> 其余问答。
   const submit = (raw: string) => {
     const t = raw.trim()
     if (!t || thinking) return
-    if (/^(https?:\/\/)?([\w-]+\.)*[\w-]+(\.[a-zA-Z]{2,})?(:\d+)?([/?#]\S*)?$/i.test(t) && !t.includes(' ')) {
-      void start(t)
+    if (STOP_RE.test(t)) {
+      pushMsg('user', 'user', t)
+      void cancelCampaign()
       return
     }
-    if (/^(停止|取消|停|stop|cancel|别再)/i.test(t)) {
-      pushMsg('user', 'user', t)
-      void cancel()
+    if (TARGET_RE.test(t) && !t.includes(' ')) {
+      void start(t)
       return
     }
     // 一般问题/指令 -> AI 问答。
@@ -409,11 +391,11 @@ export function ChatView() {
       <div className="flex-1 min-h-0 overflow-y-auto px-4 md:px-8 py-6">
         {empty ? (
           <div className="h-full flex flex-col items-center justify-center text-center gap-5 msg-in px-4">
-            <div className="hero-badge w-[72px] h-[72px] rounded-2xl border border-live/40 bg-gradient-to-br from-live/20 to-live/5 flex items-center justify-center text-[34px] shadow-glow-live">
+            <div className="hero-badge w-[72px] h-[72px] rounded-2xl border border-signal/40 bg-gradient-to-br from-signal/20 to-violet/10 flex items-center justify-center text-[34px] shadow-glow-signal">
               🦅
             </div>
             <div>
-              <div className="font-disp text-[22px] font-semibold tracking-wide bg-gradient-to-r from-signal via-ink2 to-live bg-clip-text text-transparent">
+              <div className="font-disp text-[22px] font-semibold tracking-wide bg-gradient-to-r from-signal via-ink2 to-violet bg-clip-text text-transparent">
                 Vero 自主渗透助手
               </div>
               <div className="text-[13px] text-muted mt-2">
@@ -428,19 +410,24 @@ export function ChatView() {
                 <button
                   key={t}
                   onClick={() => void start(t)}
-                  className="group px-4 py-2 text-[12px] font-mono rounded-full border border-line bg-panel2/60 text-muted hover:text-live hover:border-live/50 hover:shadow-glow-live transition-all duration-200 card-lift"
+                  className="group px-4 py-2 text-[12px] font-mono rounded-full border border-line bg-panel2/60 text-muted hover:text-signal hover:border-signal/50 hover:shadow-glow-signal transition-all duration-200 card-lift"
                 >
-                  <span className="text-live/60 group-hover:text-live mr-1.5">▸</span>
+                  <span className="text-signal/60 group-hover:text-signal mr-1.5">▸</span>
                   {t}
                 </button>
               ))}
               <button
                 onClick={() => void ask('渗透测试中 SQL 注入的原理、危害与防御是什么？')}
-                className="px-4 py-2 text-[12px] rounded-full border border-line bg-panel2/60 text-muted hover:text-signal hover:border-signal/50 hover:shadow-glow-signal transition-all duration-200 card-lift"
+                className="px-4 py-2 text-[12px] rounded-full border border-line bg-panel2/60 text-muted hover:text-violet hover:border-violet/50 hover:shadow-glow-violet transition-all duration-200 card-lift"
               >
-                <span className="text-signal/70 mr-1.5">✦</span>
+                <span className="text-violet/70 mr-1.5">✦</span>
                 试试问我: SQLi 是什么
               </button>
+            </div>
+            <div className="flex items-center gap-3 mt-1 text-[10px] text-ghost/80 font-mono">
+              <span><span className="kbd">Ctrl K</span> 命令面板</span>
+              <span><span className="kbd">Ctrl H</span> 历史战役</span>
+              <span><span className="kbd">G</span> 攻击图全屏</span>
             </div>
           </div>
         ) : (
@@ -454,11 +441,11 @@ export function ChatView() {
         <div className="max-w-3xl mx-auto">
           {engineChip && status !== 'idle' && (
             <div className="text-[10px] text-muted mb-1.5 font-mono flex items-center gap-1.5">
-              <span className={`inline-block w-1.5 h-1.5 rounded-full ${status === 'running' ? 'bg-signal ring-pulse' : 'bg-live'}`} />
+              <span className={`inline-block w-1.5 h-1.5 rounded-full ${status === 'running' ? 'bg-warn ring-pulse' : 'bg-live'}`} />
               {engineChip} · {EVENT_LABELS[status] ?? status}
             </div>
           )}
-          <div className="flex items-end gap-2 rounded-xl border border-line bg-ink/60 shadow-inner-line focus-within:border-live/60 focus-within:shadow-glow-live transition-all duration-200 px-3 py-2">
+          <div className="flex items-end gap-2 rounded-xl border border-line bg-ink/60 shadow-inner-line focus-within:border-signal/60 focus-within:shadow-glow-signal transition-all duration-200 px-3 py-2">
             <textarea
               value={input}
               onChange={(e) => setInput(e.target.value)}
@@ -470,7 +457,7 @@ export function ChatView() {
             />
             {status === 'running' ? (
               <button
-                onClick={() => void cancel()}
+                onClick={() => void cancelCampaign()}
                 className="btn-danger px-3.5 py-2 text-[12px] rounded-lg border border-alert/60 text-alert hover:bg-alert/15 shrink-0 font-medium"
                 title="停止当前战役"
               >
@@ -495,7 +482,7 @@ export function ChatView() {
             )}
           </div>
           <div className="text-[10px] text-ghost/90 mt-2 font-mono flex items-center gap-1.5 flex-wrap">
-            <kbd className="px-1.5 py-0.5 rounded border border-line/80 bg-panel2/80 text-[9.5px] text-muted">Enter</kbd>
+            <span className="kbd">Enter</span>
             <span>发送 · 目标=URL/IP · 其他内容 = 问我 · 攻击动作 L3+ 会请求你授权</span>
           </div>
         </div>

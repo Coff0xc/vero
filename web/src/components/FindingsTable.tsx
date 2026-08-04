@@ -12,8 +12,8 @@ const SEV_WEIGHT: Record<string, number> = { critical: 5, high: 4, medium: 3, lo
 // severity → 徽标 Tailwind 静态类(避免 JIT 漏扫动态类名)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#ff9d5c] border-[#ff9d5c]',
-  medium: 'text-signal border-signal',
+  high: 'text-[#fb923c] border-[#fb923c]',
+  medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
 }

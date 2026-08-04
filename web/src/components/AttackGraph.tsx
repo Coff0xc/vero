@@ -10,19 +10,37 @@ const STAGE: Record<string, number> = {
   host: 0, service: 0, finding: 1, web_shell: 2, cred: 3, claim: 3, foothold: 4,
 }
 
+// 主题色(与 tailwind token 同步): 青=主路径/聚焦, 翡翠=已证实, 玫瑰=证伪/严重。
+const C = {
+  signal: '#22d3ee',
+  live: '#34d399',
+  alert: '#fb7185',
+  warn: '#fbbf24',
+  high: '#fb923c',
+  ghost: '#54637a',
+  edgeDim: '#233042',
+  ink: '#05070c',
+  text: '#d7e1ec',
+  refutedText: '#e3bcba',
+  bgRefuted: '#241217',
+  bgMain: '#0a2129',
+  bgConfirmed: '#0b2920',
+  bgHypo: '#131c29',
+}
+
 // severity → 十六进制(画布导出用)。
 const SEV_HEX: Record<string, string> = {
-  critical: '#ff5c4d',
-  high: '#ff9d5c',
-  medium: '#e8b23a',
-  low: '#4ec9b0',
-  info: '#5b6b7a',
+  critical: C.alert,
+  high: C.high,
+  medium: C.warn,
+  low: C.live,
+  info: C.ghost,
 }
 // severity → Tailwind 静态类(徽标用)。
 const SEV_STYLE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#ff9d5c] border-[#ff9d5c]',
-  medium: 'text-signal border-signal',
+  high: 'text-[#fb923c] border-[#fb923c]',
+  medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
 }
@@ -46,37 +64,40 @@ interface RFNodeData extends Record<string, unknown> {
   updatedAt?: number
   onMainPath?: boolean
   dimmed?: boolean
+  matched?: boolean // 搜索命中(青色高亮环)
 }
 
 function nodeColorFor(d: { state?: NodeState; onMainPath?: boolean }): string {
-  if (d.state === 'refuted') return '#ff5c4d'
-  if (d.onMainPath) return '#e8b23a'
-  if (d.state === 'confirmed') return '#4ec9b0'
-  return '#5b6b7a'
+  if (d.state === 'refuted') return C.alert
+  if (d.onMainPath) return C.signal
+  if (d.state === 'confirmed') return C.live
+  return C.ghost
 }
 
-// 自定义节点: 按 state 着色(confirmed→live, hypothesis→ghost, refuted→alert 灰底红框+删除线),
-// mainPath 节点琥珀色高亮, 有 severity/technique 时追加 TTP 徽标。
+// 自定义节点: 按 state 着色(confirmed→翡翠, hypothesis→灰, refuted→玫红+删除线),
+// mainPath 节点青色高亮, 搜索命中加光环; 有 severity/technique 时追加徽标。
 function AttackGraphNodeView({ data, selected }: NodeProps) {
   const d = data as unknown as RFNodeData
   const refuted = d.state === 'refuted'
-  const border = refuted ? '#ff5c4d' : d.onMainPath ? '#e8b23a' : d.state === 'confirmed' ? '#4ec9b0' : '#5b6b7a'
-  const bg = refuted ? '#231418' : d.onMainPath ? '#241d0e' : d.state === 'confirmed' ? '#0e2b27' : '#18222e'
-  const glow = refuted
-    ? '0 0 10px rgba(255,92,77,.35)'
-    : d.onMainPath
-      ? '0 0 14px rgba(232,178,58,.4)'
-      : d.state === 'confirmed'
-        ? '0 0 10px rgba(78,201,176,.3)'
-        : 'none'
+  const border = refuted ? C.alert : d.matched ? C.signal : d.onMainPath ? C.signal : d.state === 'confirmed' ? C.live : C.ghost
+  const bg = refuted ? C.bgRefuted : d.onMainPath ? C.bgMain : d.state === 'confirmed' ? C.bgConfirmed : C.bgHypo
+  const glow = d.matched
+    ? '0 0 16px rgba(34,211,238,.55)'
+    : refuted
+      ? '0 0 10px rgba(251,113,133,.35)'
+      : d.onMainPath
+        ? '0 0 14px rgba(34,211,238,.4)'
+        : d.state === 'confirmed'
+          ? '0 0 10px rgba(52,211,153,.3)'
+          : 'none'
   return (
     <div
       className="rounded-md px-2 py-1.5 font-mono text-[11px] leading-snug"
       style={{
         background: bg,
-        border: `${selected ? 2.5 : refuted ? 2 : d.onMainPath ? 2 : 1.5}px solid ${border}`,
-        color: refuted ? '#d7b6b2' : '#cdd6e0',
-        boxShadow: selected ? '0 0 16px rgba(232,178,58,.55)' : glow,
+        border: `${selected ? 2.5 : refuted || d.matched || d.onMainPath ? 2 : 1.5}px solid ${border}`,
+        color: refuted ? C.refutedText : C.text,
+        boxShadow: selected ? '0 0 16px rgba(34,211,238,.55)' : glow,
         width: '100%',
         transition: 'box-shadow .15s, border-color .15s',
       }}
@@ -168,7 +189,7 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
   const ctx = canvas.getContext('2d')
   if (!ctx) return
   ctx.scale(scale, scale)
-  ctx.fillStyle = '#0b0f14'
+  ctx.fillStyle = C.ink
   ctx.fillRect(0, 0, W, H)
   ctx.translate(pad - minX, pad - minY)
 
@@ -182,7 +203,7 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
     const tw = t.measured?.width ?? 168
     const th = t.measured?.height ?? 60
     const main = mainPathEdges.has(e.id)
-    ctx.strokeStyle = main ? '#e8b23a' : '#2a3a4a'
+    ctx.strokeStyle = main ? C.signal : C.edgeDim
     ctx.lineWidth = main ? 2.5 : 1.5
     ctx.beginPath()
     ctx.moveTo(s.position.x + sw / 2, s.position.y + sh / 2)
@@ -199,8 +220,8 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
     const y = n.position.y
     const refuted = d.state === 'refuted'
     const main = !!d.onMainPath
-    const border = refuted ? '#ff5c4d' : main ? '#e8b23a' : d.state === 'confirmed' ? '#4ec9b0' : '#5b6b7a'
-    const bg = refuted ? '#231418' : main ? '#241d0e' : d.state === 'confirmed' ? '#0e2b27' : '#18222e'
+    const border = refuted ? C.alert : main ? C.signal : d.state === 'confirmed' ? C.live : C.ghost
+    const bg = refuted ? C.bgRefuted : main ? C.bgMain : d.state === 'confirmed' ? C.bgConfirmed : C.bgHypo
 
     ctx.save()
     ctx.shadowColor = border
@@ -214,13 +235,13 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
     ctx.restore()
 
     ctx.textBaseline = 'top'
-    ctx.fillStyle = refuted ? '#d7b6b2' : '#cdd6e0'
+    ctx.fillStyle = refuted ? C.refutedText : C.text
     ctx.font = '11px ui-monospace, Consolas, "Courier New", monospace'
     const label = shortId(d.id)
     ctx.fillText(label, x + 8, y + 7)
     if (refuted) {
       const tw = ctx.measureText(label).width
-      ctx.strokeStyle = '#ff5c4d'
+      ctx.strokeStyle = C.alert
       ctx.lineWidth = 1
       ctx.beginPath()
       ctx.moveTo(x + 8, y + 16)
@@ -245,8 +266,8 @@ function exportPNG(nodes: Node<RFNodeData>[], edges: Edge[], mainPathEdges: Set<
         ctx.fillText(text, bx + 4, by + 2)
         bx += tw + 4
       }
-      if (d.severity) badge(d.severity.toUpperCase(), SEV_HEX[d.severity] ?? '#728496')
-      if (d.technique) badge(d.technique, '#e8b23a')
+      if (d.severity) badge(d.severity.toUpperCase(), SEV_HEX[d.severity] ?? '#7d8ea3')
+      if (d.technique) badge(d.technique, C.signal)
     }
   }
 
@@ -272,11 +293,31 @@ export function AttackGraph() {
   const edges = useStore((s) => s.edges)
   const mainPath = useStore((s) => s.mainPath)
   const select = useStore((s) => s.select)
+  const nodeQuery = useStore((s) => s.nodeQuery)
+  const setNodeQuery = useStore((s) => s.setNodeQuery)
   // focus: 连通闭包聚焦锚点(本地状态, 点击切换/取消)。
   const [focus, setFocus] = useState<string | null>(null)
 
   // 闭包外的节点降透明度到 0.25。
   const closure = useMemo(() => (focus ? closureOf(focus, edges) : null), [focus, edges])
+
+  // 搜索命中集: id/severity/technique 含查询词(大小写不敏感)。
+  const query = nodeQuery.trim().toLowerCase()
+  const matched = useMemo(() => {
+    if (!query) return null
+    const set = new Set<string>()
+    for (const n of Object.values(nodes)) {
+      if (
+        n.id.toLowerCase().includes(query) ||
+        (n.severity ?? '').toLowerCase().includes(query) ||
+        (n.technique ?? '').toLowerCase().includes(query) ||
+        n.type.toLowerCase().includes(query)
+      ) {
+        set.add(n.id)
+      }
+    }
+    return set
+  }, [nodes, query])
 
   const mainPathSet = useMemo(() => new Set(mainPath), [mainPath])
   const mainPathEdgeIds = useMemo(() => mainPathEdgeIdsOf(mainPath, edges), [mainPath, edges])
@@ -290,7 +331,9 @@ export function AttackGraph() {
     const rfNodes: Node<RFNodeData>[] = Object.values(nodes).map((n) => {
       const st = STAGE[n.type] ?? 1
       const idx = byStage[st].indexOf(n.id)
-      const dimmed = !!closure && !closure.has(n.id)
+      const hit = matched ? matched.has(n.id) : false
+      // 搜索优先于闭包: 有查询时未命中即淡化; 无查询时走闭包聚焦。
+      const dimmed = matched ? !hit : !!closure && !closure.has(n.id)
       return {
         id: n.id,
         type: 'attack',
@@ -308,10 +351,11 @@ export function AttackGraph() {
           updatedAt: n.updatedAt,
           onMainPath: mainPathSet.has(n.id),
           dimmed,
+          matched: matched ? hit : false,
         },
         connectable: false,
         style: {
-          opacity: dimmed ? 0.25 : 1,
+          opacity: dimmed ? (matched ? 0.12 : 0.25) : 1,
           width: 168,
           // 只用 box-shadow 呼吸动画(不动 transform —— 修黑块: 节点 animation 里的
           // transform:scale 会覆盖 ReactFlow 的定位 transform, 导致渲染错位成黑块)。
@@ -321,16 +365,20 @@ export function AttackGraph() {
     })
     const rfEdges: Edge[] = Object.values(edges).map((e) => {
       const main = mainPathEdgeIds.has(e.id)
+      // 搜索时: 两端均命中的边保持亮色, 其余淡化。
+      const bothHit = matched ? matched.has(e.source) && matched.has(e.target) : true
       return {
         id: e.id,
         source: e.source,
         target: e.target,
         animated: main,
-        style: main ? { stroke: '#e8b23a', strokeWidth: 2.5 } : { stroke: '#2a3a4a' },
+        style: main
+          ? { stroke: C.signal, strokeWidth: 2.5, opacity: bothHit ? 1 : 0.15 }
+          : { stroke: C.edgeDim, opacity: bothHit ? 0.9 : 0.08 },
       }
     })
     return { rfNodes, rfEdges }
-  }, [nodes, edges, mainPathSet, mainPathEdgeIds, closure])
+  }, [nodes, edges, mainPathSet, mainPathEdgeIds, closure, matched])
 
   const handleNodeClick = useCallback(
     (_: ReactMouseEvent, n: Node<RFNodeData>) => {
@@ -352,13 +400,34 @@ export function AttackGraph() {
 
   return (
     <div className="absolute inset-0">
-      <div className="absolute left-4 top-3 z-10 font-disp text-[10px] tracking-[2.5px] uppercase text-muted pointer-events-none">
-        攻击图
-        <span className="block text-ghost lowercase tracking-normal mt-1 font-mono">点击节点 → 聚焦连通闭包 / 检视证据</span>
+      {/* 搜索框: 命中高亮, 未命中淡化; 计数提示 */}
+      <div className="absolute left-4 top-3 z-10 flex items-center gap-2">
+        <div className="flex items-center gap-1.5 bg-ink/80 border border-line/80 focus-within:border-signal/50 rounded-md px-2.5 py-1.5 transition-colors">
+          <span className="text-ghost text-[11px]">🔍</span>
+          <input
+            value={nodeQuery}
+            onChange={(e) => setNodeQuery(e.target.value)}
+            placeholder="搜索节点…"
+            className="w-32 bg-transparent outline-none text-[11px] font-mono text-ink2 placeholder:text-ghost/70"
+          />
+          {nodeQuery && (
+            <button onClick={() => setNodeQuery('')} className="text-ghost hover:text-alert text-[10px]" aria-label="清空搜索">
+              ✕
+            </button>
+          )}
+        </div>
+        {matched && (
+          <span className="text-[10px] font-mono text-signal bg-ink/80 border border-signal/30 rounded-md px-2 py-1.5">
+            {matched.size} 命中
+          </span>
+        )}
+      </div>
+      <div className="absolute left-4 top-11 z-10 font-mono text-[9.5px] text-ghost/80 pointer-events-none mt-0.5">
+        点击节点 → 聚焦连通闭包 / 检视证据
       </div>
       <button
         onClick={handleExport}
-        className="absolute right-4 top-3 z-10 font-disp text-[10px] tracking-wider uppercase text-muted hover:text-signal border border-line bg-ink/70 px-2.5 py-1 rounded-sm transition-colors"
+        className="absolute right-4 top-3 z-10 font-disp text-[10px] tracking-wider uppercase text-muted hover:text-signal border border-line bg-ink/80 px-2.5 py-1.5 rounded-md transition-colors"
         title="导出当前攻击图为 PNG"
       >
         导出 PNG
@@ -375,13 +444,13 @@ export function AttackGraph() {
         nodesConnectable={false}
         proOptions={{ hideAttribution: true }}
       >
-        <Background color="#1f2b38" gap={22} />
+        <Background color="#141d2b" gap={22} />
         <MiniMap
           position="bottom-left"
           pannable
           zoomable
-          bgColor="#0b0f14"
-          maskColor="rgba(11,15,20,0.7)"
+          bgColor="#05070c"
+          maskColor="rgba(5,7,12,0.72)"
           nodeColor={(n) => nodeColorFor((n.data as Partial<RFNodeData>) ?? {})}
         />
       </ReactFlow>
@@ -392,13 +461,13 @@ export function AttackGraph() {
 
 function Legend() {
   return (
-    <div className="absolute right-3.5 bottom-3 text-[10px] text-muted font-disp tracking-wider bg-ink/70 px-2.5 py-2 border border-line rounded-sm leading-loose">
+    <div className="absolute right-3.5 bottom-3 text-[10px] text-muted font-disp tracking-wider bg-ink/80 px-2.5 py-2 border border-line/80 rounded-md leading-loose">
       <div>
         <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-ghost" />
         假设, 未坐实
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-live" style={{ boxShadow: '0 0 6px #4ec9b0' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-live" style={{ boxShadow: '0 0 6px #34d399' }} />
         已证实
       </div>
       <div>
@@ -406,11 +475,11 @@ function Legend() {
         已证伪
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-signal" style={{ boxShadow: '0 0 6px #e8b23a' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle bg-signal" style={{ boxShadow: '0 0 6px #22d3ee' }} />
         主攻击路径
       </div>
       <div>
-        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ border: '2px solid #e8b23a' }} />
+        <i className="inline-block w-2 h-2 rounded-full mr-1.5 align-middle" style={{ border: '2px solid #22d3ee' }} />
         当前选中
       </div>
     </div>

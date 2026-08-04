@@ -301,7 +301,7 @@ export function SettingsPanel() {
             step={0.05}
             value={temperature}
             onChange={(e) => setTemperature(Number(e.target.value))}
-            className="flex-1 accent-[#e8b23a]"
+            className="flex-1 accent-[#22d3ee]"
           />
           <span className="font-mono text-sm text-signal w-12 text-right tabular-nums">{temperature.toFixed(2)}</span>
         </div>

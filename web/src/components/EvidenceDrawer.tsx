@@ -16,8 +16,8 @@ const NODE_TYPE_LABELS: Record<string, string> = {
 // severity → Tailwind 静态类(徽标用)。
 const SEV_BADGE: Record<string, string> = {
   critical: 'text-alert border-alert',
-  high: 'text-[#ff9d5c] border-[#ff9d5c]',
-  medium: 'text-signal border-signal',
+  high: 'text-[#fb923c] border-[#fb923c]',
+  medium: 'text-warn border-warn',
   low: 'text-live border-live',
   info: 'text-ghost border-ghost',
 }

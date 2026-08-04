@@ -106,6 +106,9 @@ function mergeEvidence(old: Evidence[], incoming: Evidence[]): Evidence[] {
   return out
 }
 
+// 主界面分区(图标轨导航)。
+export type Tab = 'campaign' | 'tools' | 'workflows' | 'reports' | 'settings'
+
 interface State {
   status: 'idle' | 'running' | 'done'
   goal: string
@@ -121,6 +124,17 @@ interface State {
   temperature: number // 思考强度(来自 /api/config)
   stage: string // 战役阶段推断(idle|recon|scan|exploit|done)
   mainPath: string[] // 主攻击路径节点 id(path SSE 事件写入)
+  // ---- UI 壳状态(命令面板/导航/图全屏/节点过滤) ----
+  activeTab: Tab
+  paletteOpen: boolean // ⌘K 命令面板
+  historyOpen: boolean // 历史战役抽屉
+  graphFull: boolean // 攻击图全屏模式
+  nodeQuery: string // 攻击图节点搜索词(空 = 不过滤)
+  setTab: (t: Tab) => void
+  togglePalette: (open?: boolean) => void
+  toggleHistory: (open?: boolean) => void
+  toggleGraphFull: (on?: boolean) => void
+  setNodeQuery: (q: string) => void
   reset: (target: string) => void
   ingest: (e: SSEEvent) => void
   applyEvent: (s: State, e: SSEEvent) => Partial<State> // 单事件状态转移(纯函数, ingest/replay 共用)
@@ -151,6 +165,16 @@ export const useStore = create<State>((set) => ({
   temperature: 0.2,
   stage: 'idle',
   mainPath: [],
+  activeTab: 'campaign',
+  paletteOpen: false,
+  historyOpen: false,
+  graphFull: false,
+  nodeQuery: '',
+  setTab: (t) => set({ activeTab: t }),
+  togglePalette: (open) => set((s) => ({ paletteOpen: open ?? !s.paletteOpen })),
+  toggleHistory: (open) => set((s) => ({ historyOpen: open ?? !s.historyOpen })),
+  toggleGraphFull: (on) => set((s) => ({ graphFull: on ?? !s.graphFull })),
+  setNodeQuery: (q) => set({ nodeQuery: q }),
 
   reset: (target) =>
     set({
@@ -166,6 +190,8 @@ export const useStore = create<State>((set) => ({
       engineLabel: '',
       stage: 'idle',
       mainPath: [],
+      activeTab: 'campaign',
+      nodeQuery: '',
     }),
 
   // applyEvent —— 单事件状态转移(纯函数): ingest 与 replay 共用; replay 循环 reduce 后单次 set。
