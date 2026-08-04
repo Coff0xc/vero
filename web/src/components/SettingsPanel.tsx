@@ -188,7 +188,7 @@ export function SettingsPanel() {
 
       {/* 配置面板 */}
       {activeTab === 'config' && (
-        <form onSubmit={onSave} className="space-y-6")
+        <form onSubmit={onSave} className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-[17px] font-semibold text-ink2">设置</h2>
         <div className="flex gap-2.5">
