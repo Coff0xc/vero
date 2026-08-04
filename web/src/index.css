@@ -90,6 +90,49 @@ body {
   z-index: 10;
 }
 
+/* React Flow 强制亮色(库自带 .dark 选择器会把画布/Minimap/Controls 强制成黑色, 覆盖回珍珠白) */
+.react-flow,
+.react-flow.dark {
+  --xy-background-color: transparent;
+  --xy-background-color-default: transparent;
+  --xy-background-pattern-dots-color: #eae7dd;
+  --xy-background-pattern-dots-color-default: #eae7dd;
+  --xy-background-pattern-lines-color: #eae7dd;
+  --xy-background-pattern-lines-color-default: #eae7dd;
+  --xy-minimap-background-color: #f4f2ec;
+  --xy-minimap-background-color-default: #f4f2ec;
+  --xy-minimap-mask-background-color: rgba(45, 41, 32, 0.08);
+  --xy-minimap-mask-background-color-default: rgba(45, 41, 32, 0.08);
+  --xy-minimap-node-background-color: #c9c5b8;
+  --xy-minimap-node-background-color-default: #c9c5b8;
+  --xy-controls-button-background-color: #ffffff;
+  --xy-controls-button-background-color-default: #ffffff;
+  --xy-controls-button-background-color-hover: #f4f2ec;
+  --xy-controls-button-background-color-hover-default: #f4f2ec;
+  --xy-controls-button-color: #6f6d62;
+  --xy-controls-button-color-default: #6f6d62;
+  --xy-controls-button-color-hover: #26241d;
+  --xy-controls-button-color-hover-default: #26241d;
+  --xy-controls-button-border-color: #e6e3d9;
+  --xy-controls-button-border-color-default: #e6e3d9;
+  --xy-edge-stroke: #d9d5c9;
+  --xy-edge-stroke-default: #d9d5c9;
+  --xy-edge-stroke-selected: #a8781c;
+  --xy-edge-stroke-selected-default: #a8781c;
+  --xy-edge-label-background-color: #ffffff;
+  --xy-edge-label-background-color-default: #ffffff;
+  --xy-edge-label-color: #6f6d62;
+  --xy-edge-label-color-default: #6f6d62;
+  --xy-node-color: #26241d;
+  --xy-node-color-default: #26241d;
+  --xy-node-border: 1px solid #e6e3d9;
+  --xy-node-border-default: 1px solid #e6e3d9;
+  --xy-node-background-color: #ffffff;
+  --xy-node-background-color-default: #ffffff;
+  --xy-node-boxshadow-selected: 0 0 0 0.5px #a8781c;
+  --xy-node-boxshadow-selected-default: 0 0 0 0.5px #a8781c;
+}
+
 /* ---- 克制的进入动画(去掉夸张特效) ---- */
 @keyframes msg-in {
   from {

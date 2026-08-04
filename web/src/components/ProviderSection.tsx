@@ -109,11 +109,11 @@ export function ProviderSection() {
         <div className="text-[11px] font-medium text-muted">模型提供商 (OpenAI 兼容)</div>
         <div className="flex gap-3 text-[11px]">
           <label className="flex items-center gap-1.5 text-muted cursor-pointer">
-            <input type="checkbox" checked={yolo} onChange={(e) => setYolo(e.target.checked)} className="accent-[#1a73e8]" />
+            <input type="checkbox" checked={yolo} onChange={(e) => setYolo(e.target.checked)} className="accent-[#a8781c]" />
             <span className={yolo ? 'text-alert font-semibold' : ''}>YOLO 免审批</span>
           </label>
           <label className="flex items-center gap-1.5 text-muted cursor-pointer">
-            <input type="checkbox" checked={deepThinking} onChange={(e) => setDeepThinking(e.target.checked)} className="accent-[#1a73e8]" />
+            <input type="checkbox" checked={deepThinking} onChange={(e) => setDeepThinking(e.target.checked)} className="accent-[#a8781c]" />
             <span className={deepThinking ? 'text-live font-semibold' : ''}>深度思考</span>
           </label>
         </div>
@@ -205,7 +205,7 @@ export function ProviderSection() {
                   type="checkbox"
                   checked={p.supports_reasoning}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, supports_reasoning: e.target.checked }))}
-                  className="accent-[#1a73e8]"
+                  className="accent-[#a8781c]"
                 />
                 深度思考
               </label>
@@ -214,7 +214,7 @@ export function ProviderSection() {
                   type="checkbox"
                   checked={p.web_search}
                   onChange={(e) => patch(p.id, (x) => ({ ...x, web_search: e.target.checked }))}
-                  className="accent-[#1a73e8]"
+                  className="accent-[#a8781c]"
                 />
                 联网搜索
               </label>
