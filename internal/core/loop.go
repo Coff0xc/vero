@@ -121,6 +121,14 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 				break
 			}
 		}
+		// D29: 攻击链贯通(confirmed foothold/shell)即显式过渡到 done 并收尾,
+		// 不再空耗预算等循环退出 —— 前端可立即展示"利用完成"终态。
+		if phase != "done" && graphGoalReached(g) {
+			phase = "done"
+			emit(Event{Kind: "phase", Data: map[string]any{"phase": "done"}})
+			emit(Event{Kind: "done", Data: map[string]any{"reason": "攻击链贯通(foothold/shell 已确认)"}})
+			break
+		}
 	}
 	// 战役结束(预算耗尽/无动作/取消/停滞): 广播 done 阶段, 前端据此收尾。
 	if phase != "done" {
@@ -485,6 +493,18 @@ func hostPortOf(s string) string {
 		hp = hp[:j]
 	}
 	return hp
+}
+
+// graphGoalReached —— 攻击链是否已贯通: 存在 confirmed 的 foothold/shell 节点。
+// D29: 贯通即视为战役主要目标达成, 提前广播 done 收尾。
+func graphGoalReached(g *AttackGraph) bool {
+	for _, id := range g.Order {
+		n := g.Nodes[id]
+		if (n.Type == "foothold" || n.Type == "shell") && n.State == StateConfirmed {
+			return true
+		}
+	}
+	return false
 }
 
 // advancePhase —— 显式阶段状态机: 按成功工具杀伤级推进 init→recon→scan→exploit。
