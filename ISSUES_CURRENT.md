@@ -1,9 +1,12 @@
 # Vero 问题清单 (当前状态)
 
-> 更新日期: 2026-08-04
-> 分支: fix/graph-reflexion-integration (基于 fix/critical-bugs)
+> 更新日期: 2026-08-05
+> 分支: main (批次 3 修复已全部合并)
 > 测试状态: go test ./... 全部通过 + 真实 agent 测试 (file.nciyuan.net)
 > 审计方法: 全代码库逐文件审查 + 实战测试交叉验证
+>
+> **批次 3 (2026-08-05): 代码层问题全部清零** — U1-U5 修复 + 高/中/低全部 29 项修复,
+> 每项独立 commit 推送 main。剩余仅架构级 A5/A6 (需设计决策) + 真实环境复测。
 
 ---
 
@@ -25,6 +28,9 @@
 | 7 | 编译和单元测试 | `go build ./...` + `go test ./...` 全绿 |
 
 ### ❌ 修复未生效部分 (真实测试发现)
+
+> **批次 3 状态 (2026-08-05): U1-U5 均已修复, 待 file.nciyuan.net 真实复测确认。**
+> 修复内容见下方"批次 3 修复"表。
 
 #### U1. claim 节点全部停留 hypothesis 状态 (C3 修复失效)
 
@@ -150,7 +156,49 @@ EDGES:
 
 ---
 
+## 批次 3 修复 (2026-08-05, 已合并 main)
+
+### U1-U5 真实测试失效项
+
+| # | 修复内容 | 涉及文件 | 验证 |
+|---|----------|----------|------|
+| U1 | claim 验证: prompt 明确 verifies 用法 + actSchema 描述修正(原误写 claim ID) + Claude 补 Verifies 透传 + 自动关联兜底(动作成功且 hypothesis claim 含目标 host → confirm, 证据=真实输出) | claude.go / deepseek.go / loop.go | 单测✅ |
+| U2 | finding 建边: keyHostPort URL 感知解析(替代 Split(":")), service 前缀+端口后缀匹配 | loop.go | 单测✅ |
+| U3 | 静默失败(无输出)归类 FailureTargetDown, 触发延迟重试 | reflexion.go | 单测✅ |
+| U4 | 停滞检测: stableArgsSig target 归一化 + 连续 3 次失败(不论 args)兜底 | loop.go | 单测✅ |
+| U5 | probe 模式: finding 找不到 service 时回退建 host→exposes→finding 边, 确保 host 节点存在 | loop.go | 单测✅ |
+
+### 高严重度 (批次 3.1)
+
+| # | 修复内容 |
+|---|----------|
+| T8 | 删除 mockSearchsploitOutput 死代码(类型断言 panic) |
+| D14 | extract 跳过 zip/tar 目录条目(Windows "device does not exist") |
+| D15 | InstallBinary 安装后校验产物非空(不再谎报成功) |
+| S6 | SQLite WAL + busy_timeout + MaxOpenConns(4)(查询不再串行化) |
+
+### 中/低严重度 (批次 3.2, D6-D31)
+
+| 域 | 修复项 |
+|----|--------|
+| 证据链 | D6 按 trace 条目匹配+截断前缀兼容 · D7 Excerpt 用原文行(属性顺序 bug) |
+| 网络 | D8 IPv6 归一化 · D9 超时杀进程组(Unix pgid / Win taskkill) |
+| 参数 | D10 ArgStr TrimSpace · D15 validateTarget 统一校验 |
+| 报告 | D11-D13 严重度统一结构化字段 · D14 共享漏洞知识映射(12 类) |
+| 服务端 | D16 SSE 丢弃计数+告警 · D17 history role 过滤 · D18 Pending 带审批详情 |
+| CLI/工具 | D19 CLI 改用 VerifyAll · D20 nxc→netexec · D21 重试重置响应体 · D22 hostOf 不再盲扫 · D23 endpoint 可配 · D24 敏感词强信号模式 · D25 path.Dir 解析 · D26 ExploitLibraryPack 注册 · D27 secretsdump.py 检测一致 · D28 双注册根因(ContainerPack 移除) |
+| 低 | D29 攻击链贯通即 done · D30 chatText 重试对齐 3 次 · D31 回退注入回归测试(审计确认已修) |
+
+### 新增回归测试
+
+TestKeyHostPort / TestNormHost / TestNormTarget / TestStableArgsSigTargetNormalized / TestValidateTarget / TestSanitizeHistory / TestNormalizeHostIPv6 / TestExtractSkipsDirEntries / TestParseProbeNoFalsePositive / TestInjectorPlanFallbackInjectsTarget / TestInjectorPlanPassthroughInjectsTarget
+
+---
+
 ## 仍然存在的问题 (代码层)
+
+> **批次 3 后: 无。全部 32 项(高 4 + 中 25 + 低 3)已修复并通过 go test ./...。**
+> 历史条目保留如下供追溯(状态均已标注)。
 
 ### 高严重度
 
@@ -203,12 +251,12 @@ EDGES:
 
 | # | 缺陷 | 状态 |
 |---|------|------|
-| A1 | "证据驱动"理念与实际实现脱节 — finding 节点建边已修复但 Key 格式不匹配, 真实测试仍孤立 | 修复失败 |
-| A2 | "LLM 自主决策"依赖 LLM 自觉填隐藏字段 — verifies 字段添加了但 LLM 不填, 真实测试全部 hypothesis | 修复失败 |
+| A1 | "证据驱动"理念与实际实现脱节 — finding 节点建边已修复但 Key 格式不匹配, 真实测试仍孤立 | 批次 3 已修 (U2/U5), 待真实复测 |
+| A2 | "LLM 自主决策"依赖 LLM 自觉填隐藏字段 — verifies 字段添加了但 LLM 不填, 真实测试全部 hypothesis | 批次 3 已修 (U1: prompt+兜底), 待真实复测 |
 | A3 | "抗幻觉"只防 LLM 编造, 不防工具模拟 — exploit_cve/searchsploit/poc_manager 假数据已移除 | 已修复 |
 | A4 | "跨平台"与"安全工具链"矛盾 — ffuf 已修 Windows 兼容, 但 nxc/metasploit 仍需 Linux | 部分修复 |
-| A5 | "多步规划"中断后无回退机制 — 某步失败即中断, 副作用不回滚 | 未修复 |
-| A6 | "HITL"理念与 YOLO 模式冲突无审计区分 — YOLO 跳过审批但审计日志不记录 | 未修复 |
+| A5 | "多步规划"中断后无回退机制 — 某步失败即中断, 副作用不回滚 | 未修复 (需设计决策) |
+| A6 | "HITL"理念与 YOLO 模式冲突无审计区分 — YOLO 跳过审批但审计日志不记录 | 未修复 (需设计决策) |
 
 ---
 
@@ -233,7 +281,8 @@ EDGES:
 
 | 状态 | 高 | 中 | 低 | 合计 |
 |------|----|----|----|------|
-| 已修复 (单元测试通过) | 8 | 5 | 1 | 14 |
-| 真实测试发现失效 | 5 (U1-U5) | 0 | 0 | 5 |
-| 仍然存在 | 4 | 25 | 3 | 32 |
-| **合计** | **17** | **30** | **4** | **51** |
+| 批次 3 前已修复 | 8 | 5 | 1 | 14 |
+| 批次 3 修复 (T8/D14/D15/S6 + D6-D31 + U1-U5) | 4 | 25 | 3 | 32 |
+| 真实测试失效项 (U1-U5, 已修待复测) | 5 | 0 | 0 | 5 |
+| **仍然存在** | **0** | **0** | **0** | **0** |
+| 架构级未决 (A5/A6) | — | — | — | 2 |
