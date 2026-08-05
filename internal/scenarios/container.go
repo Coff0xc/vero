@@ -133,52 +133,6 @@ func k8sServiceAccountEnum(args map[string]any) tools.ToolResult {
 	return tools.ToolResult{Success: true, Stdout: output.String()}
 }
 
-// k8sNodeExploit —— Kubernetes 节点权限提升 (通过特权 pod 或 hostPath)。
-func k8sNodeExploit(args map[string]any) tools.ToolResult {
-	var output strings.Builder
-	output.WriteString("Kubernetes Node Exploitation Check:\n")
-
-	// 检测 hostPath 挂载
-	mountResult := tools.Sh([]string{"mount"}, 5*time.Second)
-	if mountResult.Success {
-		stdout := mountResult.Stdout
-
-		// 检测宿主机根目录挂载
-		if strings.Contains(stdout, "/host") {
-			output.WriteString("  [!] Host filesystem mounted at /host\n")
-			output.WriteString("  [+] Attempting to chroot to host...\n")
-
-			// 尝试 chroot 到宿主机
-			chrootResult := tools.Sh([]string{"ls", "/host/etc/passwd"}, 5*time.Second)
-			if chrootResult.Success {
-				output.WriteString("  [!] Can access host /etc/passwd\n")
-				output.WriteString(tools.Clip(chrootResult.Stdout, 200) + "\n")
-			}
-		}
-
-		// 检测 /var/run/docker.sock 挂载
-		if _, err := os.Stat("/var/run/docker.sock"); err == nil {
-			output.WriteString("  [!] Docker socket available\n")
-			output.WriteString("  [+] Can create privileged container on host\n")
-
-			// 尝试列出容器
-			dockerResult := tools.Sh([]string{"docker", "ps"}, 5*time.Second)
-			if dockerResult.Success {
-				output.WriteString("  [!] Docker command works:\n")
-				output.WriteString(tools.Clip(dockerResult.Stdout, 300) + "\n")
-			}
-		}
-	}
-
-	// 检测节点端口扫描 (暴露的 kubelet API)
-	kubeletURL := "https://127.0.0.1:10250/pods"
-	kubeletResult := tools.Sh([]string{"curl", "-s", "-k", kubeletURL}, 5*time.Second)
-	if kubeletResult.Success && strings.Contains(kubeletResult.Stdout, "items") {
-		output.WriteString("  [!] Kubelet API accessible at :10250 (unauthenticated)\n")
-	}
-
-	return tools.ToolResult{Success: true, Stdout: output.String()}
-}
 
 // ---------- Parsers ----------
 
@@ -246,32 +200,6 @@ func ParseK8sServiceAccount(stdout string, args map[string]any) []tools.Observat
 	return obs
 }
 
-// ParseK8sNodeExploit —— 解析节点逃逸结果。
-func ParseK8sNodeExploit(stdout string, args map[string]any) []tools.Observation {
-	var obs []tools.Observation
-
-	// 检测宿主机访问
-	if strings.Contains(stdout, "Can access host /etc/passwd") {
-		obs = append(obs, tools.Observation{
-			Kind:    "finding",
-			Key:     "k8s:host_access",
-			Label:   "[critical] Can access host filesystem from pod",
-			Excerpt: "Can access host /etc/passwd",
-		})
-	}
-
-	// 检测 Kubelet API
-	if strings.Contains(stdout, "Kubelet API accessible") {
-		obs = append(obs, tools.Observation{
-			Kind:    "finding",
-			Key:     "k8s:kubelet_unauth",
-			Label:   "[high] Kubelet API accessible without authentication",
-			Excerpt: "Kubelet API accessible at :10250",
-		})
-	}
-
-	return obs
-}
 
 // ContainerPack —— 容器逃逸场景包。
 func ContainerPack() Pack {
@@ -284,9 +212,8 @@ func ContainerPack() Pack {
 			{Name: "k8s_sa_enum", Level: tools.LevelCred,
 				Desc: "Kubernetes ServiceAccount 提取, 获取 pod 的 SA token 并尝试访问 K8s API",
 				Run: k8sServiceAccountEnum, Parse: ParseK8sServiceAccount},
-			{Name: "k8s_node_exploit", Level: tools.LevelExploit,
-				Desc: "Kubernetes 节点逃逸利用, 通过 hostPath/Docker socket 逃逸到宿主机",
-				Run: k8sNodeExploit, Parse: ParseK8sNodeExploit},
+			// D28: k8s_node_exploit 不再在此注册 —— K8sPackEnhanced 提供更完整的同名实现,
+			// 覆盖式注册使本条目恒被覆盖(双注册语义混乱), 由 Enhanced 包唯一提供。
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			// 检测容器环境: 存在 /.dockerenv 或 /var/run/secrets/kubernetes.io

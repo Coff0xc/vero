@@ -154,7 +154,7 @@ CONTAINER ID   IMAGE     COMMAND   CREATED   STATUS
 abc123def456   nginx     "nginx"   2 hours   Up 2 hours
   [!] Kubelet API accessible at :10250 (unauthenticated)`
 
-	obs := ParseK8sNodeExploit(stdout, nil)
+	obs := ParseK8sNodeExploitEnhanced(stdout, nil)
 
 	if len(obs) != 2 {
 		t.Fatalf("expected 2 observations, got %d", len(obs))
@@ -192,7 +192,7 @@ func TestParseK8sNodeExploitNoFindings(t *testing.T) {
   [-] Docker socket not available
   [-] Kubelet API not accessible`
 
-	obs := ParseK8sNodeExploit(stdout, nil)
+	obs := ParseK8sNodeExploitEnhanced(stdout, nil)
 
 	if len(obs) != 0 {
 		t.Errorf("expected 0 observations for secure pod, got %d", len(obs))
@@ -208,8 +208,8 @@ func TestContainerPack(t *testing.T) {
 		t.Errorf("expected pack name 'container', got %s", pack.Name)
 	}
 
-	if len(pack.Tools) != 3 {
-		t.Fatalf("expected 3 tools, got %d", len(pack.Tools))
+	if len(pack.Tools) != 2 { // D28: k8s_node_exploit 移出, 由 K8sPackEnhanced 唯一注册
+		t.Fatalf("expected 2 tools, got %d", len(pack.Tools))
 	}
 
 	// 验证工具名称
@@ -218,7 +218,7 @@ func TestContainerPack(t *testing.T) {
 		toolNames[tool.Name] = true
 	}
 
-	expectedTools := []string{"docker_escape_check", "k8s_sa_enum", "k8s_node_exploit"}
+	expectedTools := []string{"docker_escape_check", "k8s_sa_enum"} // D28: k8s_node_exploit 移出 ContainerPack(由 K8sPackEnhanced 唯一注册)
 	for _, name := range expectedTools {
 		if !toolNames[name] {
 			t.Errorf("missing tool: %s", name)
@@ -235,10 +235,6 @@ func TestContainerPack(t *testing.T) {
 		case "k8s_sa_enum":
 			if tool.Level != tools.LevelCred {
 				t.Errorf("k8s_sa_enum should be LevelCred")
-			}
-		case "k8s_node_exploit":
-			if tool.Level != tools.LevelExploit {
-				t.Errorf("k8s_node_exploit should be LevelExploit")
 			}
 		}
 	}
