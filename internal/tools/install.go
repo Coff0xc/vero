@@ -126,8 +126,10 @@ func ToolBinary(toolName string) string {
 		return "nmap"
 	case toolName == "docker_escape_check", toolName == "k8s_node_exploit":
 		return "docker"
-	case toolName == "secretsdump", toolName == "lsass_dump", toolName == "sam_dump":
-		return "python3"
+	case toolName == "secretsdump", toolName == "sam_dump":
+		return "secretsdump.py" // D27: 与 deps.go 检测一致(impacket 脚本), 而非笼统的 python3
+	case toolName == "lsass_dump":
+		return "pypykatz" // D27: 与 deps.go 检测一致
 	case toolName == "port_scan":
 		return "" // Go 原生实现, 无外部依赖
 	}
