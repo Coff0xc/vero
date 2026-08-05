@@ -320,6 +320,13 @@ func RegisterDefaults(m *Manager, reg *tools.Registry) {
 	m.Register(reg, K8sPackEnhanced())     // P3: K8s 渗透增强 (抄 Reaper + ThreatCanvas)
 	m.Register(reg, ReconPack())           // 智能渗透: 交互式侦察感知层
 	m.Register(reg, CodeAuditPack())       // 代码审计: SAST + 依赖扫描 (抄 DeepAudit)
+	// D26 修复: 漏洞利用库(searchsploit_query/exploit_cve/poc_manager)此前未注册,
+	// 3 个工具不会出现在 tooltest 与 agent 调用中。返回 []tools.Tool 而非 Pack(无 Fingerprint),
+	// 直接注册工具实体; 工具名与 ExploitPack(Metasploit RPC)不冲突, 覆盖式注册安全。
+	for _, t := range ExploitLibraryPack() {
+		tt := t
+		reg.Register(&tt)
+	}
 
 	// 平台专用工具包
 	m.Register(reg, WindowsToolsPack())    // Windows 专用工具集
