@@ -112,18 +112,12 @@ func recommendations(findings []*core.Node) string {
 	seen := map[string]bool{}
 	var b strings.Builder
 	for _, f := range findings {
+		// D14: 共享漏洞知识映射覆盖常见漏洞类型, 不再只有 3 种硬编码。
 		var rec string
-		switch {
-		case strings.Contains(f.Label, "SQLi") || strings.Contains(f.Label, "SQL"):
-			rec = "- **SQL 注入**: 改用参数化查询/ORM, 登录接口做严格输入校验, 部署 WAF。"
-		case strings.Contains(f.Label, "Swagger") || strings.Contains(f.Label, "API"):
-			rec = "- **API 文档暴露**: 生产环境关闭 Swagger/api-docs 公开访问或加认证。"
-		case strings.Contains(f.Label, "Prometheus") || strings.Contains(f.Label, "Metrics"):
-			rec = "- **监控端点暴露**: 限制 /metrics 为内网/认证访问, 防信息泄露。"
-		case strings.Contains(f.Label, "Security Headers"):
-			rec = "- **缺失安全头**: 补齐 CSP / HSTS / X-Frame-Options 等安全响应头。"
-		default:
-			continue
+		if v := matchVuln(f.Label); v != nil {
+			rec = v.recommendation
+		} else {
+			rec = fmt.Sprintf("- **%s**: 建议结合证据回查定位根因, 按官方加固指南修复。", titleOf(f.Label))
 		}
 		if !seen[rec] {
 			seen[rec] = true

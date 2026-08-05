@@ -194,29 +194,19 @@ func calculateCVSS(title, severity string) CVSSScore {
 }
 
 func generateDescription(title string) string {
-	if strings.Contains(title, "SQLi") {
-		return "SQL 注入漏洞允许攻击者通过恶意输入操纵数据库查询，可能导致数据泄露、数据篡改或完全控制数据库。"
+	// D14: 共享漏洞知识映射, 未知类型给出带方向的泛化描述。
+	if v := matchVuln(title); v != nil {
+		return v.description
 	}
-	if strings.Contains(title, "Swagger") {
-		return "API 文档（Swagger/OpenAPI）公开暴露，可能泄露敏感的 API 端点、参数结构和业务逻辑，为攻击者提供攻击面信息。"
-	}
-	if strings.Contains(title, "Security Headers") {
-		return "缺失关键安全响应头，可能导致 XSS、点击劫持、MIME 类型嗅探等攻击。"
-	}
-	return "检测到潜在安全风险，建议进一步人工验证和修复。"
+	return "检测到潜在安全风险，建议结合证据回查定位具体漏洞类型，并实施针对性修复。"
 }
 
 func generateRemediation(title string) string {
-	if strings.Contains(title, "SQLi") {
-		return "使用参数化查询或 ORM 框架，对用户输入进行严格校验，部署 Web 应用防火墙（WAF）。"
+	// D14: 共享漏洞知识映射。
+	if v := matchVuln(title); v != nil {
+		return v.remediation
 	}
-	if strings.Contains(title, "Swagger") {
-		return "在生产环境关闭 Swagger UI 公开访问，或添加认证机制（BasicAuth/OAuth2）。"
-	}
-	if strings.Contains(title, "Security Headers") {
-		return "配置 CSP、HSTS、X-Frame-Options、X-Content-Type-Options 等安全响应头。"
-	}
-	return "根据具体漏洞类型实施相应修复措施。"
+	return "根据具体漏洞类型实施相应修复措施；建议升级受影响组件至最新稳定版，并复测验证。"
 }
 
 func buildRecommendations(findings []*core.Node) []Recommendation {
