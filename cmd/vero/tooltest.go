@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"time"
 
 	"github.com/Coff0xc/vero/internal/cli"
 	"github.com/Coff0xc/vero/internal/scenarios"
@@ -23,33 +22,10 @@ func runToolTest() {
 	cli.PrintInfo(fmt.Sprintf("已注册 %d 个工具", total))
 	fmt.Println()
 
-	// 执行验证（带进度条）
-	results := []tooltest.ToolStatus{}
-	for i, name := range reg.Names() {
-		cli.PrintProgress(i, total, fmt.Sprintf("验证 %s...", name))
-		tool, _ := reg.Get(name)
-
-		start := time.Now()
-		status := tooltest.ToolStatus{
-			Name:   name,
-			Level:  tool.Level,
-			Tested: true,
-		}
-
-		// 简化验证（使用安全参数）
-		args := tooltest.GetSafeTestArgs(name)
-		result := tool.Run(args)
-		status.Duration = time.Since(start)
-		status.Available = result.Success
-		if !result.Success {
-			status.Error = result.Stderr
-			if status.Error == "" {
-				status.Error = result.Stdout
-			}
-		}
-
-		results = append(results, status)
-	}
+	// 执行验证（带进度条）。
+	// D19 修复: 与 Web API /api/tools/verify 完全一致 —— 用 tooltest.VerifyAll
+	// (依赖二进制探测, 不实际执行攻击工具), 消除 CLI 与 Web 判定不一致。
+	results := tooltest.VerifyAll(reg)
 	cli.PrintProgress(total, total, "完成")
 	fmt.Println()
 
