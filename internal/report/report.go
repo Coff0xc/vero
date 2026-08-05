@@ -93,7 +93,7 @@ func Markdown(target string, g *core.AttackGraph, violations int, ts string) str
 		b.WriteString("_未确认任何发现。_\n\n")
 	}
 	for i, f := range findings {
-		fmt.Fprintf(&b, "### %d. [%s] %s\n\n", i+1, strings.ToUpper(sevOf(f.Label)), titleOf(f.Label))
+		fmt.Fprintf(&b, "### %d. [%s] %s\n\n", i+1, strings.ToUpper(sevOfNode(f)), titleOf(f.Label))
 		if len(f.Evidence) > 0 {
 			b.WriteString("**证据**(逐字来自工具输出):\n\n")
 			for _, ev := range f.Evidence {

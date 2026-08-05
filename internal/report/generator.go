@@ -27,13 +27,13 @@ func Generate(target string, g *core.AttackGraph, campaignID string, duration in
 
 	// 按严重级排序
 	sort.SliceStable(findings, func(i, j int) bool {
-		return sevRank[sevOf(findings[i].Label)] < sevRank[sevOf(findings[j].Label)]
+		return sevRank[sevOfNode(findings[i])] < sevRank[sevOfNode(findings[j])]
 	})
 
 	// 统计
 	var critCount, highCount, medCount, lowCount int
 	for _, f := range findings {
-		switch sevOf(f.Label) {
+		switch sevOfNode(f) {
 		case "critical":
 			critCount++
 		case "high":
@@ -123,7 +123,7 @@ func buildServices(nodes []*core.Node) []Service {
 func buildFindings(nodes []*core.Node) []Finding {
 	var findings []Finding
 	for i, n := range nodes {
-		sev := sevOf(n.Label)
+		sev := sevOfNode(n)
 		title := titleOf(n.Label)
 
 		// 构建证据
@@ -222,7 +222,7 @@ func buildRecommendations(findings []*core.Node) []Recommendation {
 
 	for _, f := range findings {
 		title := titleOf(f.Label)
-		sev := sevOf(f.Label)
+		sev := sevOfNode(f)
 
 		var rec Recommendation
 		if strings.Contains(title, "SQLi") && !seen["SQLi"] {
