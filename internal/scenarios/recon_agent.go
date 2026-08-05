@@ -216,13 +216,31 @@ func ParseProbe(out string, args map[string]any) []tools.Observation {
 		return obs
 	}
 	// 敏感响应词: 命中即值得深挖的 finding(证据 = 响应行)。
-	for _, kw := range []string{"error", "exception", "stacktrace", "token", "secret", "api_key", "password", "admin", "debug"} {
-		if strings.Contains(strings.ToLower(out), kw) {
-			ex := onelineExcerpt(out, kw, 160)
+	// D24 修复: 宽泛单词(error/admin/debug 在正常页面太常见)改为强信号模式 ——
+	// 具体标识符(access_token/api_key)或组合词(stack trace/debug mode), 大幅降误报。
+	sensitivePatterns := []struct{ kw, label string }{
+		{"stacktrace", "堆栈跟踪"},
+		{"stack trace", "堆栈跟踪"},
+		{"access_token", "访问令牌"},
+		{"api_key", "API 密钥"},
+		{"apikey", "API 密钥"},
+		{"secret_key", "密钥"},
+		{"client_secret", "客户端密钥"},
+		{"debug=true", "调试开关"},
+		{"debug mode", "调试模式"},
+		{"admin panel", "管理后台"},
+		{"admin login", "管理后台"},
+		{"password=", "明文密码"},
+		{"pwd=", "明文密码"},
+	}
+	low := strings.ToLower(out)
+	for _, p := range sensitivePatterns {
+		if strings.Contains(low, p.kw) {
+			ex := onelineExcerpt(out, p.kw, 160)
 			obs = append(obs, tools.Observation{
-				Kind: "finding", Key: t + path + ":sensitive:" + kw,
-				Label: fmt.Sprintf("[medium] 端点 %s 响应含敏感词 %q", path, kw),
-				Excerpt: ex,
+				Kind: "finding", Key: t + path + ":sensitive:" + p.kw,
+				Label:    fmt.Sprintf("[medium] 端点 %s 响应含敏感信号 %q(%s)", path, p.kw, p.label),
+				Excerpt:  ex,
 				Severity: "medium",
 			})
 			break // 每端点最多一条敏感 finding, 防刷屏

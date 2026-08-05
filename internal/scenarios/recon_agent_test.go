@@ -61,15 +61,15 @@ endpoint: /logo.png
 }
 
 func TestParseProbe(t *testing.T) {
-	out := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"token\":\"abc\"}\n---HTTP 200 len=28 ct=application/json---\n"
+	out := "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"access_token\":\"abc\"}\n---HTTP 200 len=28 ct=application/json---\n"
 	obs := ParseProbe(out, map[string]any{"target": "http://t:3000", "path": "/api/secret"})
 	if len(obs) == 0 {
 		t.Fatal("应至少产出 endpoint 观察")
 	}
-	// 敏感词 token 应触发 finding(evidence=响应内容)。
+	// D24: 强信号 access_token 应触发 finding(evidence=响应内容)。
 	var sensitive bool
 	for _, o := range obs {
-		if o.Kind == "finding" && strings.Contains(o.Label, "token") {
+		if o.Kind == "finding" && strings.Contains(o.Label, "access_token") {
 			sensitive = true
 			if !strings.Contains(out, o.Excerpt) {
 				t.Errorf("sensitive finding 的 excerpt 不在输出中: %q", o.Excerpt)
@@ -77,7 +77,19 @@ func TestParseProbe(t *testing.T) {
 		}
 	}
 	if !sensitive {
-		t.Error("含 token 的响应应触发敏感词 finding")
+		t.Error("含 access_token 的响应应触发敏感词 finding")
+	}
+}
+
+// TestParseProbeNoFalsePositive —— D24: 含宽泛词(error/admin/debug/token/password)的
+// 正常页面不应触发 finding(旧词表会误报刷屏)。
+func TestParseProbeNoFalsePositive(t *testing.T) {
+	out := "HTTP/1.1 200 OK\r\n\r\n<html><body>Error: 0 - welcome to admin dashboard, debug info below. Your password field is empty. token expires in 1h</body></html>\n---HTTP 200 len=120 ct=text/html---\n"
+	obs := ParseProbe(out, map[string]any{"target": "http://t:3000", "path": "/"})
+	for _, o := range obs {
+		if o.Kind == "finding" {
+			t.Errorf("正常页面含宽泛词不应触发 finding, got %q (label=%q)", o.Key, o.Label)
+		}
 	}
 }
 
