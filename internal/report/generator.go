@@ -156,22 +156,22 @@ func buildFindings(nodes []*core.Node) []Finding {
 
 func calculateCVSS(title, severity string) CVSSScore {
 	// 简化版 CVSS 计算（实际应该根据漏洞详细信息）
+	// D13 修复: 硬编码分支只决定 baseScore/vector, 不再覆盖 severity ——
+	// 返回的 Severity 必须与 finding 结构化严重度(sevOfNode)一致。
 	var baseScore float64
 	var vector string
 
-	if strings.Contains(title, "SQLi") || strings.Contains(title, "SQL") {
+	switch {
+	case strings.Contains(title, "SQLi") || strings.Contains(title, "SQL"):
 		baseScore = 9.3
 		vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:N"
-		severity = "critical"
-	} else if strings.Contains(title, "Swagger") || strings.Contains(title, "API") {
+	case strings.Contains(title, "Swagger") || strings.Contains(title, "API"):
 		baseScore = 7.5
 		vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:N/A:N"
-		severity = "high"
-	} else if strings.Contains(title, "Security Headers") {
+	case strings.Contains(title, "Security Headers"):
 		baseScore = 4.3
 		vector = "CVSS:3.1/AV:N/AC:L/PR:N/UI:R/S:U/C:L/I:N/A:N"
-		severity = "medium"
-	} else {
+	default:
 		// 默认评分
 		switch severity {
 		case "critical":
