@@ -79,7 +79,9 @@ func artifactFor(name string) *toolArtifact {
 // ToolBinary(二进制名) 索引, 使 secretsdump/lsass_dump/sam_dump(ToolBinary=python3)
 // 的 pip 提示从未生效。
 var pipPackage = map[string]string{
-	"nxc":         "nxc", // 修: NetExec 改名后 PyPI 包名是 nxc, netexec 从未发布(pip 装必失败)
+	// D20 修复: NetExec(原 CrackMapExec) 的 PyPI 包名是 netexec(官方安装: pipx install netexec),
+	// 二进制名才是 nxc —— 包名与二进制名是两回事, 用 nxc 当包名 pip 装必失败。
+	"nxc":         "netexec",
 	"impacket":    "impacket",
 	"pypykatz":    "pypykatz",
 	"secretsdump": "impacket",

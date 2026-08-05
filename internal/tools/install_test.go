@@ -11,10 +11,10 @@ import (
 // TestPipPackage —— 锁定工具名 -> pip 包名映射(设计规格 risk #7)。
 func TestPipPackage(t *testing.T) {
 	cases := map[string]string{
-		"nxc_smb_spray": "nxc", // nxc_* 前缀族
-		"nxc_ldap_enum": "nxc",
-		"smb_enum":      "nxc",
-		"kerberoast":    "nxc",
+		"nxc_smb_spray": "netexec", // D20: NetExec 的 PyPI 包名是 netexec, 二进制名才是 nxc
+		"nxc_ldap_enum": "netexec",
+		"smb_enum":      "netexec",
+		"kerberoast":    "netexec",
 		"secretsdump":   "impacket",
 		"sam_dump":      "impacket",
 		"lsass_dump":    "pypykatz",
@@ -63,8 +63,8 @@ func TestInstallPipHint(t *testing.T) {
 		"secretsdump":    "pip install --user impacket",
 		"sam_dump":       "pip install --user impacket",
 		"lsass_dump":     "pip install --user pypykatz",
-		"nxc_smb_spray":  "pip install --user nxc",
-		"smb_enum":       "pip install --user nxc",
+		"nxc_smb_spray":  "pip install --user netexec", // D20: 包名 netexec
+		"smb_enum":       "pip install --user netexec",
 		"web_vuln_scan":  "",
 		"nmap_scan":      "",
 		"msf_search":     "",
