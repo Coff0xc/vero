@@ -146,6 +146,37 @@ func (s *Server) handleEvents(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// validateTarget —— 校验并归一化 target(修 D15: 拒绝空/畸形 host, 统一补 scheme)。
+// 规则: 非空; 无空白/控制字符; 无 scheme 时补 http://; url.Parse 必须通过且 host 非空;
+// hostname 不得含非法字符或裸括号。
+func validateTarget(raw string) (string, error) {
+	t := strings.TrimSpace(raw)
+	if t == "" {
+		return "", fmt.Errorf("target 参数为空")
+	}
+	if strings.ContainsAny(t, " \t\r\n\x00") {
+		return "", fmt.Errorf("target 含空白/控制字符: %q", t)
+	}
+	if !strings.HasPrefix(t, "http://") && !strings.HasPrefix(t, "https://") {
+		if strings.Contains(t, "://") {
+			return "", fmt.Errorf("target 必须以 http:// 或 https:// 开头, 或提供主机名/IP")
+		}
+		t = "http://" + t
+	}
+	u, err := url.Parse(t)
+	if err != nil || u.Host == "" {
+		return "", fmt.Errorf("无效的 target URL: %s", t)
+	}
+	h := u.Hostname()
+	if h == "" || strings.ContainsAny(h, "!$&'()*+,;= \t\r\n") {
+		return "", fmt.Errorf("target 主机名非法: %s", u.Host)
+	}
+	if strings.HasPrefix(h, "[") && !strings.HasSuffix(h, "]") {
+		return "", fmt.Errorf("target IPv6 主机名括号未闭合: %s", u.Host)
+	}
+	return t, nil
+}
+
 // handleStart —— 启动一场战役(后台 goroutine; 拒绝并发战役)。
 func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	var body struct {
@@ -153,29 +184,10 @@ func (s *Server) handleStart(w http.ResponseWriter, r *http.Request) {
 	}
 	_ = json.NewDecoder(r.Body).Decode(&body)
 
-	// 修复 D23: 校验 target 参数
-	if body.Target == "" {
-		writeJSON(w, map[string]any{"ok": false, "err": "target 参数为空"})
-		return
-	}
-
-	// 校验 URL 格式
-	target := strings.TrimSpace(body.Target)
-	if !strings.HasPrefix(target, "http://") && !strings.HasPrefix(target, "https://") {
-		// 尝试解析为主机名或IP
-		if !strings.Contains(target, "://") {
-			// 如果没有协议，默认添加 http://
-			target = "http://" + target
-		} else {
-			writeJSON(w, map[string]any{"ok": false, "err": "target 必须以 http:// 或 https:// 开头，或提供主机名/IP"})
-			return
-		}
-	}
-
-	// 验证 URL 可解析
-	u, err := url.Parse(target)
-	if err != nil || u.Host == "" {
-		writeJSON(w, map[string]any{"ok": false, "err": "无效的 target URL: " + target})
+	// 校验 target(修 D15/D23: 空/畸形/非法字符一律拒绝, 不再默认替换)。
+	target, err := validateTarget(body.Target)
+	if err != nil {
+		writeJSON(w, map[string]any{"ok": false, "err": err.Error()})
 		return
 	}
 
