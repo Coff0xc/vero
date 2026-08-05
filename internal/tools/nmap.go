@@ -107,12 +107,12 @@ func ParseNmapXML(stdout string, args map[string]any) []Observation {
 			continue
 		}
 
-		// Host 节点(用 IP 片段作 excerpt)
+		// Host 节点(用原文真实行作 excerpt, 修 D7: 构造片段属性顺序可能与原文不一致)
 		obs = append(obs, Observation{
 			Kind:    "host",
 			Key:     hostIP,
 			Label:   hostIP,
-			Excerpt: fmt.Sprintf(`addr="%s"`, hostIP),
+			Excerpt: excerptLine(stdout, `addr="`+hostIP+`"`),
 		})
 
 		// OS 指纹 -> finding
@@ -122,7 +122,7 @@ func ParseNmapXML(stdout string, args map[string]any) []Observation {
 				Kind:    "finding",
 				Key:     hostIP + ":os:" + osMatch.Name,
 				Label:   fmt.Sprintf("[info] OS: %s (accuracy: %s%%)", osMatch.Name, osMatch.Accuracy),
-				Excerpt: fmt.Sprintf(`name="%s" accuracy="%s"`, osMatch.Name, osMatch.Accuracy),
+				Excerpt: excerptLine(stdout, `name="`+osMatch.Name+`"`),
 			})
 		}
 
@@ -154,10 +154,11 @@ func ParseNmapXML(stdout string, args map[string]any) []Observation {
 				svcLabel += ")"
 			}
 
-			// Excerpt: 服务行的 XML 片段(简化: 用关键属性拼接, 保证在原文可找到)
-			excerpt := fmt.Sprintf(`portid="%s" protocol="%s"`, port, p.Protocol)
+			// Excerpt: 从原文提取该端口所在行(逐字可回查, 修 D7: 构造属性片段
+			// 顺序与原文 XML 不一致(protocol 在前 portid 在后)导致证据回查假阴性)
+			excerpt := excerptLine(stdout, `portid="`+port+`"`)
 			if svcName != "unknown" {
-				excerpt = fmt.Sprintf(`name="%s"`, svcName)
+				excerpt = excerptLine(stdout, `name="`+svcName+`"`)
 			}
 
 			obs = append(obs, Observation{
@@ -182,13 +183,25 @@ func ParseNmapXML(stdout string, args map[string]any) []Observation {
 					Kind:    "finding",
 					Key:     svcKey + ":script:" + script.ID,
 					Label:   fmt.Sprintf("[nse] %s: %s", script.ID, oneline(scriptOut, 100)),
-					Excerpt: fmt.Sprintf(`id="%s"`, script.ID), // 脚本 ID 在 XML 里逐字存在
+					Excerpt: excerptLine(stdout, `id="`+script.ID+`"`), // 脚本行原文, 逐字可回查
 				})
 			}
 		}
 	}
 
 	return obs
+}
+
+// excerptLine —— 从工具原文中提取包含 marker 的第一行原文(去首尾空白)。
+// 替代手工构造属性片段(修 D7): 保证 Excerpt 逐字存在于原文, 证据回查不产生假阴性。
+// 找不到时返回 marker 本身 —— 回查会如实报"未找到", 而非静默掩盖。
+func excerptLine(stdout, marker string) string {
+	for _, l := range strings.Split(stdout, "\n") {
+		if strings.Contains(l, marker) {
+			return strings.TrimSpace(l)
+		}
+	}
+	return marker
 }
 
 // isVulnScript —— 判断 NSE 脚本是否为漏洞检测类(值得作为 finding)。
