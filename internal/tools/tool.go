@@ -10,6 +10,8 @@ package tools
 
 import "sort"
 
+import "strings"
+
 // 杀伤力分级: 数字越大越危险, 内核用它做 HITL 门控与审计。
 const (
 	LevelRecon    = 0 // 被动侦察 (whois/被动指纹)
@@ -161,10 +163,11 @@ func (r *Registry) Specs() []ToolSpec {
 
 // ArgStr 从 args 里安全取字符串(缺失/类型不符则返回 def)。
 // Action.Args 与工具 args 都是 map[string]any, 统一用它取值。
+// D10 修复: 返回前 TrimSpace, 纯空白字符串(如 "  ")不再通过非空校验。
 func ArgStr(args map[string]any, key, def string) string {
 	if v, ok := args[key]; ok {
 		if s, ok := v.(string); ok {
-			return s
+			return strings.TrimSpace(s)
 		}
 	}
 	return def
