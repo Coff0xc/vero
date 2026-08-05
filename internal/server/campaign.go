@@ -247,6 +247,33 @@ func (s *Server) campaignContext() string {
 	return b.String()
 }
 
+// sanitizeHistory —— 对话历史卫生(修 D17): 只保留 user/assistant 角色, 拒绝伪造 role;
+// 限制条目数(20)与单条长度(2000 字符), 防 prompt 撑爆与注入。
+func sanitizeHistory(history [][2]string) [][2]string {
+	const (
+		maxItems = 20
+		maxLen   = 2000
+	)
+	out := make([][2]string, 0, len(history))
+	for _, h := range history {
+		if h[0] != "user" && h[0] != "assistant" {
+			continue // 伪造 system/工具等角色一律丢弃
+		}
+		r := []rune(strings.TrimSpace(h[1]))
+		if len(r) == 0 {
+			continue
+		}
+		if len(r) > maxLen {
+			r = r[:maxLen]
+		}
+		out = append(out, [2]string{h[0], string(r)})
+		if len(out) >= maxItems {
+			break
+		}
+	}
+	return out
+}
+
 // handleChat —— 对话式问答: 感知当前战役上下文, 用配置的 LLM 回答用户问题。
 // 请求: {question, history?[[role,content]...]}; 响应: {answer}。
 func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
@@ -259,6 +286,7 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "question required", http.StatusBadRequest)
 		return
 	}
+	body.History = sanitizeHistory(body.History) // D17: 拒绝伪造 role, 限制条目/长度
 	ctx := s.campaignContext()
 	reg := tools.NewRegistry()
 	s.cfgMu.Lock()
