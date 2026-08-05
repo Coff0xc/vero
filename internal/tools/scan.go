@@ -131,12 +131,21 @@ func portsFrom(args map[string]any) []int {
 }
 
 // normalizeHost —— 把 URL / host:port 归一化为纯 host(端口扫描要 host)。
+// D8 修复: 裸 IPv6(多冒号, 如 2001:db8::1)不做端口剥离, 否则末段数字会被误剥成 2001:db8:。
 func normalizeHost(t string) string {
 	if i := strings.Index(t, "://"); i >= 0 {
 		t = t[i+3:]
 	}
 	if i := strings.IndexByte(t, '/'); i >= 0 {
 		t = t[:i]
+	}
+	if strings.HasPrefix(t, "[") { // [::1]:80 → [::1]
+		if i := strings.Index(t, "]"); i >= 0 {
+			return t[:i+1]
+		}
+	}
+	if strings.Count(t, ":") > 1 {
+		return t // 裸 IPv6: 冒号是地址的一部分, 不剥端口
 	}
 	if i := strings.LastIndex(t, ":"); i >= 0 {
 		if _, err := strconv.Atoi(t[i+1:]); err == nil { // 冒号后是数字端口才剥离

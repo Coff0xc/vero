@@ -48,3 +48,20 @@ func TestPortScanClosedPort(t *testing.T) {
 		t.Skip("端口 1 意外开放, 跳过")
 	}
 }
+
+// TestNormalizeHostIPv6 —— D8: 裸 IPv6(多冒号)不得被误剥端口, [::1]:80 正确归一化。
+func TestNormalizeHostIPv6(t *testing.T) {
+	cases := map[string]string{
+		"2001:db8::1":                  "2001:db8::1", // 裸 IPv6: 末段数字是地址不是端口
+		"[::1]:80":                     "[::1]",
+		"http://[::1]:8080/x":          "[::1]",
+		"10.0.0.5:80":                  "10.0.0.5",
+		"http://file.nciyuan.net:8080": "file.nciyuan.net",
+		"file.nciyuan.net":             "file.nciyuan.net",
+	}
+	for in, want := range cases {
+		if got := normalizeHost(in); got != want {
+			t.Errorf("normalizeHost(%q) = %q, want %q", in, got, want)
+		}
+	}
+}
