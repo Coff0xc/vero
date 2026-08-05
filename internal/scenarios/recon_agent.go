@@ -11,6 +11,7 @@ package scenarios
 import (
 	"fmt"
 	"net/url"
+	"path"
 	"regexp"
 	"sort"
 	"strings"
@@ -84,9 +85,10 @@ func extractEndpoints(args map[string]any) tools.ToolResult {
 			continue
 		}
 		if !strings.HasPrefix(p, "/") {
-			// 相对路径 -> 拼接 base
+			// 相对路径 -> 相对当前目录解析(D25 修复: 用 path.Dir(base.Path) 而非 TrimSuffix)。
+			// 例: base=/user/view/manifest, 相对 edit → /user/view/edit(而非 /user/view/manifest/edit)。
 			if base != nil {
-				p = strings.TrimSuffix(base.Path, "/") + "/" + p
+				p = path.Join(path.Dir(base.Path), p)
 			}
 		}
 		if p != "/" && !seen[p] {
