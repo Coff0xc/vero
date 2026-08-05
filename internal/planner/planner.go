@@ -127,14 +127,16 @@ func cloneSet(m map[string]bool) map[string]bool {
 	return c
 }
 
-// hostOf —— 图里第一个 host 的 label(按插入序稳定); 无则回退默认靶标。
+// hostOf —— 图里第一个 host 的 label(按插入序稳定); 无则返回空串。
+// D22 修复: 不再回退硬编码 10.0.0.5 —— 图里没有 host 节点时对错误 IP 发起扫描,
+// 改为返回空, 由参数校验(缺 target)明确拒绝该规则, 安全停机而非盲扫。
 func hostOf(g *core.AttackGraph) string {
 	for _, id := range g.Order {
 		if n := g.Nodes[id]; n.Type == "host" {
 			return n.Label
 		}
 	}
-	return "10.0.0.5"
+	return ""
 }
 
 // MakeRules —— 生成规划规则集(只引用真实工具)。
@@ -159,9 +161,10 @@ func MakeRules(hasNmap, allowSim bool) ([]Rule, error) {
 	return []Rule{
 		{Name: "recon", Needs: nil, Produces: "service", Tool: scanTool,
 			Make: func(g *core.AttackGraph) core.Action {
-				target := "10.0.0.5"
-				if h := hostOf(g); h != "10.0.0.5" {
-					target = h
+				target := hostOf(g)
+				if target == "" {
+					// 无 host 节点: 不留空转, 目标缺失由参数校验显式拒绝(安全停机)。
+					return core.Action{Tool: scanTool, Args: map[string]any{"target": ""}, Rationale: scanRationale}
 				}
 				return core.Action{Tool: scanTool, Args: map[string]any{"target": target}, Rationale: scanRationale}
 			}},
