@@ -211,7 +211,7 @@ func (d *DeepSeekLLM) chatText(system, user string) (string, error) {
 	}
 	out := chatResp{}
 	var lastErr error
-	for attempt := 0; attempt < 2; attempt++ {
+	for attempt := 0; attempt < 3; attempt++ { // D30: 与 proposePlan 重试次数对齐(3 次)
 		out = chatResp{} // 重置: 本次响应的字段不继承上次
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, deepSeekURL, bytes.NewReader(raw))
 		if err != nil {
