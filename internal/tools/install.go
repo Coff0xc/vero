@@ -227,6 +227,11 @@ func InstallBinary(name string) (string, error) {
 	if err := os.Chmod(target, 0o755); err != nil {
 		return "", err
 	}
+	// D15: 安装后验证产物真实存在且非空(防目录条目匹配导致空文件谎报成功)。
+	if fi, err := os.Stat(target); err != nil || fi.Size() == 0 {
+		_ = os.Remove(target)
+		return "", fmt.Errorf("安装校验失败: 产物 %s 不存在或为空 (D15)", target)
+	}
 	EnsurePath()
 	return target, nil
 }
@@ -251,6 +256,11 @@ func extract(archive string, art *toolArtifact, target string) error {
 		defer zr.Close()
 		for _, f := range zr.File {
 			if !strings.Contains(f.Name, inner) {
+				continue
+			}
+			// D14: 跳过目录条目(如 nuclei zip 里的顶层目录), 否则 Windows 上
+			// 对目录句柄 Copy 报 "A device which does not exist" 且产物为空文件。
+			if f.FileInfo().IsDir() {
 				continue
 			}
 			rc, err := f.Open()
@@ -289,6 +299,10 @@ func extract(archive string, art *toolArtifact, target string) error {
 				return err
 			}
 			if !strings.Contains(hdr.Name, inner) {
+				continue
+			}
+			// D14: 跳过目录条目, 防空产物谎报成功。
+			if hdr.Typeflag == tar.TypeDir || hdr.FileInfo().IsDir() {
 				continue
 			}
 			out, err := os.Create(target)

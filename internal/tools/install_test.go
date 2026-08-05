@@ -1,6 +1,12 @@
 package tools
 
-import "testing"
+import (
+	"archive/zip"
+	"os"
+	"path/filepath"
+	"strings"
+	"testing"
+)
 
 // TestPipPackage —— 锁定工具名 -> pip 包名映射(设计规格 risk #7)。
 func TestPipPackage(t *testing.T) {
@@ -83,5 +89,42 @@ func TestInstallableBinary(t *testing.T) {
 		if got := InstallableBinary(name); got != "" {
 			t.Errorf("InstallableBinary(%q) = %q, want empty", name, got)
 		}
+	}
+}
+
+// TestExtractSkipsDirEntries —— D14/D15: zip 里目录条目名含 inner 时,
+// 必须跳过目录提取真正的文件, 不得产出空文件/报 "device does not exist"。
+func TestExtractSkipsDirEntries(t *testing.T) {
+	// 构造 zip: 目录条目(nuclei_3.3.1_linux_amd64/)在前, 真二进制在后。
+	tmp, err := os.CreateTemp(t.TempDir(), "art-*.zip")
+	if err != nil {
+		t.Fatal(err)
+	}
+	z := zip.NewWriter(tmp)
+	w, err := z.Create("nuclei_3.3.1_linux_amd64/")
+	if err != nil {
+		t.Fatal(err)
+	}
+	w, err = z.Create("nuclei_3.3.1_linux_amd64/nuclei")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.Write([]byte("#!/bin/sh\necho nuclei-ok\n")); err != nil {
+		t.Fatal(err)
+	}
+	z.Close()
+	tmp.Close()
+
+	target := filepath.Join(t.TempDir(), "nuclei")
+	err = extract(tmp.Name(), &toolArtifact{Kind: "zip", InnerRe: "nuclei"}, target)
+	if err != nil {
+		t.Fatalf("extract 应跳过目录条目成功: %v", err)
+	}
+	b, err := os.ReadFile(target)
+	if err != nil {
+		t.Fatalf("产物缺失: %v", err)
+	}
+	if !strings.Contains(string(b), "nuclei-ok") {
+		t.Errorf("产物内容应为真实文件而非空文件, got %q", b)
 	}
 }

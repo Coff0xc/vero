@@ -53,6 +53,13 @@ func Open(path string) (*Store, error) {
 		return nil, err
 	}
 	db.SetMaxOpenConns(1) // SQLite 单写者: 串行化 DB 访问, 避免战役写与查询并发的 SQLITE_BUSY
+	// S6: WAL 模式(多读单写) + busy_timeout(写竞争等待而非立即报错) + 连接池放宽到 4。
+	// 读查询不再被单连接串行化阻塞, 写仍由 SQLite 自身串行化。
+	if _, err := db.Exec(`PRAGMA journal_mode=WAL; PRAGMA busy_timeout=5000;`); err != nil {
+		db.Close()
+		return nil, fmt.Errorf("启用 WAL 失败: %w", err)
+	}
+	db.SetMaxOpenConns(4)
 	if _, err := db.Exec(schema); err != nil {
 		db.Close()
 		return nil, err
