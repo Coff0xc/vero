@@ -13,8 +13,13 @@ import (
 const HITLTimeout = 300 * time.Second
 
 // gate —— 一次待审批: ch 等操作员裁决。
+// D18: 保存 action 详情, Pending() 可完整渲染审批卡片。
 type gate struct {
-	ch chan bool
+	ch    chan bool
+	tool  string
+	args  map[string]any
+	level int
+	why   string
 }
 
 // WebGate —— Web HITL: Approve 发 hitl_request 事件并阻塞等操作员裁决。
@@ -40,7 +45,7 @@ func (w *WebGate) ApproveCtx(ctx context.Context, a core.Action, level int) bool
 	w.mu.Lock()
 	w.seq++
 	key := fmt.Sprintf("hitl-%d", w.seq) // 自增 key: 确定性、无碰撞(不用时间戳)
-	g := &gate{ch: make(chan bool, 1)}
+	g := &gate{ch: make(chan bool, 1), tool: a.Tool, args: a.Args, level: level, why: a.Rationale}
 	w.pending[key] = g
 	w.mu.Unlock()
 
@@ -91,12 +96,15 @@ func (w *WebGate) CancelAll() {
 }
 
 // Pending —— 当前所有未裁决的审批请求(SSE 重连补缝用)。
+// D18: 携带完整动作详情(tool/args/level/why), 前端可渲染审批卡片。
 func (w *WebGate) Pending() []map[string]any {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	out := make([]map[string]any, 0, len(w.pending))
-	for key := range w.pending {
-		out = append(out, map[string]any{"key": key})
+	for key, g := range w.pending {
+		out = append(out, map[string]any{
+			"key": key, "tool": g.tool, "args": g.args, "level": g.level, "why": g.why,
+		})
 	}
 	return out
 }
