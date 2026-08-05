@@ -200,15 +200,19 @@ func (d *DeepSeekLLM) chatText(system, user string) (string, error) {
 		"temperature": d.temp,
 	}
 	raw, _ := json.Marshal(body)
-	var out struct {
+	// D21 修复: out 循环外声明 + 每次重试前重置 —— 解码失败时残留上次响应字段,
+	// 后续循环用旧值判断 len(Choices) 返回脏数据。
+	type chatResp struct {
 		Choices []struct {
 			Message struct {
 				Content string `json:"content"`
 			} `json:"message"`
 		} `json:"choices"`
 	}
+	out := chatResp{}
 	var lastErr error
 	for attempt := 0; attempt < 2; attempt++ {
+		out = chatResp{} // 重置: 本次响应的字段不继承上次
 		req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, deepSeekURL, bytes.NewReader(raw))
 		if err != nil {
 			return "", err
