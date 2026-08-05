@@ -400,7 +400,8 @@ func emitGraph(emit EmitFunc, g *AttackGraph, nid, key string) {
 func truncate(s string, n int) string {
 	r := []rune(s)
 	if len(r) > n {
-		return string(r[:n])
+		// D6: 带截断标记, 证据回查可识别"前缀截断"并兼容匹配。
+		return string(r[:n]) + "…"
 	}
 	return s
 }

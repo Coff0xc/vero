@@ -211,8 +211,9 @@ func (g *AttackGraph) Snapshot() string {
 
 // VerifyEvidence —— 证据逐字回查: confirmed 节点的每条 evidence.Excerpt 必须逐字出现在某次工具输出里。
 // 抓 "LLM 声称拿到但工具输出里根本没有" 的幻觉证据(对应 Python verify_evidence)。
+// D6 修复: ① 按 trace 条目(单次工具输出)匹配, 拒绝跨工具拼接的巧合命中; ② 截断前缀
+// (以省略号结尾的 Excerpt)按去标记后的前缀匹配, 消除截断导致的假阴性。
 func VerifyEvidence(g *AttackGraph, trace []string) []string {
-	blob := strings.Join(trace, "\n")
 	var bad []string
 	for _, id := range g.Order {
 		n := g.Nodes[id]
@@ -220,10 +221,25 @@ func VerifyEvidence(g *AttackGraph, trace []string) []string {
 			continue
 		}
 		for _, ev := range n.Evidence {
-			if ev.Excerpt != "" && !strings.Contains(blob, ev.Excerpt) {
+			if ev.Excerpt != "" && !evidenceInTrace(ev.Excerpt, trace) {
 				bad = append(bad, fmt.Sprintf("%s: 证据 %q 未在工具输出中逐字找到 (疑似幻觉)", n.ID, ev.Excerpt))
 			}
 		}
 	}
 	return bad
+}
+
+// evidenceInTrace —— Excerpt 必须完整出现在某一次工具输出内(整条目 Contains)。
+// 截断前缀(尾随省略号)时, 按去标记后的前缀匹配(前缀必然仍逐字存在于原文)。
+func evidenceInTrace(excerpt string, trace []string) bool {
+	prefix := strings.TrimSuffix(excerpt, "…")
+	if prefix == "" {
+		return true
+	}
+	for _, t := range trace {
+		if strings.Contains(t, prefix) {
+			return true
+		}
+	}
+	return false
 }
