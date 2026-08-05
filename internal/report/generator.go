@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -94,11 +95,13 @@ func calculateRiskScore(crit, high, med, low int) float64 {
 func buildServices(nodes []*core.Node) []Service {
 	var services []Service
 	for _, n := range nodes {
-		// 从 ID 提取端口（格式：host:ip:port）
-		parts := strings.Split(n.ID, ":")
+		// 从 ID 尾部提取端口（格式：service:host:port）。
+		// D12 修复: 用 LastIndex 而非 Split 取 parts[2] —— IPv6 ID(service:[::1]:80)会被冒号切坏。
 		port := 0
-		if len(parts) >= 3 {
-			fmt.Sscanf(parts[2], "%d", &port)
+		if i := strings.LastIndex(n.ID, ":"); i >= 0 {
+			if p, err := strconv.Atoi(n.ID[i+1:]); err == nil {
+				port = p
+			}
 		}
 
 		protocol := "unknown"
