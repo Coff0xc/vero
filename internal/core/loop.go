@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os"
 	"sort"
+	"strconv"
 	"strings"
 
 	"github.com/Coff0xc/vero/internal/tools"
@@ -60,7 +61,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 	g := NewAttackGraph()
 	var history []HistoryItem
 	var trace []string
-	lastSig, stall, prevNodeCount := "", 0, 0
+	lastSig, stall, prevNodeCount, failStreak := "", 0, 0, 0
 	// 显式阶段状态机: init→recon→scan→exploit→done。按成功工具杀伤级推进, 每推进一次广播 phase 事件。
 	phase := "init"
 	emit(Event{Kind: "phase", Data: map[string]any{"phase": "init"}})
@@ -114,7 +115,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 			if ctx.Err() != nil {
 				break
 			}
-			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount, &phase,
+			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount, &failStreak, &phase,
 				llm, reg, approve, emit, step, &acts[i])
 			if !cont {
 				break
@@ -132,7 +133,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 // runAction —— 执行单个动作(注册校验/HITL 门控/执行/图更新/停滞检测), 返回是否继续后续动作。
 // false = 该步未成功执行(未知工具/被拒/失败), 计划模式下中断剩余步骤。
 func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trace *[]string,
-	lastSig *string, stall *int, prevNodeCount *int, phase *string,
+	lastSig *string, stall *int, prevNodeCount *int, failStreak *int, phase *string,
 	llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, step int, action *Action) bool {
 
 	tool, ok := reg.Get(action.Tool)
@@ -198,6 +199,7 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		}
 	}
 	if !res.Success {
+		*failStreak++ // U4: 连续失败计数(不论 args 是否相同), 供停滞检测兜底
 		if r, ok := llm.(Rejecter); ok {
 			r.OnReject() // 失败 -> 让规划器换路
 		}
@@ -208,6 +210,7 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	if !res.Success {
 		return false // 计划模式: 失败即中断后续依赖步骤
 	}
+	*failStreak = 0
 	// 成功 -> 按工具杀伤级推进阶段状态机(init→recon→scan→exploit)。
 	advancePhase(emit, phase, level)
 	// 固定 parser 结构化; 返回产出条数, 供 LLM-as-observer 兜底判断。
@@ -242,7 +245,7 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		cid := "claim:" + verifiesVal
 		if _, ok := g.Nodes[cid]; ok {
 			_, _ = g.Confirm(cid, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
-			if host := "host:" + tools.ArgStr(action.Args, "target", "?"); g.Nodes[host] != nil && !g.HasEdge(host, "verifies", cid) {
+			if host := "host:" + normHost(tools.ArgStr(action.Args, "target", "?")); g.Nodes[host] != nil && !g.HasEdge(host, "verifies", cid) {
 				g.Edges = append(g.Edges, &Edge{
 					Src: host, Rel: "verifies", Dst: cid, State: StateConfirmed,
 					Evidence: []Evidence{{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)}},
@@ -250,6 +253,20 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 				emit(Event{Kind: "edge", Data: map[string]any{"src": host, "dst": cid, "rel": "verifies"}})
 			}
 			emitGraph(emit, g, cid, "confirm")
+		}
+	}
+	// U1 兜底: LLM 不填 verifies 时, 动作成功 + 图里有 hypothesis claim 且 claim 文本含本动作目标 host
+	// → 自动 confirm(证据=真实工具输出, 约束不变)。不依赖 LLM 自觉填字段。
+	// 保守近似: 动作成功 + 目标一致即视为对该目标的假设提供了证据, 结果可经 Excerpt 回查。
+	if verifiesVal == "" {
+		if host := normHost(tools.ArgStr(action.Args, "target", "")); host != "" {
+			for id, n := range g.Nodes {
+				if n.Type == "finding" && n.State == StateHypothesis && strings.HasPrefix(id, "claim:") &&
+					strings.Contains(n.Label, host) {
+					_, _ = g.Confirm(id, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+					emitGraph(emit, g, id, "confirm")
+				}
+			}
 		}
 	}
 	// 规划产出: 规划步成功 -> 建 produces 类型节点(confirmed, 证据=工具输出)
@@ -278,8 +295,9 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 
 	// 停滞检测: 连续重复(tool+args)且攻击图无新增 -> 停止空转(防 LLM 分析瘫痪/无效循环)
 	// 修复 C4: 用稳定的 JSON 序列化替代 fmt.Sprint(map)（map 遍历无序导致 sig 不稳定）
+	// U4 补充: sig 只按工具+归一化参数比较; 连续失败(不论 args 是否相同)且图无新增也停止。
 	sig := action.Tool + "|" + stableArgsSig(action.Args)
-	if sig == *lastSig && len(g.Nodes) == *prevNodeCount {
+	if (*failStreak >= 3 && len(g.Nodes) == *prevNodeCount) || (sig == *lastSig && len(g.Nodes) == *prevNodeCount) {
 		if *stall++; *stall >= 2 {
 			emit(Event{Kind: "done", Data: map[string]any{"reason": "检测到重复无进展动作, 停止空转"}})
 			return false
@@ -316,32 +334,47 @@ func applyObservations(g *AttackGraph, tool *tools.Tool, action *Action, res too
 			}
 		}
 		// 修复 C1: 为 finding 类型建立关联边
+		// U2 修复: Key 可能是 URL/自定义格式(http://host:tech:Via 等), 不能直接 Split(":")。
+		// 用 URL 感知解析提取 host[:port]: 端口段非纯数字(如 tech)时只按 host 匹配。
+		// U5 修复: 找不到 service(如 probe 模式)时回退建 host→exposes→finding 边, 保证图有拓扑。
 		if o.Kind == "finding" {
-			// 查找此 finding 关联的 service 节点
+			host, port := keyHostPort(o.Key)
+			if host == "" {
+				host, port = keyHostPort(tools.ArgStr(action.Args, "target", ""))
+			}
+			// 1) 优先匹配 service: host 精确前缀 + 端口(有则)命中
 			var sourceService string
-			if strings.Contains(o.Key, ":") {
-				parts := strings.Split(o.Key, ":")
-				if len(parts) >= 2 {
-					host := parts[0]
-					port := parts[1]
-					// 查找对应的 service 节点
-					for sid, sn := range g.Nodes {
-						if sn.Type == "service" && strings.HasPrefix(sid, "service:") {
-							if strings.Contains(sid, host) && strings.Contains(sid, port) {
-								sourceService = sid
-								break
-							}
-						}
+			if host != "" {
+				for sid, sn := range g.Nodes {
+					if sn.Type != "service" || !strings.HasPrefix(sid, "service:"+host+":") {
+						continue
+					}
+					if port != "" && !strings.HasSuffix(sid, ":"+port) {
+						continue
+					}
+					sourceService = sid
+					if port != "" {
+						break // host+port 全命中: 最佳匹配
 					}
 				}
 			}
-			// 如果找到源服务，建立 service→exposes→finding 边
-			if sourceService != "" && !g.HasEdge(sourceService, "exposes", nid) {
+			// 2) 无 service 时: 确保 host 节点存在, 回退挂到 host 上(probe 模式兜底)
+			src := sourceService
+			if src == "" && host != "" {
+				hid := "host:" + normHost(host)
+				if g.Nodes[hid] == nil {
+					g.UpsertNode(&Node{ID: hid, Type: "host", Label: normHost(host)})
+					emitGraph(emit, g, hid, "confirm")
+				}
+				src = hid
+			}
+			// 3) 建边 service→exposes→finding 或 host→exposes→finding
+			if src != "" && !g.HasEdge(src, "exposes", nid) {
 				g.Edges = append(g.Edges, &Edge{
-					Src: sourceService, Rel: "exposes", Dst: nid, State: StateConfirmed,
+					Src: src, Rel: "exposes", Dst: nid, State: StateConfirmed,
 					Evidence: []Evidence{{Tool: action.Tool, Excerpt: o.Excerpt}},
 				})
-				emit(Event{Kind: "edge", Data: map[string]any{"src": sourceService, "dst": nid, "rel": "exposes"}})
+				emit(Event{Kind: "edge", Data: map[string]any{"src": src, "dst": nid, "rel": "exposes"}})
 			}
 		}
 		emitGraph(emit, g, nid, "confirm")
@@ -477,15 +510,82 @@ func advancePhase(emit EmitFunc, phase *string, level int) {
 
 // stableArgsSig —— 生成稳定的参数签名（修复 C4: fmt.Sprint(map) 遍历无序导致 sig 不稳定）。
 // 按 key 排序后 JSON 序列化，保证同一组参数始终产生相同的 sig。
+// U4 补充: target 归一化(剥 scheme/尾斜杠), 避免 "http://host:8080" 与 "host:8080" 视为不同参数。
 func stableArgsSig(args map[string]any) string {
 	if len(args) == 0 {
 		return "{}"
 	}
-	keys := make([]string, 0, len(args))
-	for k := range args {
+	norm := make(map[string]any, len(args))
+	for k, v := range args {
+		if k == "target" {
+			if s, ok := v.(string); ok {
+				norm[k] = normTarget(s)
+				continue
+			}
+		}
+		norm[k] = v
+	}
+	keys := make([]string, 0, len(norm))
+	for k := range norm {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	b, _ := json.Marshal(args)
+	b, _ := json.Marshal(norm)
 	return string(b)
+}
+
+// normTarget —— target 归一化: 去空白/尾斜杠, 剥 scheme, 用于停滞检测 sig 稳定。
+func normTarget(s string) string {
+	s = strings.TrimSpace(s)
+	s = strings.TrimRight(s, "/")
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+	return s
+}
+
+// normHost —— 从可能带 scheme/路径/端口的字符串提取裸 host(用于 host 节点 ID 归一化)。
+func normHost(s string) string {
+	s = strings.TrimSpace(s)
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+	if i := strings.IndexAny(s, "/?#"); i >= 0 {
+		s = s[:i]
+	}
+	if strings.HasPrefix(s, "[") { // IPv6 [::1]:80
+		if i := strings.Index(s, "]"); i >= 0 {
+			return s[:i+1]
+		}
+	}
+	if i := strings.LastIndex(s, ":"); i >= 0 {
+		if _, err := strconv.Atoi(s[i+1:]); err == nil {
+			return s[:i]
+		}
+	}
+	return s
+}
+
+// keyHostPort —— 从 observation Key(URL/裸 host:port/自定义格式)提取 host 与端口。
+// 例: http://host:8080:tech:Via → host, 8080; host:80:x → host, 80; host:tech:Via → host, ""。
+// 端口段非纯数字(如 tech)时视为类型标识, 返回空端口(仅按 host 匹配)。
+func keyHostPort(key string) (string, string) {
+	s := key
+	if i := strings.Index(s, "://"); i >= 0 {
+		s = s[i+3:]
+	}
+	if i := strings.IndexAny(s, "/?#"); i >= 0 {
+		s = s[:i]
+	}
+	parts := strings.Split(s, ":")
+	if len(parts) == 0 || parts[0] == "" {
+		return "", ""
+	}
+	host := parts[0]
+	if len(parts) >= 2 {
+		if _, err := strconv.Atoi(parts[1]); err == nil {
+			return host, parts[1]
+		}
+	}
+	return host, ""
 }

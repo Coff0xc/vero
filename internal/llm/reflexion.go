@@ -85,6 +85,13 @@ func (r *ReflexionEnhanced) initDB() error {
 func ClassifyFailure(reason string) FailureMode {
 	reason = strings.ToLower(reason)
 
+	// 静默失败: 命令执行但无任何输出(如 curl -sI 连接被拒时 stdout/stderr 都为空)。
+	// 无输出通常意味着连接层失败, 按目标不可达处理, 允许延迟重试(U3)。
+	if strings.Contains(reason, "无输出") || strings.Contains(reason, "no output") ||
+		strings.Contains(reason, "empty output") || reason == "" {
+		return FailureTargetDown
+	}
+
 	// 网络超时
 	if strings.Contains(reason, "timeout") || strings.Contains(reason, "connection refused") ||
 		strings.Contains(reason, "no route to host") || strings.Contains(reason, "connection reset") {

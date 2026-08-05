@@ -27,6 +27,7 @@ func TestClassifyFailure(t *testing.T) {
 		{"参数校验失败", FailureArgument},
 		{"host unreachable", FailureTargetDown},
 		{"service unavailable", FailureTargetDown},
+		{"工具失败(无输出)", FailureTargetDown}, // U3: curl -sI 静默失败时 stdout/stderr 为空
 		{"random error", FailureUnknown},
 	}
 
