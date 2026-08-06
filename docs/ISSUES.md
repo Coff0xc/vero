@@ -59,7 +59,16 @@
   patch.kpi = { ...s.kpi, services: e.data.services ?? [] }
   ```
 - **关联**: `web/src/lib/sse.ts` — ingest 调用加 try/catch 防御，es.onerror 日志
-- **状态**: ✅ 已修复 (待提交)
+- **状态**: ✅ 已修复 (提交 e7c6032)
+
+### P1-4: 停止按钮无效 — 战役无法中止
+- **文件**: `internal/server/server.go` (handleCancel), `web/src/lib/actions.ts`, `web/src/store.ts`
+- **问题**: 后端 handleCancel 仅取消 context，未广播任何事件；前端 cancelCampaign 仅发请求不更新 UI，导致停止后画面仍卡死在"运行中"
+- **修复**:
+  - 后端: handleCancel 调用 cancel 后立即广播 `campaign_stopped` 事件
+  - 前端: cancelCampaign 先乐观更新 store 状态 (status→idle, 清空 hitl) 再请求后端
+  - 前端: types.ts/store.ts 新增 `campaign_stopped` 事件处理
+- **状态**: ✅ 已修复 (提交 7c2c53e)
 
 ---
 
@@ -113,6 +122,18 @@ engine → phase(init) → plan → step(port_scan) → tool(port_scan)
 ```
 **结论**: 后端事件流正常，前端白屏问题由 P1-3 修复。
 
+### 停止按钮测试 (2026-04-03)
+使用 Go 客户端验证 `campaign_stopped` 事件：
+```
+1. 订阅 /events
+2. POST /start → 200 OK {"ok":true}
+3. 等待 3 秒
+4. POST /cancel → 200 OK {"ok":true}
+5. 立即收到: data: {"data":{"reason":"操作员已停止"},"kind":"campaign_stopped"}
+6. 随后收到: done → phase(done) → route → summary → done
+```
+**结论**: 停止按钮立即生效，双重保障（乐观更新 + SSE 事件）。
+
 ### 编译测试
 - ✅ `go build` 通过
 - ✅ `npm run build` 通过 (vite 421KB JS, 49KB CSS)
@@ -127,9 +148,9 @@ engine → phase(init) → plan → step(port_scan) → tool(port_scan)
 ## Git 状态
 
 ```
-fix/critical-bugs
+fix/ai-engine-and-security-patches (4 commits)
 ├── 8c979f5 fix(critical): 修复攻击图边缺失和exploit假阳性问题
 ├── 0eb9cf0 fix(tools): 移除searchsploit和poc_manager假数据输出
-├── [最新] fix(core+llm): 添加verifies字段和证据去重机制
-└── [待提交] fix(frontend): 修复数组null兜底和SSE容错
+├── e7c6032 fix(frontend): SSE ingest容错 + issues清单
+└── 7c2c53e fix(cancel): 停止按钮立即响应 — 后端广播campaign_stopped + 前端乐观更新
 ```
