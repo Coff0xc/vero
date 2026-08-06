@@ -72,14 +72,16 @@
 
 ### P1-5: 战役结束后 UI 不自动恢复 — 必须手动点停止
 - **文件**: `web/src/store.ts`, `web/src/components/ChatView.tsx`
-- **问题**: 战役结束 (done 事件) 后 status 设为 'done' 而非 'idle'，UI 仍显示"停止"按钮；输入框残留目标文本；点击"新建"也设 status 为 'running'，导致每次都要手动点停止
+- **问题**:
+  1. 后端 `done` 事件将 status 设为 'done' 而非 'idle'，UI 仍显示"停止"按钮
+  2. `reset('')` (新建会话) 只重置前端状态，未通知后端停止正在运行的 goroutine，后端 SSE 继续推送事件覆盖前端状态
+  3. 输入框残留目标文本，初始值预填 localhost:3000
 - **修复**:
   - store.ts: 'done' 事件处理改为 status='idle', stage='idle', 清空 hitl
+  - store.ts: reset('') 空目标时检测到 running 状态则自动调用 `/cancel` 停止后端战役
   - store.ts: reset('') 空目标时 status='idle' (新建会话)，有目标时 status='running' (启动战役)
-  - ChatView.tsx: 输入框初始为空字符串 (不再预填 localhost:3000)
-  - ChatView.tsx: start 成功后清空输入框
-  - ChatView.tsx: useEffect 监听 status 从 'running'→'idle' 时自动清空输入框
-- **状态**: ✅ 已修复 (待提交)
+  - ChatView.tsx: 输入框初始为空字符串，start 成功后清空，useEffect 监听 status 从 running→idle 时自动清空
+- **状态**: ✅ 已修复
 
 ---
 

@@ -152,7 +152,7 @@ interface State {
 }
 
 // 单一 store: 所有 UI 由 SSE 事件累积驱动(信号流/攻击图/KPI/证据/HITL)。
-export const useStore = create<State>((set) => ({
+export const useStore = create<State>((set, get) => ({
   status: 'idle',
   goal: '—',
   log: [],
@@ -178,7 +178,14 @@ export const useStore = create<State>((set) => ({
   toggleGraphFull: (on) => set((s) => ({ graphFull: on ?? !s.graphFull })),
   setNodeQuery: (q) => set({ nodeQuery: q }),
 
-  reset: (target) =>
+  reset: (target) => {
+    // 点击"新建"时如果战役还在跑, 先通知后端停止, 防止 SSE 继续推送覆盖前端状态
+    if (!target) {
+      const { status } = get()
+      if (status === 'running') {
+        fetch('/cancel', { method: 'POST' }).catch(() => {})
+      }
+    }
     set({
       status: target ? 'running' : 'idle',
       goal: target || '—',
@@ -194,7 +201,8 @@ export const useStore = create<State>((set) => ({
       mainPath: [],
       activeTab: 'campaign',
       nodeQuery: '',
-    }),
+    })
+  },
 
   // applyEvent —— 单事件状态转移(纯函数): ingest 与 replay 共用; replay 循环 reduce 后单次 set。
   applyEvent: (s: State, e: SSEEvent): Partial<State> => {
