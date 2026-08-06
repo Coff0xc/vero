@@ -70,6 +70,17 @@
   - 前端: types.ts/store.ts 新增 `campaign_stopped` 事件处理
 - **状态**: ✅ 已修复 (提交 7c2c53e)
 
+### P1-5: 战役结束后 UI 不自动恢复 — 必须手动点停止
+- **文件**: `web/src/store.ts`, `web/src/components/ChatView.tsx`
+- **问题**: 战役结束 (done 事件) 后 status 设为 'done' 而非 'idle'，UI 仍显示"停止"按钮；输入框残留目标文本；点击"新建"也设 status 为 'running'，导致每次都要手动点停止
+- **修复**:
+  - store.ts: 'done' 事件处理改为 status='idle', stage='idle', 清空 hitl
+  - store.ts: reset('') 空目标时 status='idle' (新建会话)，有目标时 status='running' (启动战役)
+  - ChatView.tsx: 输入框初始为空字符串 (不再预填 localhost:3000)
+  - ChatView.tsx: start 成功后清空输入框
+  - ChatView.tsx: useEffect 监听 status 从 'running'→'idle' 时自动清空输入框
+- **状态**: ✅ 已修复 (待提交)
+
 ---
 
 ## 🟡 P2 中优先级 (待修复)
@@ -148,9 +159,10 @@ engine → phase(init) → plan → step(port_scan) → tool(port_scan)
 ## Git 状态
 
 ```
-fix/ai-engine-and-security-patches (4 commits)
+fix/ai-engine-and-security-patches (5 commits)
 ├── 8c979f5 fix(critical): 修复攻击图边缺失和exploit假阳性问题
 ├── 0eb9cf0 fix(tools): 移除searchsploit和poc_manager假数据输出
 ├── e7c6032 fix(frontend): SSE ingest容错 + issues清单
-└── 7c2c53e fix(cancel): 停止按钮立即响应 — 后端广播campaign_stopped + 前端乐观更新
+├── 7c2c53e fix(cancel): 停止按钮立即响应 — 后端广播campaign_stopped + 前端乐观更新
+└── 7274627 fix(ui): 战役结束后自动恢复待命状态 — 无需手动点停止
 ```

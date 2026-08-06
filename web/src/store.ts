@@ -180,10 +180,10 @@ export const useStore = create<State>((set) => ({
 
   reset: (target) =>
     set({
-      status: 'running',
-      goal: target,
+      status: target ? 'running' : 'idle',
+      goal: target || '—',
       log: [],
-      messages: [{ id: seq++, role: 'user', kind: 'user', text: target, ts: Date.now() }],
+      messages: target ? [{ id: seq++, role: 'user', kind: 'user', text: target, ts: Date.now() }] : [],
       nodes: {},
       edges: {},
       kpi: emptyKpi,
@@ -258,8 +258,9 @@ export const useStore = create<State>((set) => ({
           patch.hitl = { key: e.data.key, tool: e.data.tool, args: e.data.args, level: e.data.level, why: e.data.why ?? '' }
           break
         case 'done':
-          patch.status = 'done'
-          patch.stage = 'done'
+          patch.status = 'idle'
+          patch.stage = 'idle'
+          patch.hitl = null
           break
         case 'campaign_stopped':
           patch.status = 'idle'
