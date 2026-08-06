@@ -35,10 +35,13 @@ export async function startCampaign(target: string): Promise<ActionResult> {
 }
 
 // cancelCampaign —— 停止当前战役(幂等, 无战役时后端空转)。
+// 前端先乐观更新状态, 后端广播 campaign_stopped 事件双重保障。
 export async function cancelCampaign(): Promise<void> {
+  // 乐观更新: 立即清除 UI 卡死状态
+  useStore.setState({ status: 'idle', stage: 'idle', hitl: null })
   try {
     await fetch('/cancel', { method: 'POST' })
   } catch {
-    /* 网络失败静默: 状态灯会如实反映 */
+    /* 网络失败静默: 状态已乐观更新 */
   }
 }

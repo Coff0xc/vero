@@ -11,6 +11,7 @@ export type EventKind =
   | 'path' | 'phase'
   | 'error' | 'reflect' | 'thinking' | 'hitl'
   | 'warning'
+  | 'campaign_stopped'
 
 export interface EngineData { engine: string; target: string }
 export interface StepData { step: number; tool: string; args: Record<string, unknown>; level: number; why?: string }
@@ -46,6 +47,7 @@ export interface WarningData { msg: string }
 export interface ReflectData { text: string }
 export interface ThinkingData { text: string } // 深度思考: 决策器思维链(reasoning_content)
 export interface HitlResultData { action: string; approved: boolean } // HITL 裁决结果(拒绝/放行)
+export interface CampaignStoppedData { reason?: string }
 
 // ChatMessage —— 对话消息(对话式 UI 的消息流): 用户输入 + 事件渲染成的助手消息 + 问答回复。
 export interface ChatMessage {
@@ -82,6 +84,7 @@ export type SSEEvent =
   | { kind: 'reflect'; data: ReflectData }
   | { kind: 'thinking'; data: ThinkingData }
   | { kind: 'hitl'; data: HitlResultData }
+  | { kind: 'campaign_stopped'; data: CampaignStoppedData }
 
 export const EVENT_KINDS: readonly EventKind[] = [
   'engine', 'step', 'tool', 'graph', 'edge', 'hitl_request',
@@ -94,6 +97,7 @@ export const EVENT_KINDS: readonly EventKind[] = [
   'reflect',
   'thinking',
   'hitl',
+  'campaign_stopped',
 ]
 
 export interface Evidence {

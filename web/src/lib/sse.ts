@@ -5,7 +5,12 @@ import { useStore, parseEvent } from '../store'
 export function useSSE() {
   const ingest = useStore((s) => s.ingest)
   useEffect(() => {
+    let connected = false
     const es = new EventSource('/events')
+    es.onopen = () => {
+      connected = true
+      console.info('[SSE] connected to /events')
+    }
     es.onmessage = (m) => {
       let raw: unknown
       try {
@@ -23,7 +28,11 @@ export function useSSE() {
     }
     es.onerror = () => {
       // EventSource 自动重连, 这里只打日志
-      console.warn('[SSE] connection error, waiting for auto-reconnect')
+      if (!connected) {
+        console.error('[SSE] failed to connect to /events')
+      } else {
+        console.warn('[SSE] connection error, waiting for auto-reconnect')
+      }
     }
     return () => es.close()
   }, [ingest])

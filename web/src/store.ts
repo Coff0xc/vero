@@ -29,6 +29,7 @@ function fmt(e: SSEEvent): string {
     case 'graph': return `${e.data.confirm ? '已证实' : '待验证'} ${e.data.confirm ?? e.data.hypothesis ?? ''}`
     case 'edge': return `${e.data.src} —${e.data.rel}→ ${e.data.dst}`
     case 'hitl_request': return `需授权 L${e.data.level} ${e.data.tool}`
+    case 'campaign_stopped': return `战役已停止: ${e.data.reason ?? '操作员已停止'}`
     case 'route': return `服务 ${(e.data.services ?? []).join(' · ') || '—'} → 激活 ${(e.data.activated ?? []).join(' · ') || '无'}`
     case 'summary': return `已证实 ${e.data.confirmed} · 待验证 ${e.data.hypothesis} · 证据违规 ${e.data.evidence_violations}`
     case 'done': return `战役结束: ${e.data.reason ?? ''}`
@@ -259,6 +260,11 @@ export const useStore = create<State>((set) => ({
         case 'done':
           patch.status = 'done'
           patch.stage = 'done'
+          break
+        case 'campaign_stopped':
+          patch.status = 'idle'
+          patch.stage = 'idle'
+          patch.hitl = null
           break
         case 'engine':
           patch.engineLabel = e.data.engine

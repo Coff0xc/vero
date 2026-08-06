@@ -21,6 +21,7 @@ import (
 
 	"github.com/Coff0xc/vero/internal/audit"
 	"github.com/Coff0xc/vero/internal/config"
+	"github.com/Coff0xc/vero/internal/core"
 	"github.com/Coff0xc/vero/internal/scenarios"
 	"github.com/Coff0xc/vero/internal/store"
 	"github.com/Coff0xc/vero/internal/tools"
@@ -230,6 +231,8 @@ func (s *Server) handleCancel(w http.ResponseWriter, r *http.Request) {
 	if stop != nil {
 		stop()
 	}
+	// 广播停止事件, 让前端立即感知
+	s.broker.Emit(core.Event{Kind: "campaign_stopped", Data: map[string]any{"reason": "操作员已停止"}})
 	writeJSON(w, map[string]any{"ok": true})
 }
 
