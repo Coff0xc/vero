@@ -254,6 +254,7 @@ make dev-web       # 前端 :5173
 |---|------|------|------|
 | P9 | **Docker 配置环境变量未声明** | `docker-compose.yml`: 补全 VERO_HOST/DEEPSEEK_API_KEY/VERO_AUTH_TOKEN | ✅ |
 | P10 | **chatText 重试次数不一致** (2 vs 3) | `deepseek.go`: 统一为 3 次, 修复残留字段问题 | ✅ |
+| P12 | **新建战役前端白屏**: store.ts 数组方法对 null/undefined TypeError | `store.ts` fmt/applyEvent 全部数组字段用 `?? []` 兜底 | ✅ |
 
 ### 💭 Enhancement (未修复)
 
