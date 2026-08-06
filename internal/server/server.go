@@ -46,6 +46,8 @@ type Server struct {
 	lastCtx *campaignCtx // 最近一次战役的上下文(对话式问答感知用)
 
 	cfgMu sync.Mutex // 配置并发保护(handleConfigSet 与战役/chat 并发读, 修 data race)
+
+	authToken string // API 认证 token; 非空时非回环请求必须携带 Bearer token
 }
 
 // New —— 组装 server。webFS 为前端静态资源(embed 或 os.DirFS), 其根含 index.html。
@@ -58,6 +60,10 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 		_ = os.Setenv("VERO_MODEL", cfg.Model)
 	}
 	tools.EnsurePath()
+	// API 认证 token: 通过 VERO_AUTH_TOKEN 环境变量设置。
+	// 非空时, 非回环地址的请求必须携带 Authorization: Bearer <token>。
+	// 回环地址(127.0.0.1/localhost/::1)免认证, 本地开发不受影响。
+	authToken := os.Getenv("VERO_AUTH_TOKEN")
 	return &Server{
 		broker:    broker,
 		gate:      NewWebGate(broker),
@@ -66,6 +72,7 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 		scenarios: sm,
 		webFS:     webFS,
 		cfg:       cfg,
+		authToken: authToken,
 	}
 }
 
@@ -73,7 +80,8 @@ func New(st *store.Store, auditor *audit.Auditor, webFS fs.FS) *Server {
 func (s *Server) Router() http.Handler {
 	r := chi.NewRouter()
 	r.Use(middleware.Recoverer)
-	r.Use(originGuard) // 跨站防护: 非本源的浏览器请求一律 403(SSE 监听 / 任意页面触发攻击)
+	r.Use(originGuard)     // 跨站防护: 非本源的浏览器请求一律 403(SSE 监听 / 任意页面触发攻击)
+	r.Use(s.authGuard)     // API 认证: 非回环请求需 Bearer token(VERO_AUTH_TOKEN 环境变量配置)
 	r.Get("/events", s.handleEvents)
 	r.Post("/start", s.handleStart)
 	r.Post("/approve", s.handleApprove)
@@ -311,6 +319,33 @@ func isLoopback(hostport string) bool {
 	}
 	ip := net.ParseIP(h)
 	return ip != nil && ip.IsLoopback()
+}
+
+// authGuard —— API 认证中间件: 未设置 VERO_AUTH_TOKEN 时完全放行(向后兼容)。
+// 设置后, 回环地址(本地开发)免认证; 非回环请求必须携带 Authorization: Bearer <token>。
+// /healthz 端点始终免认证(容器健康检查用)。
+func (s *Server) authGuard(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.authToken == "" || r.URL.Path == "/healthz" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if isLoopback(r.RemoteAddr) {
+			next.ServeHTTP(w, r)
+			return
+		}
+		auth := r.Header.Get("Authorization")
+		if !strings.HasPrefix(auth, "Bearer ") {
+			http.Error(w, "unauthorized: missing bearer token", http.StatusUnauthorized)
+			return
+		}
+		token := strings.TrimPrefix(auth, "Bearer ")
+		if token != s.authToken {
+			http.Error(w, "unauthorized: invalid token", http.StatusUnauthorized)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 // originGuard —— 跨站防护中间件: 浏览器发出的请求必带 Origin。

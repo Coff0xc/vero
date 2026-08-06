@@ -211,7 +211,9 @@ function StatusLine({ m }: { m: ChatMessage }) {
     )
   }
   const tone =
-    kind === 'done' ? 'text-live' : kind === 'error' || kind === 'tool_error' ? 'text-alert' : 'text-muted'
+    kind === 'done' ? 'text-live' :
+    kind === 'warning' ? 'text-warning' :
+    kind === 'error' || kind === 'tool_error' ? 'text-alert' : 'text-muted'
   return (
     <div className={`text-[11.5px] ${tone} mb-0.5 msg-in font-mono`}>
       {m.text}

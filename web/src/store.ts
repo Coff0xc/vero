@@ -42,6 +42,7 @@ function fmt(e: SSEEvent): string {
     case 'path': return `主路径: ${e.data.nodes.length ? e.data.nodes.join(' → ') : '—'}`
     case 'phase': return `阶段: ${e.data.phase}`
     case 'error': return `错误: ${e.data.msg}`
+    case 'warning': return `⚠ 提示: ${e.data.msg}`
     case 'reflect': return `反思: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'thinking': return `思考: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'hitl':

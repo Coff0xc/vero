@@ -138,14 +138,9 @@ func ParseSemgrep(out string, args map[string]any) []tools.Observation {
 			}
 		}
 
-		// 摘要: 文件:行号 + 消息
-		excerpt := fmt.Sprintf("%s:%d - %s", r.Path, r.Start.Line, r.Extra.Message)
-
-		// 代码片段作为证据(截断到 200 字符)
-		codeSnippet := r.Extra.Lines
-		if len(codeSnippet) > 200 {
-			codeSnippet = codeSnippet[:200] + "..."
-		}
+		// 摘要: 文件:行号 + 消息 + 代码片段(用 Clip 安全截断防 UTF-8 截断)
+		codeSnippet := tools.Clip(r.Extra.Lines, 200)
+		excerpt := fmt.Sprintf("%s:%d - %s\n%s", r.Path, r.Start.Line, r.Extra.Message, codeSnippet)
 
 		label := fmt.Sprintf("[%s] %s (%s)", severity, r.CheckID, tag)
 

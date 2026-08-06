@@ -10,6 +10,7 @@ export type EventKind =
   | 'tool_result' | 'tool_error'
   | 'path' | 'phase'
   | 'error' | 'reflect' | 'thinking' | 'hitl'
+  | 'warning'
 
 export interface EngineData { engine: string; target: string }
 export interface StepData { step: number; tool: string; args: Record<string, unknown>; level: number; why?: string }
@@ -41,6 +42,7 @@ export interface ToolErrorData { tool: string; error: string }
 export interface PathData { nodes: string[] } // 主路径: 连通节点 id 序列
 export interface PhaseData { phase: string } // init/recon/scan/exploit/done
 export interface ErrorData { msg: string }
+export interface WarningData { msg: string }
 export interface ReflectData { text: string }
 export interface ThinkingData { text: string } // 深度思考: 决策器思维链(reasoning_content)
 export interface HitlResultData { action: string; approved: boolean } // HITL 裁决结果(拒绝/放行)
@@ -76,6 +78,7 @@ export type SSEEvent =
   | { kind: 'path'; data: PathData }
   | { kind: 'phase'; data: PhaseData }
   | { kind: 'error'; data: ErrorData }
+  | { kind: 'warning'; data: WarningData }
   | { kind: 'reflect'; data: ReflectData }
   | { kind: 'thinking'; data: ThinkingData }
   | { kind: 'hitl'; data: HitlResultData }
@@ -87,6 +90,7 @@ export const EVENT_KINDS: readonly EventKind[] = [
   'tool_result', 'tool_error',
   'path', 'phase',
   'error',
+  'warning',
   'reflect',
   'thinking',
   'hitl',

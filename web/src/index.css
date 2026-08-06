@@ -342,3 +342,8 @@ body {
     transition: none !important;
   }
 }
+
+/* 警告文本样式(用于 warning 事件) */
+.text-warning {
+  color: #a8781c;
+}

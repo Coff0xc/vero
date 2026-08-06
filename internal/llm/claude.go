@@ -16,9 +16,9 @@ import (
 	"github.com/Coff0xc/vero/internal/tools"
 )
 
-// DefaultModel —— 攻击性任务默认用 opus: sonnet 有 cyber 安全拦截会整轮失败(已验证)。
+// DefaultModel —— 默认模型。opus 有 cyber 安全拦截会整轮失败, 改用 sonnet。
 // 可用环境变量 VERO_MODEL 覆盖(兼容旧的 REDCELL_MODEL)。
-const DefaultModel = "claude-opus-4-8"
+const DefaultModel = "claude-sonnet-4-20250514"
 
 // systemPrompt —— ReAct 红队决策 + 防注入第一层。
 const systemPrompt = "你是授权红队渗透智能体, 按 ReAct 范式工作: 观察工具输出 → 推理 → 给出下一步动作计划。\n" +

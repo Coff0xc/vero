@@ -78,6 +78,12 @@ func main() {
 		}
 	}
 
+	// 监听地址: 默认回环(本地安全), 通过 VERO_HOST 环境变量可改为 0.0.0.0(Docker/K8s)。
+	host := "127.0.0.1"
+	if h := os.Getenv("VERO_HOST"); h != "" {
+		host = h
+	}
+
 	if *toolTest {
 		runToolTest()
 		return
@@ -157,7 +163,7 @@ func main() {
 	}
 
 	srv := server.New(st, auditor, sub)
-	addr := fmt.Sprintf("127.0.0.1:%d", *port)
+	addr := fmt.Sprintf("%s:%d", host, *port)
 	fmt.Printf("VERO 作战室: http://%s  (Ctrl+C 停)\n", addr)
 	if err := http.ListenAndServe(addr, srv.Router()); err != nil {
 		log.Fatal(err)
