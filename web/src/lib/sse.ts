@@ -14,7 +14,16 @@ export function useSSE() {
         return /* 忽略半包/心跳 */
       }
       const e = parseEvent(raw)
-      if (e) ingest(e)
+      if (!e) return
+      try {
+        ingest(e)
+      } catch (err) {
+        console.error('[SSE] ingest failed for event', e?.kind, err)
+      }
+    }
+    es.onerror = () => {
+      // EventSource 自动重连, 这里只打日志
+      console.warn('[SSE] connection error, waiting for auto-reconnect')
     }
     return () => es.close()
   }, [ingest])
