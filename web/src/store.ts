@@ -29,7 +29,7 @@ function fmt(e: SSEEvent): string {
     case 'graph': return `${e.data.confirm ? '已证实' : '待验证'} ${e.data.confirm ?? e.data.hypothesis ?? ''}`
     case 'edge': return `${e.data.src} —${e.data.rel}→ ${e.data.dst}`
     case 'hitl_request': return `需授权 L${e.data.level} ${e.data.tool}`
-    case 'route': return `服务 ${e.data.services.join(' · ') || '—'} → 激活 ${e.data.activated.join(' · ') || '无'}`
+    case 'route': return `服务 ${(e.data.services ?? []).join(' · ') || '—'} → 激活 ${(e.data.activated ?? []).join(' · ') || '无'}`
     case 'summary': return `已证实 ${e.data.confirmed} · 待验证 ${e.data.hypothesis} · 证据违规 ${e.data.evidence_violations}`
     case 'done': return `战役结束: ${e.data.reason ?? ''}`
     case 'plan': return `计划 ${e.data.count} 步: ${e.data.rationale ?? ''}`
@@ -39,7 +39,7 @@ function fmt(e: SSEEvent): string {
     case 'workflow_cancelled': return `工作流已取消: ${e.data.workflow}`
     case 'tool_result': return `${e.data.tool} ${e.data.success ? '成功' : '失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
     case 'tool_error': return `${e.data.tool} 失败: ${e.data.error}`
-    case 'path': return `主路径: ${e.data.nodes.length ? e.data.nodes.join(' → ') : '—'}`
+    case 'path': return `主路径: ${(e.data.nodes ?? []).length ? (e.data.nodes ?? []).join(' → ') : '—'}`
     case 'phase': return `阶段: ${e.data.phase}`
     case 'error': return `错误: ${e.data.msg}`
     case 'warning': return `⚠ 提示: ${e.data.msg}`
@@ -240,13 +240,13 @@ export const useStore = create<State>((set) => ({
           break
         }
         case 'path':
-          patch.mainPath = e.data.nodes
+          patch.mainPath = e.data.nodes ?? []
           break
         case 'phase':
           patch.stage = advanceStage(s.stage, e.data.phase)
           break
         case 'route':
-          patch.kpi = { ...s.kpi, services: e.data.services, activated: e.data.activated }
+          patch.kpi = { ...s.kpi, services: e.data.services ?? [], activated: e.data.activated ?? [] }
           patch.stage = advanceStage(s.stage, 'recon')
           break
         case 'summary':
