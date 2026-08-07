@@ -76,7 +76,9 @@ type HistoryItem struct {
 // Retrier —— 可选能力(修复 L1/L2: 接入 ReflexionEnhanced 的重试逻辑):
 // 工具失败后, 内核询问决策器是否可自动重试(网络超时等可恢复失败),
 // 以及如何调整参数重试(增加 timeout/retry 次数)。
-// DeepSeekLLM 实现它(包装 llm.ShouldRetry / llm.AdjustArgsForRetry)。
+// DeepSeekLLM 与 ClaudeLLM 均实现它(包装 llm.ShouldRetry / llm.AdjustArgsForRetry)。
+// 注意: 新增可选能力接口时, 所有 LLM 后端都应实现, 否则 `llm.(接口)` 断言对未实现的
+// 后端恒 false, 该能力静默失效(U3 曾因 Claude 未实现 Retrier 而对 Claude 后端完全无效)。
 type Retrier interface {
 	ShouldRetry(reason string) bool
 	AdjustArgsForRetry(action Action, reason string) map[string]any

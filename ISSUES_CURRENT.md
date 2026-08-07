@@ -168,6 +168,18 @@ EDGES:
 | U4 | 停滞检测: stableArgsSig target 归一化 + 连续 3 次失败(不论 args)兜底 | loop.go | 单测✅ |
 | U5 | probe 模式: finding 找不到 service 时回退建 host→exposes→finding 边, 确保 host 节点存在 | loop.go | 单测✅ |
 
+> **批次 4 静态复核修正 (2026-08-06)**: 逐文件 + 可执行探针复核发现批次 3 的 U1/U3/U4
+> 存在"单测过但根因未除"的缺陷, 已在批次 4 修复(见下)。U2/U5 复核确认真实生效。
+
+### 批次 4 修复 (2026-08-06, 静态复核后补修)
+
+| # | 批次 3 遗留缺陷 | 根因 | 批次 4 修复 | 回归测试 |
+|---|----------------|------|-------------|----------|
+| U3-Claude | 静默失败重试仅对 DeepSeek 生效, Claude 后端完全失效 | 只有 DeepSeekLLM 实现 core.Retrier, ClaudeLLM 无 ShouldRetry/AdjustArgsForRetry, `llm.(Retrier)` 断言恒 false | ClaudeLLM 补实现 Retrier(委托 reflexion.ShouldRetry/AdjustArgsForRetry) [claude.go] | TestClaudeImplementsRetrier / TestClassifyNoOutputRetryable |
+| U4-死代码 | "连续 3 次失败兜底"是死代码, 连续失败仍跑满预算 | 失败路径在 `return false`(loop.go 失败分支)提前返回, `failStreak>=3` 检测位于成功路径之后永不可达; 且成功路径 failStreak 恒为 0 | 兜底前移到失败分支 + 新增 `*stop` 信号让外层循环真正终止(此前停滞检测只中断当前 plan, 外层仍 Propose 空转) [loop.go] | TestU4ConsecFailStall |
+| U1-过严 | 自然语言 claim(label 不含 host 字面量)永不触发兜底, 根因(全 hypothesis)在这类 claim 上仍在 | 兜底靠 `strings.Contains(label, host)` 关联 | 创建 claim 时记录 target host(claimHost map), 关联优先用记录值, 回退文本匹配 [loop.go] | TestU1NaturalLanguageClaimConfirmedByLaterAction |
+| U1-过松 | 任意成功工具 confirm 所有含 host 的 claim, 语义无关证据绑定(可绕过抗幻觉) | 兜底不排除本动作自己的 claim, 且不区分动作语义 | 排除本动作自身 claim(self-assertion ≠ verification), 仅【之前】动作创建的 claim 可被后续独立动作确认 [loop.go] | TestU1SelfAssertionStaysHypothesis |
+
 ### 高严重度 (批次 3.1)
 
 | # | 修复内容 |
