@@ -80,32 +80,40 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 	if d.lastReflection != "" {
 		user += "\n\n战役反思(上一轮总结, 参考其方向):\n" + d.lastReflection
 	}
-	body := map[string]any{
-		"model": d.model,
-		"messages": []map[string]any{
-			{"role": "system", "content": systemPrompt},
-			{"role": "user", "content": user},
-		},
-		"tools": []map[string]any{{
-			"type": "function",
-			"function": map[string]any{
-				"name":        "act",
-				"description": "选择下一段要执行的动作计划",
-				"parameters": map[string]any{
-					"type":       "object",
-					"properties": props,
-					"required":   required,
-				},
+	// deepseek-reasoner (Thinking 模式) 不支持强制 tool_choice, 改用 "auto" 让模型自主决定是否调用工具。
+	// deepseek-chat 支持强制 tool_choice, 能保证结构化输出不跑偏。
+	isReasoner := strings.Contains(d.model, "reasoner")
+
+	tools := []map[string]any{{
+		"type": "function",
+		"function": map[string]any{
+			"name":        "act",
+			"description": "选择下一段要执行的动作计划",
+			"parameters": map[string]any{
+				"type":       "object",
+				"properties": props,
+				"required":   required,
 			},
-		}},
-		"tool_choice": map[string]any{"type": "function", "function": map[string]any{"name": "act"}},
-		"max_tokens":  2048,
+		},
+	}}
+
+	body := map[string]any{
+		"model":       d.model,
+		"messages":    []map[string]any{{"role": "system", "content": systemPrompt}, {"role": "user", "content": user}},
+		"tools":       tools,
+		"max_tokens":  4096,
 		"temperature": d.temp,
+	}
+	if isReasoner {
+		body["tool_choice"] = "auto" // reasoner 自主决定是否调用 act
+	} else {
+		body["tool_choice"] = map[string]any{"type": "function", "function": map[string]any{"name": "act"}}
 	}
 	raw, _ := json.Marshal(body)
 	var out struct {
 		Choices []struct {
 			Message struct {
+				Content  string `json:"content"`
 				ToolCalls []struct {
 					Function struct {
 						Arguments string `json:"arguments"`
@@ -152,9 +160,33 @@ func (d *DeepSeekLLM) proposePlan(goal string, g *core.AttackGraph, history []co
 		}
 		d.lastErr = "DeepSeek API 响应解析失败: " + derr.Error()
 	}
-	if !ok || len(out.Choices) == 0 || len(out.Choices[0].Message.ToolCalls) == 0 {
+	if !ok || len(out.Choices) == 0 {
 		if d.lastErr == "" {
-			d.lastErr = "DeepSeek 未返回有效动作计划(检查模型名/密钥/网络)"
+			d.lastErr = "DeepSeek 未返回有效响应(检查模型名/密钥/网络)"
+		}
+		return nil
+	}
+
+	// reasoner (auto 模式) 可能返回纯文本而非 tool_call, 尝试从文本中提取 JSON 兜底
+	toolCalls := out.Choices[0].Message.ToolCalls
+	if len(toolCalls) == 0 && isReasoner {
+		text := out.Choices[0].Message.Content
+		if text != "" {
+			// 尝试在文本中查找 JSON 对象 ({...})
+			if j := extractJSON(text); j != "" {
+				toolCalls = []struct {
+					Function struct {
+						Arguments string `json:"arguments"`
+					} `json:"function"`
+				}{{Function: struct {
+					Arguments string `json:"arguments"`
+				}{Arguments: j}}}
+			}
+		}
+	}
+	if len(toolCalls) == 0 {
+		if d.lastErr == "" {
+			d.lastErr = "DeepSeek 未返回有效动作计划(reasoner 可能需要更多 token 或提示)"
 		}
 		return nil
 	}
@@ -286,4 +318,26 @@ func (d *DeepSeekLLM) AdjustArgsForRetry(action core.Action, reason string) map[
 // history 为 [role, content] 对(role: user|assistant), 支持多轮对话。
 func (d *DeepSeekLLM) Chat(context, question string, history [][2]string) (string, error) {
 	return d.chatText(chatSystem, ChatPrompt(context, question, history))
+}
+
+// extractJSON —— 从文本中提取第一个完整的 JSON 对象 (reasoner auto 模式兜底用)。
+// 找到第一个 { 开始, 按括号配对提取到对应的 }。
+func extractJSON(text string) string {
+	start := strings.Index(text, "{")
+	if start < 0 {
+		return ""
+	}
+	depth := 0
+	for i := start; i < len(text); i++ {
+		switch text[i] {
+		case '{':
+			depth++
+		case '}':
+			depth--
+			if depth == 0 {
+				return text[start : i+1]
+			}
+		}
+	}
+	return ""
 }

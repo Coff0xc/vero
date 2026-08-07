@@ -216,3 +216,61 @@ make dev-web       # 前端 :5173
 | A4 | **"跨平台"与"安全工具链"矛盾** | Go 原生工具（PortScan/HTTPProbe）确实跨平台，但场景包大量调用 Linux 专属工具（ffuf 的 `/dev/stdout`、searchsploit 的 `/usr/bin/` 路径、nuclei 的 Linux 路径），Windows 用户跑起来全部失败 | Windows 环境 44 个工具仅 1-3 个可用 | scenarios/*.go + tools/install.go |
 | A5 | **"多步规划"中断后无回退机制** | Plan 模式下某步失败即中断后续步骤（[loop.go:191](file:///Z:/Coff0xc-Repos/vero/internal/core/loop.go#L191) `return false`），但已执行步骤的副作用（如已建立的节点/边）不回滚。下一轮 ProposePlan 看到的攻击图状态是"半成品"，可能导致规划器误判 | 规划器在部分失败后可能走错误路径 | core/loop.go:191 |
 | A6 | **"HITL"理念与 YOLO 模式冲突无审计区分** | YOLO 模式跳过全部审批（[campaign.go:83](file:///Z:/Coff0xc-Repos/vero/internal/server/campaign.go#L83) `approve = core.AutoApprove`），但审计日志不记录 YOLO 状态。事后审查审计日志无法区分"自动批准"和"人工批准" | 审计不可信、合规风险 | server/campaign.go:83 + audit/audit.go |
+
+---
+
+## 综合修复清单 (2026-08-06) — PR #2
+
+> GitHub Issue: [#14 综合问题清单与修复方案](https://github.com/Coff0xc/vero/issues/14)
+> GitHub PR: [#2 fix: AI引擎选择/安全加固/前端事件修复](https://github.com/Coff0xc/vero/pull/2)
+> 修改文件: 14 个, +450/-45 行
+
+### 🔴 Critical
+
+| # | 问题 | 修复 | 状态 |
+|---|------|------|------|
+| P1 | **AI 未参与处理**: 旧 DeepSeekKey 未迁移到 providers 系统, 引擎回退脚本模式 | `config.go`: Load() 自动迁移旧 key; `campaign.go`: 分离判断+诊断日志 | ✅ |
+| P2 | **API 无认证**: 任意来源可触发战役/审批/访问配置 | `server.go`: authGuard 中间件, Bearer token 认证, 回环免认证 | ✅ |
+
+### 🟠 High
+
+| # | 问题 | 修复 | 状态 |
+|---|------|------|------|
+| P3 | **引擎回退误显示为"engine 失败"**: tool(success:false) → warning 事件 | `campaign.go`: emit warning; `types.ts`/`store.ts`/`ChatView.tsx`/`index.css`: 前端支持 | ✅ |
+| P4 | **MockLLM 接口不完整**: 缺少 Planner/ErrorReporter/Rejecter/Reflector 等 | `mock.go`: 实现全部接口; `mock_test.go`: 单元测试 | ✅ |
+| P5 | **DeepSeek 401/403 静默空转**: 密钥错误重试无意义 | `deepseek.go`: 401/403 直接放弃并告警 | ✅ |
+
+### 🟡 Medium
+
+| # | 问题 | 修复 | 状态 |
+|---|------|------|------|
+| P6 | **Claude 模型名错误**: claude-3-opus 已过时 | `claude.go`: 更新为 claude-sonnet-4-20250514 | ✅ |
+| P7 | **VERO_HOST 环境变量缺失**: Docker/K8s 无法对外暴露 | `main.go`: 读取 VERO_HOST; `docker-compose.yml`: 声明 | ✅ |
+| P8 | **UTF-8 截断**: code_audit.go 字节截断导致乱码 | `code_audit.go`: tools.Clip 替代字节截断 | ✅ |
+
+### 🟢 Low
+
+| # | 问题 | 修复 | 状态 |
+|---|------|------|------|
+| P9 | **Docker 配置环境变量未声明** | `docker-compose.yml`: 补全 VERO_HOST/DEEPSEEK_API_KEY/VERO_AUTH_TOKEN | ✅ |
+| P10 | **chatText 重试次数不一致** (2 vs 3) | `deepseek.go`: 统一为 3 次, 修复残留字段问题 | ✅ |
+| P12 | **新建战役前端白屏**: store.ts 数组方法对 null/undefined TypeError | `store.ts` fmt/applyEvent 全部数组字段用 `?? []` 兜底 | ✅ |
+
+### 💭 Enhancement (未修复)
+
+| # | 问题 | 说明 |
+|---|------|------|
+| P11 | **规则引擎+AI外壳而非真正的AI Agent** | 硬编码攻击序列、字符串匹配证据、无跨会话记忆, 需长期架构改进 |
+
+### 测试验证
+
+```powershell
+# 单元测试
+go test ./internal/...
+
+# 编译
+go build -o vero.exe ./cmd/vero
+
+# 运行
+.\vero.exe
+```

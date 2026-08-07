@@ -29,7 +29,8 @@ function fmt(e: SSEEvent): string {
     case 'graph': return `${e.data.confirm ? '已证实' : '待验证'} ${e.data.confirm ?? e.data.hypothesis ?? ''}`
     case 'edge': return `${e.data.src} —${e.data.rel}→ ${e.data.dst}`
     case 'hitl_request': return `需授权 L${e.data.level} ${e.data.tool}`
-    case 'route': return `服务 ${e.data.services.join(' · ') || '—'} → 激活 ${e.data.activated.join(' · ') || '无'}`
+    case 'campaign_stopped': return `战役已停止: ${e.data.reason ?? '操作员已停止'}`
+    case 'route': return `服务 ${(e.data.services ?? []).join(' · ') || '—'} → 激活 ${(e.data.activated ?? []).join(' · ') || '无'}`
     case 'summary': return `已证实 ${e.data.confirmed} · 待验证 ${e.data.hypothesis} · 证据违规 ${e.data.evidence_violations}`
     case 'done': return `战役结束: ${e.data.reason ?? ''}`
     case 'plan': return `计划 ${e.data.count} 步: ${e.data.rationale ?? ''}`
@@ -39,9 +40,10 @@ function fmt(e: SSEEvent): string {
     case 'workflow_cancelled': return `工作流已取消: ${e.data.workflow}`
     case 'tool_result': return `${e.data.tool} ${e.data.success ? '成功' : '失败'} ${(e.data.stdout ?? '').replace(/\n/g, ' ↵ ')}`
     case 'tool_error': return `${e.data.tool} 失败: ${e.data.error}`
-    case 'path': return `主路径: ${e.data.nodes.length ? e.data.nodes.join(' → ') : '—'}`
+    case 'path': return `主路径: ${(e.data.nodes ?? []).length ? (e.data.nodes ?? []).join(' → ') : '—'}`
     case 'phase': return `阶段: ${e.data.phase}`
     case 'error': return `错误: ${e.data.msg}`
+    case 'warning': return `⚠ 提示: ${e.data.msg}`
     case 'reflect': return `反思: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'thinking': return `思考: ${(e.data as unknown as { text?: string }).text ?? ''}`
     case 'hitl':
@@ -150,7 +152,7 @@ interface State {
 }
 
 // 单一 store: 所有 UI 由 SSE 事件累积驱动(信号流/攻击图/KPI/证据/HITL)。
-export const useStore = create<State>((set) => ({
+export const useStore = create<State>((set, get) => ({
   status: 'idle',
   goal: '—',
   log: [],
@@ -176,12 +178,19 @@ export const useStore = create<State>((set) => ({
   toggleGraphFull: (on) => set((s) => ({ graphFull: on ?? !s.graphFull })),
   setNodeQuery: (q) => set({ nodeQuery: q }),
 
-  reset: (target) =>
+  reset: (target) => {
+    // 点击"新建"时如果战役还在跑, 先通知后端停止, 防止 SSE 继续推送覆盖前端状态
+    if (!target) {
+      const { status } = get()
+      if (status === 'running') {
+        fetch('/cancel', { method: 'POST' }).catch(() => {})
+      }
+    }
     set({
-      status: 'running',
-      goal: target,
+      status: target ? 'running' : 'idle',
+      goal: target || '—',
       log: [],
-      messages: [{ id: seq++, role: 'user', kind: 'user', text: target, ts: Date.now() }],
+      messages: target ? [{ id: seq++, role: 'user', kind: 'user', text: target, ts: Date.now() }] : [],
       nodes: {},
       edges: {},
       kpi: emptyKpi,
@@ -192,7 +201,8 @@ export const useStore = create<State>((set) => ({
       mainPath: [],
       activeTab: 'campaign',
       nodeQuery: '',
-    }),
+    })
+  },
 
   // applyEvent —— 单事件状态转移(纯函数): ingest 与 replay 共用; replay 循环 reduce 后单次 set。
   applyEvent: (s: State, e: SSEEvent): Partial<State> => {
@@ -239,13 +249,13 @@ export const useStore = create<State>((set) => ({
           break
         }
         case 'path':
-          patch.mainPath = e.data.nodes
+          patch.mainPath = e.data.nodes ?? []
           break
         case 'phase':
           patch.stage = advanceStage(s.stage, e.data.phase)
           break
         case 'route':
-          patch.kpi = { ...s.kpi, services: e.data.services, activated: e.data.activated }
+          patch.kpi = { ...s.kpi, services: e.data.services ?? [], activated: e.data.activated ?? [] }
           patch.stage = advanceStage(s.stage, 'recon')
           break
         case 'summary':
@@ -256,8 +266,14 @@ export const useStore = create<State>((set) => ({
           patch.hitl = { key: e.data.key, tool: e.data.tool, args: e.data.args, level: e.data.level, why: e.data.why ?? '' }
           break
         case 'done':
-          patch.status = 'done'
-          patch.stage = 'done'
+          patch.status = 'idle'
+          patch.stage = 'idle'
+          patch.hitl = null
+          break
+        case 'campaign_stopped':
+          patch.status = 'idle'
+          patch.stage = 'idle'
+          patch.hitl = null
           break
         case 'engine':
           patch.engineLabel = e.data.engine

@@ -211,7 +211,9 @@ function StatusLine({ m }: { m: ChatMessage }) {
     )
   }
   const tone =
-    kind === 'done' ? 'text-live' : kind === 'error' || kind === 'tool_error' ? 'text-alert' : 'text-muted'
+    kind === 'done' ? 'text-live' :
+    kind === 'warning' ? 'text-warning' :
+    kind === 'error' || kind === 'tool_error' ? 'text-alert' : 'text-muted'
   return (
     <div className={`text-[11.5px] ${tone} mb-0.5 msg-in font-mono`}>
       {m.text}
@@ -277,9 +279,18 @@ export function ChatView() {
   const pushMsg = useStore((s) => s.pushMsg)
   const patchMsg = useStore((s) => s.patchMsg)
   const engineLabel = useStore((s) => s.engineLabel)
-  const [input, setInput] = useState('http://localhost:3000')
+  const [input, setInput] = useState('')
   const bottomRef = useRef<HTMLDivElement>(null)
   const [thinking, setThinking] = useState(false) // 问答请求中(禁用发送/显示等待)
+
+  // 战役结束/停止后自动清空输入框, 恢复到待命状态
+  const prevStatusRef = useRef(status)
+  useEffect(() => {
+    if (prevStatusRef.current === 'running' && status === 'idle') {
+      setInput('')
+    }
+    prevStatusRef.current = status
+  }, [status])
 
   // 新消息自动滚动到底部。
   useEffect(() => {
@@ -295,7 +306,7 @@ export function ChatView() {
       pushMsg('assistant', 'chat', '无法启动战役: ' + (r.err ?? '未知错误'))
       return
     }
-    setInput(t)
+    setInput('')
   }
 
   // 打字机效果: 逐字填充回答(每帧 2 字符)。

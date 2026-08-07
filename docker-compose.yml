@@ -1,4 +1,4 @@
-﻿version: '3.8'
+version: '3.8'
 
 services:
   # VERO 主服务
@@ -17,6 +17,8 @@ services:
       - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
       - VERO_DB=/app/data/vero.db
       - VERO_PORT=8000
+      - VERO_HOST=0.0.0.0
+      - VERO_AUTH_TOKEN=${VERO_AUTH_TOKEN:-}
       - VERO_MSF_PASSWORD=${MSF_PASSWORD:-}
     networks:
       - vero-net

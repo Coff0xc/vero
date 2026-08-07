@@ -110,7 +110,62 @@ func Load() *Config {
 	if len(c.Providers) == 0 {
 		c.Providers = Default().Providers
 	}
+
+	// ── 自动迁移旧 key 到 providers 系统 ──
+	// 旧 DeepSeekKey → providers[deepseek].api_key
+	if c.DeepSeekKey != "" {
+		for _, p := range c.Providers {
+			if p.ID == "deepseek" && p.APIKey == "" {
+				p.APIKey = c.DeepSeekKey
+				if p.Model == "" {
+					p.Model = "deepseek-chat"
+				}
+			}
+		}
+		// 确保 active_provider 指向有 key 的 provider
+		if c.ActiveProvider == "" || !c.hasKeyProvider() {
+			c.ActiveProvider = "deepseek"
+		}
+	}
+	// 旧 AnthropicKey → providers 中对应 ID (如果存在)
+	if c.AnthropicKey != "" {
+		for _, p := range c.Providers {
+			if (p.ID == "anthropic" || p.ID == "claude") && p.APIKey == "" {
+				p.APIKey = c.AnthropicKey
+			}
+		}
+	}
+
+	// 如果 active_provider 没有 key，但有其他 provider 有 key，自动切换
+	if !c.hasKeyProvider() {
+		if keyed := c.firstKeyProvider(); keyed != nil {
+			// 确保激活了有 key 的 provider
+			for _, p := range c.Providers {
+				if p == keyed {
+					c.ActiveProvider = p.ID
+					break
+				}
+			}
+		}
+	}
+
 	return c
+}
+
+// hasKeyProvider —— 当前 active_provider 是否有 key。
+func (c *Config) hasKeyProvider() bool {
+	p := c.Active()
+	return p != nil && p.APIKey != ""
+}
+
+// firstKeyProvider —— 找到第一个有 key 的 provider。
+func (c *Config) firstKeyProvider() *Provider {
+	for _, p := range c.Providers {
+		if p.APIKey != "" {
+			return p
+		}
+	}
+	return nil
 }
 
 // Active —— 当前启用的提供商(未指定/不存在时回退 deepseek 或首个)。

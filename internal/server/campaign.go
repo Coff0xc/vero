@@ -28,6 +28,28 @@ func scriptLLM(reg *tools.Registry, target string) core.LLM {
 	})
 }
 
+// defaultModelFor —— 按 provider ID 推默认模型名(用户设了 key 但没选模型时兜底)。
+func defaultModelFor(id string) string {
+	switch id {
+	case "deepseek":
+		return "deepseek-chat"
+	case "openai":
+		return "gpt-4o-mini"
+	case "kimi":
+		return "moonshot-v1-8k"
+	case "qwen":
+		return "qwen-turbo"
+	case "openrouter":
+		return "openrouter-chat"
+	case "ollama":
+		return "" // ollama 由 /api/tags 自发现, 空可接受
+	case "zhipu":
+		return "glm-4-flash"
+	default:
+		return ""
+	}
+}
+
 // buildLiveRegistry —— 真实工具集: Go 原生端口扫描 + web/AD 场景包(curl/nuclei/exploit)。
 func buildLiveRegistry() (*tools.Registry, *scenarios.Manager) {
 	reg := tools.NewRegistry()
@@ -72,8 +94,6 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 	}
 
 	// 决策引擎: 多提供商(OpenAI 兼容)优先, 兼容旧 claude/deepseek 配置; 无 key 回退脚本。
-	var chosen core.LLM
-	engine := "脚本(无 key)"
 	s.cfgMu.Lock()
 	cfg := s.cfg
 	s.cfgMu.Unlock()
@@ -82,8 +102,28 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 	if cfg.YOLO {
 		approve = core.AutoApprove
 	}
+
+	// 智能引擎选择: 有 key 就用真实模型, 空模型名用默认值兜底, 不再强制要求选模型。
+	// 先选 provider(多提供商), 再兼容旧 key 路径(DeepSeek/Claude)。
+	var chosen core.LLM
+	engine := "脚本(无 key)"
 	prov := cfg.Active()
-	useProvider := prov != nil && prov.Model != "" && (prov.APIKey != "" || prov.ID == "ollama")
+	hasProviderKey := prov != nil && prov.APIKey != ""
+	hasOldDeepSeek := cfg.DeepSeekKey != ""
+	hasOldAnthropic := cfg.AnthropicKey != ""
+	useProvider := hasProviderKey || (prov != nil && prov.ID == "ollama")
+
+	// ── 诊断日志: 输出当前配置状态, 便于排障 ──
+	fmt.Fprintf(os.Stderr, "[engine] config: engine=%s, active_provider=%s, prov_key=%v, prov_model=%q, old_deepseek=%v, old_anthropic=%v\n",
+		cfg.Engine, cfg.ActiveProvider, hasProviderKey, func() string { if prov != nil { return prov.Model }; return "(nil)" }(),
+		hasOldDeepSeek, hasOldAnthropic)
+
+	// provider 有 key 但没选模型 → 按 ID 推默认模型名
+	if useProvider && prov.Model == "" {
+		prov.Model = defaultModelFor(prov.ID)
+		fmt.Fprintf(os.Stderr, "[engine] auto-filled model for %s: %s\n", prov.ID, prov.Model)
+	}
+
 	switch {
 	case cfg.Engine == config.EngineScript:
 		chosen = scriptLLM(reg, target)
@@ -94,13 +134,21 @@ func (s *Server) RunCampaign(ctx context.Context, target string) {
 		if cfg.DeepThinking {
 			engine += "·深度思考"
 		}
-	case cfg.AnthropicKey != "":
+		fmt.Fprintf(os.Stderr, "[engine] using provider: %s (model=%s)\n", prov.Name, prov.Model)
+	case hasOldDeepSeek:
+		chosen = llm.WithTarget(llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature), target)
+		engine = "DeepSeek 自主"
+		fmt.Fprintf(os.Stderr, "[engine] using legacy DeepSeek key (model=%s)\n", func() string { m := os.Getenv("VERO_MODEL"); if m != "" { return m }; return "deepseek-chat" }())
+	case hasOldAnthropic:
 		chosen = llm.WithTarget(llm.NewClaude(reg, cfg.AnthropicKey, cfg.Temperature), target)
 		engine = "Claude 自主"
+		fmt.Fprintf(os.Stderr, "[engine] using legacy Anthropic key\n")
 	default:
-		emit(core.Event{Kind: "tool", Data: map[string]any{"tool": "engine", "success": false, "stdout": "未配置可用模型(提供商 key/模型), 回退脚本模式"}})
+		// 引擎回退通知: 用 warning 事件而不是 tool 事件, 避免前端误显示为"引擎失败"
+		emit(core.Event{Kind: "warning", Data: map[string]any{"msg": "未配置可用模型 API Key, 自动回退到脚本模式执行"}})
 		chosen = scriptLLM(reg, target)
 		engine = "脚本(key 缺失回退)"
+		fmt.Fprintf(os.Stderr, "[engine] no key available, falling back to script mode\n")
 	}
 
 	s.broker.Emit(core.Event{Kind: "engine", Data: map[string]any{"engine": engine, "target": target, "yolo": cfg.YOLO}})
@@ -295,13 +343,33 @@ func (s *Server) handleChat(w http.ResponseWriter, r *http.Request) {
 	var chat llm.Chatter
 	var thinking string
 	var oai *llm.OpenAILLM
-	if prov := cfg.Active(); prov != nil && prov.Model != "" && (prov.APIKey != "" || prov.ID == "ollama") {
-		oai = llm.NewOpenAI(prov, reg, cfg.Temperature)
+
+	// ── 统一引擎选择(与 RunCampaign 保持一致) ──
+	prov := cfg.Active()
+	hasProviderKey := prov != nil && prov.APIKey != ""
+	hasOldDeepSeek := cfg.DeepSeekKey != ""
+	hasOldAnthropic := cfg.AnthropicKey != ""
+	useProvider := hasProviderKey || (prov != nil && prov.ID == "ollama")
+
+	if useProvider {
+		model := prov.Model
+		if model == "" {
+			model = defaultModelFor(prov.ID)
+		}
+		tmpProv := *prov
+		tmpProv.Model = model
+		oai = llm.NewOpenAI(&tmpProv, reg, cfg.Temperature)
 		chat = oai
-	} else if cfg.AnthropicKey != "" {
+		fmt.Fprintf(os.Stderr, "[chat] using provider: %s (model=%s)\n", prov.Name, model)
+	} else if hasOldDeepSeek {
+		chat = llm.NewDeepSeek(reg, cfg.DeepSeekKey, cfg.Temperature)
+		fmt.Fprintf(os.Stderr, "[chat] using legacy DeepSeek key\n")
+	} else if hasOldAnthropic {
 		chat = llm.NewClaude(reg, cfg.AnthropicKey, cfg.Temperature)
+		fmt.Fprintf(os.Stderr, "[chat] using legacy Anthropic key\n")
 	} else {
 		http.Error(w, "未配置可用模型(请先在设置中填入提供商 key 与模型)", http.StatusBadGateway)
+		fmt.Fprintf(os.Stderr, "[chat] no key available, returning error\n")
 		return
 	}
 	answer, err := chat.Chat(ctx, body.Question, body.History)
