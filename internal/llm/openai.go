@@ -16,7 +16,9 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -58,6 +60,17 @@ func (o *OpenAILLM) LastThinking() string { return o.lastThinking }
 // ThinkingReporter —— 可选能力: 决策器最近一次决策的思维链(深度思考展示)。
 type ThinkingReporter interface {
 	LastThinking() string
+}
+
+// ShouldRetry —— 实现 core.Retrier: 接入 ReflexionEnhanced 的可恢复失败判断。
+// N2 修复: 此前 OpenAILLM 未实现 Retrier, 静默失败对所有 OpenAI 兼容后端永不重试。
+func (o *OpenAILLM) ShouldRetry(reason string) bool {
+	return ShouldRetry(reason)
+}
+
+// AdjustArgsForRetry —— 实现 core.Retrier: 接入 ReflexionEnhanced 的参数自动调整。
+func (o *OpenAILLM) AdjustArgsForRetry(action core.Action, reason string) map[string]any {
+	return AdjustArgsForRetry(action, reason)
 }
 
 func (o *OpenAILLM) Propose(goal string, g *core.AttackGraph, history []core.HistoryItem) *core.Action {
@@ -200,6 +213,7 @@ func (o *OpenAILLM) proposePlan(goal string, g *core.AttackGraph, history []core
 			Rationale string         `json:"rationale"`
 			Claim     string         `json:"claim"`
 			Produces  string         `json:"produces"`
+			Verifies  string         `json:"verifies"` // N1 修复: 透传 verifies 字段, 与 Claude/DeepSeek 对齐
 		} `json:"plan"`
 	}
 	if err := json.Unmarshal([]byte(argsJSON), &d); err != nil {
@@ -212,7 +226,7 @@ func (o *OpenAILLM) proposePlan(goal string, g *core.AttackGraph, history []core
 		if a.Args == nil {
 			a.Args = map[string]any{}
 		}
-		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces})
+		p.Actions = append(p.Actions, core.Action{Tool: a.Tool, Args: a.Args, Rationale: a.Rationale, Claim: a.Claim, Produces: a.Produces, Verifies: a.Verifies})
 	}
 	return p
 }
@@ -276,8 +290,71 @@ func (o *OpenAILLM) Chat(context, question string, history [][2]string) (string,
 
 // ---- 提供商连接测试(设置面板用) ----
 
+// ssrfBlockedRanges —— 拒绝出站请求的 IP 段: 环回、链路本地、RFC1918 私有网络。
+var ssrfBlockedRanges = func() []*net.IPNet {
+	cidrs := []string{
+		"127.0.0.0/8",     // 环回
+		"::1/128",         // IPv6 环回
+		"169.254.0.0/16",  // 链路本地(AWS IMDS 等)
+		"fe80::/10",       // IPv6 链路本地
+		"10.0.0.0/8",      // RFC1918
+		"172.16.0.0/12",   // RFC1918
+		"192.168.0.0/16",  // RFC1918
+		"0.0.0.0/8",       // "this" 网络
+		"fc00::/7",        // IPv6 唯一本地地址
+	}
+	nets := make([]*net.IPNet, 0, len(cidrs))
+	for _, c := range cidrs {
+		_, ipnet, _ := net.ParseCIDR(c)
+		nets = append(nets, ipnet)
+	}
+	return nets
+}()
+
+// validateBaseURL —— 拒绝非 http/https 协议及内网/环回地址, 防止 SSRF。
+// 解析 hostname → 解析为 IP → 逐段比对拦截列表。
+func validateBaseURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil {
+		return fmt.Errorf("base_url 格式非法: %v", err)
+	}
+	if u.Scheme != "http" && u.Scheme != "https" {
+		return fmt.Errorf("base_url 协议不支持(仅允许 http/https): %s", u.Scheme)
+	}
+	hostname := u.Hostname()
+	// 先尝试直接按字面 IP 解析, 失败则 DNS 解析
+	addrs := []net.IP{net.ParseIP(hostname)}
+	if addrs[0] == nil {
+		resolved, err := net.LookupHost(hostname)
+		if err != nil {
+			// DNS 解析失败时放行, 让后续 HTTP 请求自然失败; 不在此拦截合法域名
+			return nil
+		}
+		addrs = addrs[:0]
+		for _, a := range resolved {
+			if ip := net.ParseIP(a); ip != nil {
+				addrs = append(addrs, ip)
+			}
+		}
+	}
+	for _, ip := range addrs {
+		if ip == nil {
+			continue
+		}
+		for _, block := range ssrfBlockedRanges {
+			if block.Contains(ip) {
+				return fmt.Errorf("base_url 指向受限地址(%s), 已拒绝", ip)
+			}
+		}
+	}
+	return nil
+}
+
 // ListModels —— GET {base}/models, 返回可用模型 id 列表(自动获取模型下拉)。
 func ListModels(p *config.Provider) ([]string, error) {
+	if err := validateBaseURL(p.BaseURL); err != nil {
+		return nil, err
+	}
 	base := strings.TrimRight(p.BaseURL, "/")
 	var ep string
 	if strings.HasSuffix(base, "/v1") || strings.Contains(base, "localhost") || strings.Contains(base, "127.0.0.1") {

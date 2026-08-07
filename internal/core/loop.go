@@ -19,6 +19,9 @@ const HITLThreshold = tools.LevelExploit
 // reflectEvery —— 战役级反思间隔(BattleReflector): 每 N 步让决策器总结证伪/策略。
 const reflectEvery = 4
 
+// failStreakStall —— U4: 连续失败达到此阈值即判定停滞, 停止空转(不论 args 是否相同)。
+const failStreakStall = 3
+
 // Approve —— HITL 审批回调: 返回是否放行(CLI 与 Web 各有实现)。
 type Approve func(a Action, level int) bool
 
@@ -62,6 +65,10 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 	var history []HistoryItem
 	var trace []string
 	lastSig, stall, prevNodeCount, failStreak := "", 0, 0, 0
+	stop := false // U4: 停滞检测置位后终止整个循环(不只中断当前 plan)
+	// U1: claim nid -> 创建该 claim 的动作目标 host。用于自动关联兜底:
+	// 后续动作命中同一 host 且成功时, 视为对该假设的独立佐证(不依赖 claim 文本含 host, 也不依赖 LLM 填 verifies)。
+	claimHost := map[string]string{}
 	// 显式阶段状态机: init→recon→scan→exploit→done。按成功工具杀伤级推进, 每推进一次广播 phase 事件。
 	phase := "init"
 	emit(Event{Kind: "phase", Data: map[string]any{"phase": "init"}})
@@ -115,11 +122,15 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 			if ctx.Err() != nil {
 				break
 			}
-			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount, &failStreak, &phase,
+			cont := runAction(ctx, g, &history, &trace, &lastSig, &stall, &prevNodeCount, &failStreak, &stop, claimHost, &phase,
 				llm, reg, approve, emit, step, &acts[i])
 			if !cont {
 				break
 			}
+		}
+		// U4: 停滞检测置位 -> 终止整个循环, 不再调 Propose 空转下一轮。
+		if stop {
+			break
 		}
 		// D29: 攻击链贯通(confirmed foothold/shell)即显式过渡到 done 并收尾,
 		// 不再空耗预算等循环退出 —— 前端可立即展示"利用完成"终态。
@@ -141,7 +152,7 @@ func RunAgentCtx(ctx context.Context, goal string, llm LLM, reg *tools.Registry,
 // runAction —— 执行单个动作(注册校验/HITL 门控/执行/图更新/停滞检测), 返回是否继续后续动作。
 // false = 该步未成功执行(未知工具/被拒/失败), 计划模式下中断剩余步骤。
 func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trace *[]string,
-	lastSig *string, stall *int, prevNodeCount *int, failStreak *int, phase *string,
+	lastSig *string, stall *int, prevNodeCount *int, failStreak *int, stop *bool, claimHost map[string]string, phase *string,
 	llm LLM, reg *tools.Registry, approve Approve, emit EmitFunc, step int, action *Action) bool {
 
 	tool, ok := reg.Get(action.Tool)
@@ -216,6 +227,14 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 		}
 	}
 	if !res.Success {
+		// U4: 连续失败兜底停滞检测必须在此 return 之前 —— 失败路径不会走到后面(成功路径)的
+		// 停滞检测块。连续 failStreak 次失败(不论 args 是否相同)累积到阈值即停止空转,
+		// 防 LLM 对同一不可达目标反复试探耗尽预算。
+		if *failStreak >= failStreakStall {
+			emit(Event{Kind: "done", Data: map[string]any{"reason": "连续失败无进展, 停止空转"}})
+			*stop = true
+			return false
+		}
 		return false // 计划模式: 失败即中断后续依赖步骤
 	}
 	*failStreak = 0
@@ -240,6 +259,12 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 	if action.Claim != "" {
 		cid := "claim:" + action.Claim
 		g.UpsertNode(&Node{ID: cid, Type: "finding", Label: action.Claim, State: StateHypothesis})
+		// U1: 记录该 claim 的目标 host, 供后续动作自动关联(不依赖 claim 文本是否含 host 字面量)。
+		if h := normHost(tools.ArgStr(action.Args, "target", "")); h != "" {
+			if _, seen := claimHost[cid]; !seen {
+				claimHost[cid] = h
+			}
+		}
 		emitGraph(emit, g, cid, "hypothesis")
 	}
 	// claim 即验证: 本动作 verifies 某 claim -> confirm
@@ -263,17 +288,32 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 			emitGraph(emit, g, cid, "confirm")
 		}
 	}
-	// U1 兜底: LLM 不填 verifies 时, 动作成功 + 图里有 hypothesis claim 且 claim 文本含本动作目标 host
-	// → 自动 confirm(证据=真实工具输出, 约束不变)。不依赖 LLM 自觉填字段。
-	// 保守近似: 动作成功 + 目标一致即视为对该目标的假设提供了证据, 结果可经 Excerpt 回查。
+	// U1 兜底: LLM 不填 verifies 时, 用"独立后续动作命中同一 host"做自动关联。
+	// 约束(防退化为自证):
+	//   1) 只 confirm 由【之前】动作创建的 hypothesis claim, 排除本动作自己的 claim
+	//      (self-assertion ≠ verification, 保持 TestUnverifiedClaimStaysHypothesis 不变式);
+	//   2) 关联信号优先用创建 claim 时记录的 target host(claimHost), 回退到 claim 文本含 host,
+	//      解决自然语言 claim(不含 host 字面量)永不触发的过严问题;
+	//   3) 证据=本动作真实 stdout, 逐字回查约束不变。
 	if verifiesVal == "" {
-		if host := normHost(tools.ArgStr(action.Args, "target", "")); host != "" {
+		host := normHost(tools.ArgStr(action.Args, "target", ""))
+		selfClaim := ""
+		if action.Claim != "" {
+			selfClaim = "claim:" + action.Claim
+		}
+		if host != "" {
 			for id, n := range g.Nodes {
-				if n.Type == "finding" && n.State == StateHypothesis && strings.HasPrefix(id, "claim:") &&
-					strings.Contains(n.Label, host) {
-					_, _ = g.Confirm(id, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
-					emitGraph(emit, g, id, "confirm")
+				if n.Type != "finding" || n.State != StateHypothesis || !strings.HasPrefix(id, "claim:") {
+					continue
 				}
+				if id == selfClaim {
+					continue // 不自证: 本动作创建的 claim 不能由本动作确认
+				}
+				if claimHost[id] != host && !strings.Contains(n.Label, host) {
+					continue // 目标不一致: 既非记录的 host, 文本也不含 host
+				}
+				_, _ = g.Confirm(id, Evidence{Tool: action.Tool, Excerpt: truncate(strings.TrimSpace(res.Stdout), 200)})
+				emitGraph(emit, g, id, "confirm")
 			}
 		}
 	}
@@ -303,11 +343,12 @@ func runAction(ctx context.Context, g *AttackGraph, history *[]HistoryItem, trac
 
 	// 停滞检测: 连续重复(tool+args)且攻击图无新增 -> 停止空转(防 LLM 分析瘫痪/无效循环)
 	// 修复 C4: 用稳定的 JSON 序列化替代 fmt.Sprint(map)（map 遍历无序导致 sig 不稳定）
-	// U4 补充: sig 只按工具+归一化参数比较; 连续失败(不论 args 是否相同)且图无新增也停止。
+	// U4: 连续失败兜底已前移到失败分支(见上, 成功路径 failStreak 恒为 0), 此处只判 sig 重复。
 	sig := action.Tool + "|" + stableArgsSig(action.Args)
-	if (*failStreak >= 3 && len(g.Nodes) == *prevNodeCount) || (sig == *lastSig && len(g.Nodes) == *prevNodeCount) {
+	if sig == *lastSig && len(g.Nodes) == *prevNodeCount {
 		if *stall++; *stall >= 2 {
 			emit(Event{Kind: "done", Data: map[string]any{"reason": "检测到重复无进展动作, 停止空转"}})
+			*stop = true
 			return false
 		}
 	} else {
@@ -551,8 +592,22 @@ func stableArgsSig(args map[string]any) string {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
-	b, _ := json.Marshal(norm)
-	return string(b)
+	// N3 修复: json.Marshal(map) 不保证顺序; 改为按排序后的 keys 手工构造 JSON,
+	// 保证同组参数始终产生相同 sig(C4 的真正意图)。
+	var buf strings.Builder
+	buf.WriteByte('{')
+	for i, k := range keys {
+		if i > 0 {
+			buf.WriteByte(',')
+		}
+		kb, _ := json.Marshal(k)
+		vb, _ := json.Marshal(norm[k])
+		buf.Write(kb)
+		buf.WriteByte(':')
+		buf.Write(vb)
+	}
+	buf.WriteByte('}')
+	return buf.String()
 }
 
 // normTarget —— target 归一化: 去空白/尾斜杠, 剥 scheme, 用于停滞检测 sig 稳定。
